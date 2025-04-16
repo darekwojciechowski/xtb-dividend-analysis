@@ -1,0 +1,16 @@
+Terminal Display of Dividend Data
+This terminal table offers a quick snapshot of dividend information for various stocks, formatted for clarity and ease of reading.
+The table's structured format allows for swift assessment of financial metrics, ideal for analysts and investors needing a clear view of their dividend data.
+
+------------------------------------------------------------
+
+Detected language: ENG
++------------+---------+--------------+---------------+--------+
+|    Date    | Ticker  | Net Dividend | Tax Collected | Shares |
++------------+---------+--------------+---------------+--------+
+| 2024-05-31 | SBUX.US |  13.68 USD   |     0.45      |  24.0  |
+| 2025-02-21 | MMM.US  |   4.2 USD    |      0.3      |  6.0   |
+| 2025-02-21 | TXT.PL  |  28.22 PLN   |     0.19      |  17.0  |
+| 2025-03-31 | PLD.US  |   5.05 USD   |     0.15      |  5.0   |
+| 2025-04-03 | VICI.US |   9.52 USD   |     0.15      |  22.0  |
++------------+---------+--------------+---------------+--------+
