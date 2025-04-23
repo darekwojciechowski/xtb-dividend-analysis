@@ -25,6 +25,8 @@ ticker_colors = {
 }
 
 # Function to get a random color from ticker_colors
+
+
 def get_random_color():
     """Return a randomly selected color from the ticker_colors dictionary."""
     return random.choice(list(ticker_colors.values()))

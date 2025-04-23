@@ -1,6 +1,7 @@
 import pandas as pd
 from typing import Optional
 
+
 class DateConverter:
     def __init__(self, date_string: str):
         """
@@ -18,7 +19,8 @@ class DateConverter:
         :param format: The format in which the date_string is provided.
         """
         try:
-            self.date_only = pd.to_datetime(self.date_string, format=format).date()
+            self.date_only = pd.to_datetime(
+                self.date_string, format=format).date()
         except ValueError as e:
             print(f"Error converting date: {e}")
             self.date_only = None
@@ -30,4 +32,3 @@ class DateConverter:
         :return: The converted date object or None if conversion failed.
         """
         return self.date_only
-

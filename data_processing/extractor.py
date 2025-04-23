@@ -1,6 +1,7 @@
 import re
 from typing import Dict
 
+
 class MultiConditionExtractor:
     def __init__(self, input_string: str):
         """
@@ -27,10 +28,10 @@ class MultiConditionExtractor:
 
         # Search for each keyword in the lowercase input string
         for keyword, condition in keyword_map.items():
-            pattern = re.compile(r'\b' + re.escape(keyword.lower()) + r'\b', re.IGNORECASE)
+            pattern = re.compile(
+                r'\b' + re.escape(keyword.lower()) + r'\b', re.IGNORECASE)
             if pattern.search(lower_input_string):
                 return condition
 
         # Return the original input string if no keywords are matched
         return self.input_string
-

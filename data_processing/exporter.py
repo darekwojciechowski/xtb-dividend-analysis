@@ -2,6 +2,7 @@ import re
 import pandas as pd
 from typing import Optional
 
+
 class GoogleSpreadsheetExporter:
     def __init__(self, df: pd.DataFrame):
         """
@@ -33,14 +34,13 @@ class GoogleSpreadsheetExporter:
 
         # Remove ANSI sequences from 'Ticker'
         self.df['Ticker'] = self.df['Ticker'].apply(self.remove_ansi)
-        
+
         # Replace NaN values with 0
         self.df.fillna(0, inplace=True)
-        
+
         # Round numeric columns to two decimal places
         numeric_cols = self.df.select_dtypes(include=['number']).columns
         self.df[numeric_cols] = self.df[numeric_cols].round(2)
-        
+
         # Export to CSV with tab as separator
         self.df.to_csv(filename, sep='\t', index=False)
-

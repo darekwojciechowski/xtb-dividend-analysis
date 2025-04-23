@@ -13,13 +13,16 @@ df = pd.read_csv(file_path, sep="\t")
 # Check required columns
 required_columns = {"Ticker", "Net Dividend"}
 if not required_columns.issubset(df.columns):
-    raise ValueError(f"Missing required columns {required_columns} in the CSV file.")
+    raise ValueError(
+        f"Missing required columns {required_columns} in the CSV file.")
 
 # Extract currency
-df["Currency"] = df["Net Dividend"].astype(str).apply(lambda x: "PLN" if "PLN" in x else "$" if "USD" in x else "")
+df["Currency"] = df["Net Dividend"].astype(str).apply(
+    lambda x: "PLN" if "PLN" in x else "$" if "USD" in x else "")
 
 # Convert "Net Dividend" to float
-df["Net Dividend"] = df["Net Dividend"].astype(str).str.replace(r'[^0-9.]', '', regex=True).astype(float)
+df["Net Dividend"] = df["Net Dividend"].astype(
+    str).str.replace(r'[^0-9.]', '', regex=True).astype(float)
 
 # Convert date
 if "Date" in df.columns:
@@ -34,7 +37,8 @@ palette = github_palette[:len(unique_tickers)]
 
 # Plot
 plt.figure(num="Net Dividend Chart", figsize=(7, 5))
-ax = sns.barplot(data=df, x="Ticker", y="Net Dividend", estimator=sum, errorbar=None, hue="Ticker", palette=palette, legend=False)
+ax = sns.barplot(data=df, x="Ticker", y="Net Dividend", estimator=sum,
+                 errorbar=None, hue="Ticker", palette=palette, legend=False)
 
 # Labels
 plt.title("Net Dividend", fontsize=10, color='#61AFEF')
@@ -47,7 +51,7 @@ sns.despine()
 
 # Properly label each bar with the correct currency
 for p, ticker in zip(ax.patches, unique_tickers):
-    currency = ticker_currency_map.get(ticker, "")  
+    currency = ticker_currency_map.get(ticker, "")
     ax.annotate(f'{p.get_height():.2f} {currency}',
                 (p.get_x() + p.get_width() / 2., p.get_height() / 2),
                 ha='center', va='center', fontsize=8, color='white')

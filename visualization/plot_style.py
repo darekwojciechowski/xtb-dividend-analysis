@@ -5,7 +5,7 @@ def apply_github_dark_theme():
     Apply a GitHub Dark-inspired theme to matplotlib and seaborn plots.
     """
     import matplotlib.pyplot as plt
-    
+
     plt.rcParams.update({
         'axes.facecolor': '#0D1117',  # Dark background
         'figure.facecolor': '#0D1117',  # Dark figure background
@@ -20,6 +20,7 @@ def apply_github_dark_theme():
         'xtick.labelsize': 9,
         'ytick.labelsize': 9,
     })
+
 
 github_palette = [
     "#E06C75",  # Soft Red
