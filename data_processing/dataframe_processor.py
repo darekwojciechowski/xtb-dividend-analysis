@@ -131,10 +131,15 @@ class DataFrameProcessor:
 
     def filter_dividends(self) -> None:
         """
-        Filters the DataFrame to include only rows where 'Type'/'Typ' is either 'Dividend', 'Dywidenda','DIVIDENT',
-        'Withholding Tax', 'Podatek od dywidend'
+        Filters the DataFrame to include only rows where 'Type'/'Typ' is either 'Dividend', 'Dywidenda', 'DIVIDENT',
+        'Withholding Tax', 'Podatek od dywidend'. Handles missing values in the 'Type'/'Typ' column.
         """
         type_col = self.get_column_name('Type', 'Typ')
+
+        # Drop rows with NaN in the 'Type'/'Typ' column
+        self.df = self.df[self.df[type_col].notna()]
+
+        # Filter rows with specific values
         self.df = self.df[self.df[type_col].isin(
             ['Dividend', 'Dywidenda', 'DIVIDENT', 'Withholding Tax', 'Podatek od dywidend'])]
 
@@ -155,12 +160,13 @@ class DataFrameProcessor:
 
     def add_empty_column(self, col_name: str = 'Tax Collected', position: int = 4) -> None:
         """
-        Adds an empty column to the DataFrame.
+        Adds an empty column to the DataFrame if it does not already exist.
 
         :param col_name: The name of the column to be added. Defaults to 'Tax Collected'.
         :param position: The position to insert the column. Defaults to 4.
         """
-        self.df.insert(position, col_name, np.nan)
+        if col_name not in self.df.columns:
+            self.df.insert(position, col_name, pd.NA)
 
     def prepare_columns(self) -> None:
         """
