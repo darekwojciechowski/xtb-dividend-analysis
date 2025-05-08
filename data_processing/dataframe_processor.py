@@ -5,7 +5,6 @@ from typing import Dict, Optional, List, Tuple
 from .extractor import MultiConditionExtractor
 from .date_converter import DateConverter
 from datetime import datetime
-# Import get_random_color
 from visualization.ticker_colors import ticker_colors, get_random_color
 
 
@@ -61,20 +60,16 @@ class DataFrameProcessor:
 
         :param columns: A list of column names to be dropped.
         """
-
-        # Check if self.df is a valid DataFrame
         if self.df is None or self.df.empty:
             raise ValueError(
                 "Error: The DataFrame is empty or has not been loaded.")
 
-        # Check if the specified columns exist in the DataFrame
         missing_columns = [
             col for col in columns if col not in self.df.columns]
         if missing_columns:
             raise ValueError(
                 f"Error: Missing columns: {', '.join(missing_columns)}")
 
-        # Drop the columns
         self.df.drop(columns=columns, inplace=True)
 
     def rename_columns(self, columns_dict: Dict[str, str]) -> None:
@@ -83,6 +78,12 @@ class DataFrameProcessor:
 
         :param columns_dict: A dictionary where keys are current column names and values are new column names.
         """
+        missing_columns = [
+            col for col in columns_dict.keys() if col not in self.df.columns]
+        if missing_columns:
+            raise KeyError(
+                f"The following columns are missing in the DataFrame: {', '.join(missing_columns)}")
+
         self.df.rename(columns=columns_dict, inplace=True)
 
     def convert_dates(self, date_col: Optional[str] = None) -> None:
@@ -103,7 +104,6 @@ class DataFrameProcessor:
         Applies random color formatting to the 'Ticker' column.
         Creates a new 'Colored Ticker' column without modifying the original 'Ticker' column.
         """
-        # Create a new 'Colored Ticker' column
         self.df['Colored Ticker'] = self.df['Ticker'].apply(
             lambda ticker: f"{get_random_color()}{ticker}\033[0m"
         )
@@ -136,10 +136,7 @@ class DataFrameProcessor:
         """
         type_col = self.get_column_name('Type', 'Typ')
 
-        # Drop rows with NaN in the 'Type'/'Typ' column
         self.df = self.df[self.df[type_col].notna()]
-
-        # Filter rows with specific values
         self.df = self.df[self.df[type_col].isin(
             ['Dividend', 'Dywidenda', 'DIVIDENT', 'Withholding Tax', 'Podatek od dywidend'])]
 
