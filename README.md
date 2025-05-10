@@ -10,28 +10,7 @@ A data processing pipeline designed for financial data analysis, specifically fo
 - **Date Standardization**: Converts various date formats to a consistent standard
 - **Advanced DataFrame Processing**: Comprehensive data manipulation capabilities
 - **Google Sheets Integration**: Seamless export functionality for collaborative analysis
-- **Visualization Support**: Custom styling for financial data visualization
 - **Web Automation with Playwright**: Automates the download of currency exchange rate data for streamlined data acquisition
-
-## Installation
-
-### Prerequisites
-- Python 3.8+
-- pip package manager
-
-### Dependencies
-```bash
-# Install all required packages
-pip install -r requirements.txt
-```
-
-**Core Dependencies:**
-- pandas (≥2.2.3) - Data manipulation and analysis
-- numpy (≥2.2.0) - Numerical computing
-- seaborn (≥0.13.2) - Statistical data visualization
-- matplotlib (≥3.10.0) - Comprehensive visualization library
-- tabulate (≥0.9.0) - Pretty-print tabular data
-- playwright (≥1.0.0) - Automated browser testing and web scraping
 
 ## Usage Guide
 
@@ -93,18 +72,6 @@ If Python is not found in zsh:
 1. Install Python: `brew install python`
 2. Configure zsh: `echo "alias python=/usr/bin/python3" >> ~/.zshrc`
 3. Restart terminal
-
-### Common Errors
-
-#### Data Import Issues
-- **FileNotFoundError**: Verify the file path is correct and the file exists
-- **PermissionError**: Check file permissions
-- **UnicodeDecodeError**: Try specifying the encoding: `pd.read_csv('file.csv', encoding='utf-8')`
-
-#### Data Processing Errors
-- **KeyError**: Confirm column names match exactly what's in your code
-- **TypeError**: Verify data types are compatible with operations
-- **ValueError**: Check for missing values or invalid data formats
 
 ## License
 

@@ -18,10 +18,13 @@ class DateConverter:
 
         :param format: The format in which the date_string is provided.
         """
+        if not self.date_string:  # Check for None or empty string
+            self.date_only = None
+            return
         try:
             self.date_only = pd.to_datetime(
                 self.date_string, format=format).date()
-        except ValueError as e:
+        except (ValueError, TypeError) as e:
             print(f"Error converting date: {e}")
             self.date_only = None
 

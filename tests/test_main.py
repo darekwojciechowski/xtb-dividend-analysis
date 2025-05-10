@@ -37,7 +37,8 @@ def processor(sample_dataframe):
 
 def test_combined_methods(processor):
     """
-    Verifies that multiple methods work together without errors.
+    Tests that multiple methods can be executed sequentially without errors.
+    Verifies that the resulting DataFrame is valid.
     """
     processor.apply_date_converter()
     processor.filter_dividends()
@@ -47,7 +48,8 @@ def test_combined_methods(processor):
 
 def test_methods_with_missing_values():
     """
-    Verifies that methods handle missing values gracefully.
+    Tests that methods handle missing values in the DataFrame gracefully.
+    Ensures rows with NaN values in critical columns are removed.
     """
     df_with_nans = pd.DataFrame({
         "Date": ["2024-01-01", None],
@@ -64,7 +66,8 @@ def test_methods_with_missing_values():
 
 def test_replace_tax_with_percentage_logic(processor):
     """
-    Verifies that replace_tax_with_percentage correctly calculates tax as a percentage.
+    Tests that the replace_tax_with_percentage method correctly calculates 
+    and adds a 'Tax Percentage' column based on 'Tax Collected' and 'Amount'.
     """
     # Prepare input data
     processor.df["Amount"] = [100.0, 200.0]
@@ -86,7 +89,8 @@ def test_replace_tax_with_percentage_logic(processor):
 
 def test_large_dataframe():
     """
-    Verifies that methods handle large DataFrames efficiently without performance issues.
+    Tests that methods handle large DataFrames efficiently without performance degradation.
+    Verifies that the resulting DataFrame is not empty.
     """
     large_df = pd.DataFrame({
         "Date": pd.date_range(start="2024-01-01", periods=10000, freq="D"),
@@ -102,7 +106,8 @@ def test_large_dataframe():
 
 def test_methods_on_empty_dataframe():
     """
-    Verifies that methods handle an empty DataFrame without errors.
+    Tests that all methods handle an empty DataFrame without raising errors.
+    Ensures the DataFrame remains empty after processing.
     """
     empty_processor = DataFrameProcessor(pd.DataFrame())
     # Ensure no errors occur with an empty DataFrame

@@ -37,7 +37,7 @@ def processor(sample_dataframe):
 
 def test_rename_columns(processor):
     """
-    Verifies that renaming columns updates the DataFrame columns as expected.
+    Tests that the rename_columns method correctly updates column names in the DataFrame.
     """
     processor.rename_columns({"Date": "TransactionDate", "Amount": "Value"})
     assert "TransactionDate" in processor.df.columns
@@ -46,7 +46,7 @@ def test_rename_columns(processor):
 
 def test_get_column_name(processor):
     """
-    Verifies that get_column_name returns the correct column name if present.
+    Tests that the get_column_name method returns the correct column name if it exists.
     """
     result = processor.get_column_name("Ticker", "Symbol")
     assert result in ["Ticker", "Symbol"]
@@ -54,7 +54,7 @@ def test_get_column_name(processor):
 
 def test_apply_colorize_ticker(processor):
     """
-    Verifies that apply_colorize_ticker executes without errors and retains the 'Ticker' column.
+    Tests that the apply_colorize_ticker method executes without errors and retains the 'Ticker' column.
     """
     processor.apply_colorize_ticker()
     assert "Ticker" in processor.df.columns
@@ -62,7 +62,7 @@ def test_apply_colorize_ticker(processor):
 
 def test_apply_extractor(processor):
     """
-    Verifies that apply_extractor executes without errors and returns a DataFrame.
+    Tests that the apply_extractor method executes without errors and returns a valid DataFrame.
     """
     processor.apply_extractor()
     assert isinstance(processor.df, pd.DataFrame)
@@ -70,7 +70,7 @@ def test_apply_extractor(processor):
 
 def test_filter_dividends(processor):
     """
-    Verifies that filter_dividends filters rows correctly without increasing the number of rows.
+    Tests that the filter_dividends method filters rows correctly without increasing the row count.
     """
     original_len = len(processor.df)
     processor.filter_dividends()
@@ -79,7 +79,7 @@ def test_filter_dividends(processor):
 
 def test_group_by_dividends(processor):
     """
-    Verifies that group_by_dividends executes without errors and returns a grouped DataFrame.
+    Tests that the group_by_dividends method executes without errors and returns a grouped DataFrame.
     """
     processor.group_by_dividends()
     assert isinstance(processor.df, pd.DataFrame)
@@ -87,7 +87,7 @@ def test_group_by_dividends(processor):
 
 def test_add_empty_column(processor):
     """
-    Verifies that add_empty_column adds a new column with NaN values to the DataFrame.
+    Tests that the add_empty_column method adds a new column with NaN values to the DataFrame.
     """
     processor.add_empty_column("New Column")
     assert "New Column" in processor.df.columns
@@ -96,7 +96,7 @@ def test_add_empty_column(processor):
 
 def test_move_negative_values(processor):
     """
-    Verifies that move_negative_values executes without errors and returns a DataFrame.
+    Tests that the move_negative_values method executes without errors and returns a valid DataFrame.
     """
     processor.move_negative_values()
     assert isinstance(processor.df, pd.DataFrame)
@@ -104,7 +104,7 @@ def test_move_negative_values(processor):
 
 def test_calculate_dividend(processor):
     """
-    Verifies that calculate_dividend executes without errors and returns a DataFrame.
+    Tests that the calculate_dividend method executes without errors and returns a valid DataFrame.
     """
     processor.calculate_dividend(["dummy_path"], language="en")
     assert isinstance(processor.df, pd.DataFrame)
@@ -112,7 +112,8 @@ def test_calculate_dividend(processor):
 
 def test_replace_tax_with_percentage(processor):
     """
-    Verifies that replace_tax_with_percentage correctly calculates and replaces 'Tax Collected' values with percentages.
+    Tests that the replace_tax_with_percentage method correctly calculates and replaces 
+    'Tax Collected' values with percentages based on the 'Comment' column.
     """
     # Prepare input data
     processor.df = pd.DataFrame({
@@ -132,7 +133,7 @@ def test_replace_tax_with_percentage(processor):
 
 def test_add_currency_to_dividends(processor):
     """
-    Verifies that add_currency_to_dividends executes without errors and returns a DataFrame.
+    Tests that the add_currency_to_dividends method executes without errors and returns a valid DataFrame.
     """
     processor.add_currency_to_dividends()
     assert isinstance(processor.df, pd.DataFrame)
@@ -140,7 +141,7 @@ def test_add_currency_to_dividends(processor):
 
 def test_get_processed_df(processor):
     """
-    Verifies that get_processed_df returns a DataFrame.
+    Tests that the get_processed_df method returns a valid DataFrame.
     """
     result = processor.get_processed_df()
     assert isinstance(result, pd.DataFrame)
@@ -148,7 +149,7 @@ def test_get_processed_df(processor):
 
 def test_methods_on_empty_dataframe():
     """
-    Verifies that methods handle an empty DataFrame without errors.
+    Tests that all methods handle an empty DataFrame without raising errors.
     """
     empty_processor = DataFrameProcessor(pd.DataFrame())
 
@@ -164,7 +165,8 @@ def test_methods_on_empty_dataframe():
 
 def test_move_negative_values_with_no_negatives(processor):
     """
-    Verifies that move_negative_values does not modify the DataFrame if no negative values exist.
+    Tests that the move_negative_values method does not modify the DataFrame 
+    if no negative values are present.
     """
     original_df = processor.df.copy()
     processor.move_negative_values()
@@ -173,7 +175,7 @@ def test_move_negative_values_with_no_negatives(processor):
 
 def test_filter_dividends_with_missing_values():
     """
-    Verifies that filter_dividends handles missing values in the 'Type' column correctly.
+    Tests that the filter_dividends method handles missing values in the 'Type' column correctly.
     """
     df_with_nans = pd.DataFrame({
         "Type": ["Dividend", None, "Dywidenda", "Invalid", None],
@@ -187,7 +189,7 @@ def test_filter_dividends_with_missing_values():
 
 def test_large_dataframe():
     """
-    Verifies that methods handle large DataFrames efficiently without performance issues.
+    Tests that all methods handle large DataFrames efficiently without performance issues.
     """
     large_df = pd.DataFrame({
         "Date": pd.date_range(start="2024-01-01", periods=10000, freq="D"),
