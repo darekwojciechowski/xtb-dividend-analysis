@@ -1,36 +1,16 @@
-import os
+import logging
+from logging_config import setup_logging
+from data_processing.file_paths import get_file_paths
 from data_processing.dataframe_processor import DataFrameProcessor
 from data_processing.exporter import GoogleSpreadsheetExporter
 from data_processing.import_data_xlsx import import_and_process_data
 from tabulate import tabulate
 
 
-def main():
+def process_data(file_path, courses_paths):
     """
-    Main function to read data, process it, and export it to a Google Spreadsheet format.
+    Process the data using DataFrameProcessor and return the processed DataFrame.
     """
-
-    # Define file paths
-    file_path = "data/demo_XTB_broker_statement.xlsx"
-
-    # Dynamically find all files starting with "archiwum_tab_a_" in the data folder
-    data_folder = "data"
-    courses_paths = [
-        os.path.join(data_folder, f)
-        for f in os.listdir(data_folder)
-        if f.startswith("archiwum_tab_a_") and f.endswith(".csv")]
-
-    # Check if the main file exists
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(
-            f"The file '{file_path}' does not exist. Please check the path.")
-
-    # Check if each course file exists
-    for course_path in courses_paths:
-        if not os.path.exists(course_path):
-            raise FileNotFoundError(
-                f"The file '{course_path}' does not exist. Please check the path.")
-
     # Load data from XLSX file
     df = import_and_process_data(file_path)
 
@@ -39,12 +19,9 @@ def main():
 
     # Detect language before renaming columns
     language = processor.detect_language()
-    print(f"Detected language: {language}")  # Debugging statement
 
-    # Drop unnecessary columns
+    # Perform data processing steps
     processor.drop_columns(["ID"])
-
-    # Rename columns based on detected language
     processor.rename_columns(
         {
             processor.get_column_name("Time", "Czas"): "Date",
@@ -54,8 +31,6 @@ def main():
             processor.get_column_name("Type", "Typ"): "Type",
         }
     )
-
-    # Continue with processing
     processor.apply_colorize_ticker()
     processor.apply_extractor()
     processor.apply_date_converter()
@@ -68,9 +43,9 @@ def main():
     processor.merge_rows_and_reorder()
     processor.add_currency_to_dividends()
 
-    # Display processed data
-    print(
-        tabulate(
+    # Log processed data
+    logging.info(
+        "\n" + tabulate(
             processor.get_processed_df(),
             headers="keys",
             tablefmt="pretty",
@@ -78,15 +53,25 @@ def main():
         )
     )
 
-    # Retrieve processed DataFrame
-    df_processed = processor.get_processed_df()
+    return processor.get_processed_df()
+
+
+def main():
+    """
+    Main function to orchestrate the workflow.
+    """
+    # Set up logging
+    setup_logging(log_level=logging.INFO)
+
+    # Get file paths and validate them
+    file_path, courses_paths = get_file_paths()
+
+    # Process data
+    df_processed = process_data(file_path, courses_paths)
 
     # Export data to a CSV file for Google Spreadsheet
-    # df with removed ANSI sequences from 'Ticker'
     exporter = GoogleSpreadsheetExporter(df_processed)
     exporter.export_to_google("for_google_spreadsheet.csv")
-
-    return df_processed  # Ensure that the DataFrame is returned
 
 
 if __name__ == "__main__":

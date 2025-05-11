@@ -1,3 +1,8 @@
+# Ignore all for_google_spreadsheet.csv files except in assets/
+for_google_spreadsheet.csv
+!assets/for_google_spreadsheet.csv
+
+# Private or sensitive files
 *.pdf
 account*
 .DS_Store
@@ -163,3 +168,4 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 .qodo
+

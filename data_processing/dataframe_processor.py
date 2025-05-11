@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import re
+import logging
 from typing import Dict, Optional, List, Tuple
 from .extractor import MultiConditionExtractor
 from .date_converter import DateConverter
@@ -19,6 +20,8 @@ class DataFrameProcessor:
             raise ValueError(
                 "The DataFrame 'df' cannot be None. Please provide a valid DataFrame.")
         self.df = df.copy()
+        logging.info(
+            "Step 1 - Initialized DataFrameProcessor with a DataFrame.")
 
     def detect_language(self) -> str:
         """
@@ -30,10 +33,10 @@ class DataFrameProcessor:
         polish_columns = {'Data', 'Symbol', 'Komentarz', 'Kwota', 'Typ'}
         english_columns = {'Date', 'Ticker', 'Comment', 'Amount', 'Type'}
 
-        if len(polish_columns.intersection(self.df.columns)) > len(english_columns.intersection(self.df.columns)):
-            return 'PL'
-        else:
-            return 'ENG'
+        language = 'PL' if len(polish_columns.intersection(self.df.columns)) > len(
+            english_columns.intersection(self.df.columns)) else 'ENG'
+        logging.info(f"Step 2 - Detected language: {language}.")
+        return language
 
     def get_column_name(self, english_name: str, polish_name: str) -> str:
         """
@@ -139,6 +142,8 @@ class DataFrameProcessor:
         self.df = self.df[self.df[type_col].notna()]
         self.df = self.df[self.df[type_col].isin(
             ['Dividend', 'Dywidenda', 'DIVIDENT', 'Withholding Tax', 'Podatek od dywidend'])]
+        logging.info(
+            "Step 3 - Filtered rows to include only dividend-related data.")
 
     def group_by_dividends(self) -> None:
         """
@@ -154,6 +159,8 @@ class DataFrameProcessor:
         self.df = self.df.groupby([date_col, ticker_col, type_col, comment_col]).agg(
             {amount_col: 'sum'}).reset_index()
         self.df.rename(columns={amount_col: 'Net Dividend'}, inplace=True)
+        logging.info(
+            "Step 4 - Grouped data by date, ticker, and type; aggregated amounts.")
 
     def add_empty_column(self, col_name: str = 'Tax Collected', position: int = 4) -> None:
         """
@@ -453,6 +460,8 @@ class DataFrameProcessor:
             row[amount_col] if not pd.isna(row['Shares']) else row[amount_col],
             axis=1
         )
+        logging.info(
+            "Step 5 - Calculated dividends and updated shares using exchange rates.")
 
         return self.df
 
@@ -517,6 +526,8 @@ class DataFrameProcessor:
                     percentage_value = float(match.group(1)) / 100
                     # Replace the value in Tax Collected with the extracted percentage
                     self.df.at[index, tax_col] = percentage_value
+        logging.info(
+            "Step 6 - Updated 'Tax Collected' column with extracted percentages.")
 
         return self.df
 
@@ -526,6 +537,7 @@ class DataFrameProcessor:
 
         :return: The processed DataFrame.
         """
+        logging.info("Step 7 - Returning the processed DataFrame.")  # Log here
         return self.df
 
     def process(self) -> pd.DataFrame:
@@ -535,6 +547,7 @@ class DataFrameProcessor:
         Returns:
             pd.DataFrame: The processed DataFrame.
         """
+        logging.info("Starting DataFrame processing.")
         # Convert dates if needed
         self.convert_dates()
 
@@ -551,5 +564,6 @@ class DataFrameProcessor:
 
         # Merge and clean up
         self.merge_and_sum()
+        logging.info("DataFrame processing completed.")
 
         return self.df

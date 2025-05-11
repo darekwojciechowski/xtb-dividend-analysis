@@ -18,14 +18,14 @@ A data processing pipeline designed for financial data analysis, specifically fo
 
 #### Using Playwright to Download Currency Archive
 
-The `playwright_download_currency_archive.py` script automates the download of currency exchange rate data from the NBP Exchange Rates Archive. This script uses Playwright to interact with the website and download the required CSV file.
+The `playwright_download_currency_archive.py` script automates the download of currency exchange rate data from the NBP Exchange Rates Archive. This script uses Playwright to interact with the website and download the required CSV files.
 
 To run the script, execute the following command:
 ```bash
 python playwright_download_currency_archive.py
 ```
 
-Ensure that Playwright is installed and set up correctly. This script will download the `archiwum_tab_a_2025.csv` file, which is necessary for the data processing pipeline.
+This script will download files for the last 3 years, such as `archiwum_tab_a_<YYYY>.csv` (e.g., `archiwum_tab_a_2025.csv`, `archiwum_tab_a_2024.csv`, `archiwum_tab_a_2023.csv`). These files are necessary for the data processing pipeline.
 
 ### 2. Data Processing
 
