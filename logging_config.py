@@ -2,7 +2,7 @@ import logging
 import os
 
 
-def setup_logging(log_level=logging.INFO, log_file="application.log"):
+def setup_logging(log_level=logging.INFO, log_file="app.log"):
     """
     Set up logging configuration for the application.
     """
