@@ -63,8 +63,11 @@ def main():
     # Set up logging
     setup_logging(log_level=logging.INFO)
 
+    # Define the main file path here
+    file_path = "data/demo_XTB_broker_statement.xlsx"
+
     # Get file paths and validate them
-    file_path, courses_paths = get_file_paths()
+    file_path, courses_paths = get_file_paths(file_path)
 
     # Process data
     df_processed = process_data(file_path, courses_paths)

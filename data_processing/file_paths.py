@@ -2,15 +2,14 @@ import os
 import logging
 
 
-def get_file_paths():
+def get_file_paths(file_path):
     """
     Define file paths and validate their existence.
+    Args:
+        file_path (str): Path to the main file.
     Returns:
         tuple: file_path (str), courses_paths (list)
     """
-    # Define file paths
-    file_path = "data/demo_XTB_broker_statement.xlsx"
-
     # Dynamically find all files starting with "archiwum_tab_a_" in the data folder
     data_folder = "data"
     courses_paths = [
