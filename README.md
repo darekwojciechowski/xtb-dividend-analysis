@@ -40,6 +40,13 @@ python main.py
 
 Use `GoogleSpreadsheetExporter` to export processed data to Google Sheets. Ensure all dependencies are installed and API credentials are configured for seamless integration.
 
+### 4. Visualization (External Repository)
+
+Visualize the exported data using my [Streamlit Dividend Dashboard](https://github.com/darekwojciechowski/Streamlit-Dividend-Dashboard) repository, built specifically for this purpose and ready to use.  
+Just upload the exported CSV file to the dashboard for interactive data visualization.
+
+![Dashboard Demo](assets/streamlit-dashboard-demo.gif)
+
 ## Core Components
 
 - **Data Extraction**: Utilizes `MultiConditionExtractor` for parsing financial transaction descriptions using pattern matching and regular expressions.
@@ -53,25 +60,6 @@ Use `GoogleSpreadsheetExporter` to export processed data to Google Sheets. Ensur
 - **Visualization**: Leverages `matplotlib` and `seaborn` for creating financial-specific plots and interactive visualizations.
 
 - **Web Automation**: Uses Playwright for automated browser interactions to download currency exchange rate data.
-
-## Troubleshooting
-
-### Python Environment Issues
-
-#### Windows Command Not Found
-If encountering `pip` command not found errors in Windows:
-```powershell
-# Ensure Python is properly installed
-python --version
-# Use Python to execute pip
-python -m pip install <package>
-```
-
-#### macOS/Linux Command Not Found
-If Python is not found in zsh:
-1. Install Python: `brew install python`
-2. Configure zsh: `echo "alias python=/usr/bin/python3" >> ~/.zshrc`
-3. Restart terminal
 
 ## License
 
