@@ -1,3 +1,4 @@
+import os
 import re
 import pandas as pd
 from typing import Optional
@@ -25,6 +26,7 @@ class GoogleSpreadsheetExporter:
     def export_to_google(self, filename: str = 'for_google_spreadsheet.csv') -> None:
         """
         Processes the DataFrame and exports it to a CSV file formatted for Google Sheets.
+        The file is saved in the 'output' directory.
 
         :param filename: The name of the file to which the DataFrame will be exported.
         """
@@ -42,5 +44,12 @@ class GoogleSpreadsheetExporter:
         numeric_cols = self.df.select_dtypes(include=['number']).columns
         self.df[numeric_cols] = self.df[numeric_cols].round(2)
 
+        # Create output directory if it doesn't exist
+        output_dir = 'output'
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Create full file path
+        file_path = os.path.join(output_dir, filename)
+
         # Export to CSV with tab as separator
-        self.df.to_csv(filename, sep='\t', index=False)
+        self.df.to_csv(file_path, sep='\t', index=False)

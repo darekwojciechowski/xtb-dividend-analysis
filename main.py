@@ -1,5 +1,5 @@
 import logging
-from logging_config import setup_logging
+from config.logging_config import setup_logging
 from data_processing.file_paths import get_file_paths
 from data_processing.dataframe_processor import DataFrameProcessor
 from data_processing.exporter import GoogleSpreadsheetExporter
