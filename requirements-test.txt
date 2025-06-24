@@ -1,9 +1,9 @@
+# Core dependencies for testing (without playwright to avoid build issues)
 pandas>=2.0.0,<3.0.0
 numpy>=1.21.0,<3.0.0
 seaborn>=0.13.0,<1.0.0
 matplotlib>=3.4.0,<4.0.0
 tabulate>=0.9.0,<1.0.0
-playwright>=1.45.0,<2.0.0
 openpyxl>=3.1.0,<4.0.0
 
 # Testing dependencies
