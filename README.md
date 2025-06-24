@@ -42,8 +42,8 @@ Use `GoogleSpreadsheetExporter` to export processed data to Google Sheets. Ensur
 
 ### 4. Visualization (External Repository)
 
-Visualize the exported data using my [Streamlit Dividend Dashboard](https://github.com/darekwojciechowski/Streamlit-Dividend-Dashboard) repository, built specifically for this purpose and ready to use.  
-Just upload the exported CSV file to the dashboard for interactive data visualization.
+To visualize the exported data, use the [Streamlit Dividend Dashboard](https://github.com/darekwojciechowski/Streamlit-Dividend-Dashboard) repository, which I created specifically for visualizing this data and is ready to use.  
+Simply take the exported CSV file from this project and use it as input in the Streamlit dashboard for interactive data visualization.
 
 ![Dashboard Demo](assets/streamlit-dashboard-demo.gif)
 

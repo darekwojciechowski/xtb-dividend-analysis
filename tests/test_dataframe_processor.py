@@ -110,25 +110,23 @@ def test_calculate_dividend(processor):
     assert isinstance(processor.df, pd.DataFrame)
 
 
-def test_replace_tax_with_percentage(processor):
-    """
-    Tests that the replace_tax_with_percentage method correctly calculates and replaces 
-    'Tax Collected' values with percentages based on the 'Comment' column.
-    """
-    # Prepare input data
-    processor.df = pd.DataFrame({
-        "Comment": ["15%", "20%", "No tax info"],
-        "Tax Collected": [0.0, 0.0, 0.0],
-        "Amount": [100.0, 200.0, 300.0]
+@pytest.mark.parametrize(
+    "comments,expected",
+    [
+        (["15%", "20%", "No tax info"], [0.15, 0.20, 0.0]),
+        (["5%", "0%", "30%"], [0.05, 0.0, 0.30]),
+        (["No info", "25%", ""], [0.0, 0.25, 0.0]),
+    ]
+)
+def test_replace_tax_with_percentage_parametrized(comments, expected):
+    df = pd.DataFrame({
+        "Comment": comments,
+        "Tax Collected": [0.0] * len(comments),
+        "Amount": [100.0] * len(comments)
     })
-
-    # Execute the method
+    processor = DataFrameProcessor(df)
     processor.replace_tax_with_percentage()
-
-    # Verify the results
-    assert processor.df["Tax Collected"][0] == 0.15, "Expected 15% to be converted to 0.15"
-    assert processor.df["Tax Collected"][1] == 0.20, "Expected 20% to be converted to 0.20"
-    assert processor.df["Tax Collected"][2] == 0.0, "Expected no change for 'No tax info'"
+    assert list(processor.df["Tax Collected"]) == expected
 
 
 def test_add_currency_to_dividends(processor):
@@ -187,17 +185,44 @@ def test_filter_dividends_with_missing_values():
     assert all(processor.df["Type"].isin(["Dividend", "Dywidenda"]))
 
 
-def test_large_dataframe():
+@pytest.mark.parametrize(
+    "periods,tickers,amounts,types,comments,expected_min_length",
+    [
+        # Small dataset
+        (100, ["AAPL"] * 100, [10.0] * 100,
+         ["Cash"] * 100, ["Dividend"] * 100, 1),
+        # Medium dataset with mixed tickers
+        (1000, ["AAPL", "MSFT", "GOOGL"] * 334, [15.5, 25.0, 30.75]
+         * 334, ["Cash"] * 1000, ["Dividend"] * 1000, 1),
+        # Large dataset with varied amounts
+        (5000, ["TSLA"] * 5000, list(range(1, 5001)),
+         ["Cash"] * 5000, ["Dividend"] * 5000, 1),
+        # Very large dataset
+        (10000, ["NVDA", "AMD"] * 5000, [50.0, 75.0] *
+         5000, ["Cash"] * 10000, ["Dividend"] * 10000, 1),
+        # Mixed types and comments
+        (2000, ["IBM"] * 2000, [100.0] * 2000, ["Cash", "Stock"]
+         * 1000, ["Dividend", "Split"] * 1000, 0),
+    ]
+)
+def test_large_dataframe(periods, tickers, amounts, types, comments, expected_min_length):
     """
     Tests that all methods handle large DataFrames efficiently without performance issues.
+    Uses parametrized inputs to test different scenarios and data sizes.
     """
+    # Ensure all lists have the correct length
+    tickers = tickers[:periods]
+    amounts = amounts[:periods]
+    types = types[:periods]
+    comments = comments[:periods]
+
     large_df = pd.DataFrame({
-        "Date": pd.date_range(start="2024-01-01", periods=10000, freq="D"),
-        "Ticker": ["AAPL"] * 10000,
-        "Amount": [10.0] * 10000,
-        "Type": ["Cash"] * 10000,
-        "Comment": ["Dividend"] * 10000
+        "Date": pd.date_range(start="2024-01-01", periods=periods, freq="D"),
+        "Ticker": tickers,
+        "Amount": amounts,
+        "Type": types,
+        "Comment": comments
     })
     processor = DataFrameProcessor(large_df)
     processor.group_by_dividends()
-    assert len(processor.df) > 0
+    assert len(processor.df) >= expected_min_length
