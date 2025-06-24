@@ -1,3 +1,7 @@
+# main.py
+# XTB Dividend Analysis Pipeline
+# Main entry point for processing XTB broker statements and calculating dividend data
+
 import logging
 from config.logging_config import setup_logging
 from data_processing.file_paths import get_file_paths
@@ -5,6 +9,10 @@ from data_processing.dataframe_processor import DataFrameProcessor
 from data_processing.exporter import GoogleSpreadsheetExporter
 from data_processing.import_data_xlsx import import_and_process_data
 from tabulate import tabulate
+
+# Configuration constants
+DEFAULT_INPUT_FILE = "data/demo_XTB_broker_statement.xlsx"
+DEFAULT_OUTPUT_FILE = "for_google_spreadsheet.csv"
 
 
 def process_data(file_path, courses_paths):
@@ -63,8 +71,8 @@ def main():
     # Set up logging
     setup_logging(log_level=logging.INFO)
 
-    # Define the main file path here
-    file_path = "data/demo_XTB_broker_statement.xlsx"
+    # Use default input file path
+    file_path = DEFAULT_INPUT_FILE
 
     # Get file paths and validate them
     file_path, courses_paths = get_file_paths(file_path)
@@ -74,7 +82,7 @@ def main():
 
     # Export data to a CSV file for Google Spreadsheet
     exporter = GoogleSpreadsheetExporter(df_processed)
-    exporter.export_to_google("for_google_spreadsheet.csv")
+    exporter.export_to_google(DEFAULT_OUTPUT_FILE)
 
 
 if __name__ == "__main__":

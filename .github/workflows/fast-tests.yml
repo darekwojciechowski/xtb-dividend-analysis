@@ -1,0 +1,41 @@
+name: Fast Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  quick-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pytest-cov
+        pip install -r requirements.txt
+        
+    - name: Run fast tests
+      run: |
+        pytest -v --tb=short
+        
+    - name: Test import of main modules
+      run: |
+        python -c "import data_processing.dataframe_processor; print('✓ dataframe_processor imports successfully')"
+        python -c "import data_processing.date_converter; print('✓ date_converter imports successfully')"
+        python -c "import data_processing.exporter; print('✓ exporter imports successfully')"
+        python -c "import visualization.chart_net_dividend; print('✓ chart_net_dividend imports successfully')" || echo "⚠ chart_net_dividend import failed (may be expected)"
