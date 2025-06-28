@@ -132,9 +132,9 @@ jobs:
                     error = testcase.find('error')
                     print(f'- **{classname}::{name}**')
                     if failure is not None:
-                        print(f'  - Failure: {failure.get("message", "Unknown error")}')
+                        print(f'  - Failure: {failure.get(\"message\", \"Unknown error\")}')
                     if error is not None:
-                        print(f'  - Error: {error.get("message", "Unknown error")}')
+                        print(f'  - Error: {error.get(\"message\", \"Unknown error\")}')
         except Exception as e:
             print(f'Could not parse test results: {e}')
         " >> $GITHUB_STEP_SUMMARY
@@ -351,9 +351,16 @@ jobs:
 
     - name: Set final status
       run: |
-        if [[ "${{ needs.test.result }}" == "success" && "${{ needs.lint.result }}" == "success" && "${{ needs.security.result }}" == "success" ]]; then
+        echo "📊 Final Results Summary:"
+        echo "- Test job: ${{ needs.test.result }}"
+        echo "- Lint job: ${{ needs.lint.result }}"
+        echo "- Security job: ${{ needs.security.result }}"
+        
+        if [ "${{ needs.test.result }}" = "success" ] && [ "${{ needs.lint.result }}" = "success" ] && [ "${{ needs.security.result }}" = "success" ]; then
           echo "✅ Pipeline completed successfully"
+          exit 0
         else
-          echo "❌ Pipeline failed"
+          echo "❌ Pipeline failed - one or more jobs did not succeed"
+          echo "Please check the individual job results above"
           exit 1
         fi
