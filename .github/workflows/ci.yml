@@ -92,7 +92,16 @@ jobs:
         
     - name: Run tests with pytest
       run: |
-        pytest --cov=data_processing --cov=data_acquisition --cov=visualization --cov=config --cov-report=xml --cov-report=term-missing --junitxml=test-results.xml -v
+        echo "Current directory: $(pwd)"
+        echo "Python path: $(python -c 'import sys; print(sys.path)')"
+        echo "Files in current directory:"
+        ls -la
+        echo "Files in tests directory:"
+        ls -la tests/
+        echo "Running pytest with discovery info..."
+        pytest --collect-only -q
+        echo "Running actual tests..."
+        pytest --cov=data_processing --cov=data_acquisition --cov=visualization --cov=config --cov-report=xml --cov-report=term-missing --junitxml=test-results.xml -v tests/
         
     - name: Publish Test Results
       uses: dorny/test-reporter@v1.9.1
@@ -111,64 +120,33 @@ jobs:
         import xml.etree.ElementTree as ET
         import os
         
+        # Simple parsing for debugging - detailed summary will be in summary job
         if os.path.exists('test-results.xml'):
             try:
-                with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as f:
-                    f.write("### 📊 Test Results Summary\n")
-                    
                 tree = ET.parse('test-results.xml')
                 root = tree.getroot()
                 tests = root.get('tests', '0')
                 failures = root.get('failures', '0')
                 errors = root.get('errors', '0')
-                time = root.get('time', '0')
-
-                with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as f:
-                    f.write("| Tests | Failures | Errors | Time |\n")
-                    f.write("|-------|----------|--------|----- |\n")
-                    f.write(f"| {tests} | {failures} | {errors} | {time}s |\n")
-
-                    if int(failures) > 0 or int(errors) > 0:
-                        f.write("\n#### ❌ Failed Tests:\n")
-                        for testcase in root.findall('.//testcase'):
-                            name = testcase.get('name', 'Unknown')
-                            classname = testcase.get('classname', '')
-                            failure = testcase.find('failure')
-                            error = testcase.find('error')
-                            f.write(f"- **{classname}::{name}**\n")
-                            if failure is not None:
-                                msg = failure.get('message', 'Unknown error').replace('\n', ' ')
-                                f.write(f"  - Failure: {msg}\n")
-                            if error is not None:
-                                msg = error.get('message', 'Unknown error').replace('\n', ' ')
-                                f.write(f"  - Error: {msg}\n")
+                
+                print(f"Tests run: {tests}, Failures: {failures}, Errors: {errors}")
+                
+                # Only write to summary if there are failures/errors
+                if int(failures) > 0 or int(errors) > 0:
+                    with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as f:
+                        f.write(f"⚠️ Python ${{ matrix.python-version }} on ${{ matrix.os }}: {failures} failures, {errors} errors\n")
             except Exception as e:
-                with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as f:
-                    f.write(f"Could not parse test results: {e}\n")
+                print(f"Could not parse test results: {e}")
         
     - name: Generate Test Summary
       if: always()
       shell: python
       run: |
         import os
-        import xml.etree.ElementTree as ET
         
+        # Minimal summary - detailed report will be in summary job
         with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as f:
-            f.write("## 🧪 Test Results - Python ${{ matrix.python-version }} on ${{ matrix.os }}\n")
-            f.write("| Metric | Value |\n")
-            f.write("|--------|-------|\n")
-            f.write("| Status | ${{ job.status == 'success' && '✅ Passed' || '❌ Failed' }} |\n")
-            f.write("| Python Version | ${{ matrix.python-version }} |\n")
-            f.write("| OS | ${{ matrix.os }} |\n")
-            
-            if os.path.exists('coverage.xml'):
-                try:
-                    tree = ET.parse('coverage.xml')
-                    line_rate = float(tree.getroot().attrib['line-rate'])
-                    coverage_pct = f"{line_rate * 100:.1f}%"
-                except:
-                    coverage_pct = "N/A"
-                f.write(f"| Coverage | {coverage_pct} |\n")
+            f.write(f"✅ Python ${{ matrix.python-version }} on ${{ matrix.os }} completed\n")
         
     - name: Upload Test Artifacts
       uses: actions/upload-artifact@v4
@@ -319,36 +297,112 @@ jobs:
       contents: read
       security-events: write
     steps:
-    - name: Generate Pipeline Summary
-      run: |
-        echo "## 🚀 CI Pipeline Results" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "| Job | Status | Details |" >> $GITHUB_STEP_SUMMARY
-        echo "|-----|--------|---------|" >> $GITHUB_STEP_SUMMARY
-        echo "| 🧪 Tests | ${{ needs.test.result == 'success' && '✅ Passed' || '❌ Failed' }} | Cross-platform testing |" >> $GITHUB_STEP_SUMMARY
-        echo "| 🔍 Linting | ${{ needs.lint.result == 'success' && '✅ Passed' || '❌ Failed' }} | Code quality checks |" >> $GITHUB_STEP_SUMMARY
-        echo "| 🔒 Security | ${{ needs.security.result == 'success' && '✅ Passed' || '❌ Failed' }} | Security scanning |" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 📊 Pipeline Metrics" >> $GITHUB_STEP_SUMMARY
-        echo "- **Workflow run**: [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
-        echo "- **Triggered by**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Commit**: [\`${{ github.sha }}\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
+    - name: Download test artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: test-results-*
+        merge-multiple: true
+      continue-on-error: true
         
-        if [[ "${{ needs.test.result }}" == "success" && "${{ needs.lint.result }}" == "success" && "${{ needs.security.result }}" == "success" ]]; then
-          echo "### 🎉 All checks passed! Ready to merge." >> $GITHUB_STEP_SUMMARY
-        else
-          echo "### ⚠️ Some checks failed. Please review the errors above." >> $GITHUB_STEP_SUMMARY
-        fi
+    - name: Generate Comprehensive Pipeline Summary
+      shell: python
+      run: |
+        import os
+        import xml.etree.ElementTree as ET
+        import glob
+        
+        # Collect all test results
+        test_files = glob.glob('test-results.xml') + glob.glob('**/test-results.xml', recursive=True)
+        
+        total_tests = 0
+        total_failures = 0
+        total_errors = 0
+        total_time = 0.0
+        failed_tests = []
+        
+        # Parse all test result files
+        for file_path in test_files:
+            try:
+                tree = ET.parse(file_path)
+                root = tree.getroot()
+                
+                tests = int(root.get('tests', '0'))
+                failures = int(root.get('failures', '0'))
+                errors = int(root.get('errors', '0'))
+                time = float(root.get('time', '0'))
+                
+                total_tests += tests
+                total_failures += failures
+                total_errors += errors
+                total_time += time
+                
+                # Collect failed test details
+                if failures > 0 or errors > 0:
+                    for testcase in root.findall('.//testcase'):
+                        failure = testcase.find('failure')
+                        error = testcase.find('error')
+                        if failure is not None or error is not None:
+                            name = testcase.get('name', 'Unknown')
+                            classname = testcase.get('classname', '')
+                            failed_tests.append(f"{classname}::{name}")
+            except Exception as e:
+                print(f"Error parsing {file_path}: {e}")
+        
+        # Generate summary
+        with open(os.environ['GITHUB_STEP_SUMMARY'], 'w', encoding='utf-8') as f:
+            f.write("# 🚀 CI Pipeline Complete Summary\n\n")
+            
+            # Overall status
+            all_passed = '${{ needs.test.result }}' == 'success' and '${{ needs.lint.result }}' == 'success' and '${{ needs.security.result }}' == 'success'
+            if all_passed:
+                f.write("## ✅ All Checks Passed! Ready to merge.\n\n")
+            else:
+                f.write("## ⚠️ Some checks failed. Please review below.\n\n")
+            
+            # Job results table
+            f.write("## 📊 Job Results\n\n")
+            f.write("| Job | Status | Details |\n")
+            f.write("|-----|--------|---------|\n")
+            f.write("| 🧪 Tests | ${{ needs.test.result == 'success' && '✅ Passed' || '❌ Failed' }} | Cross-platform testing |\n")
+            f.write("| 🔍 Linting | ${{ needs.lint.result == 'success' && '✅ Passed' || '❌ Failed' }} | Code quality checks |\n")
+            f.write("| 🔒 Security | ${{ needs.security.result == 'success' && '✅ Passed' || '❌ Failed' }} | Security scanning |\n\n")
+            
+            # Test results summary
+            f.write("## 🧪 Combined Test Results\n\n")
+            f.write("| Metric | Value |\n")
+            f.write("|--------|-------|\n")
+            f.write(f"| Total Tests | {total_tests} |\n")
+            f.write(f"| Failures | {total_failures} |\n")
+            f.write(f"| Errors | {total_errors} |\n")
+            f.write(f"| Execution Time | {total_time:.2f}s |\n")
+            f.write(f"| Success Rate | {((total_tests - total_failures - total_errors) / max(total_tests, 1) * 100):.1f}% |\n\n")
+            
+            # Failed tests details
+            if failed_tests:
+                f.write("### ❌ Failed Tests\n")
+                for test in failed_tests[:10]:  # Limit to first 10
+                    f.write(f"- {test}\n")
+                if len(failed_tests) > 10:
+                    f.write(f"- ... and {len(failed_tests) - 10} more\n")
+                f.write("\n")
+            
+            # Pipeline metrics
+            f.write("## � Pipeline Metrics\n\n")
+            f.write("| Metric | Value |\n")
+            f.write("|--------|-------|\n")
+            f.write("| Workflow Run | [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |\n")
+            f.write("| Triggered By | ${{ github.event_name }} |\n")
+            f.write("| Branch | ${{ github.ref_name }} |\n")
+            f.write("| Commit | [\`${{ github.sha }}\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) |\n")
 
     - name: Comment PR with Results
       if: github.event_name == 'pull_request'
       uses: marocchino/sticky-pull-request-comment@v2
       with:
         message: |
-          ## 🚀 CI Pipeline Results
+          # 🚀 CI Pipeline Results
           
+          ## Status Overview
           | Job | Status | Details |
           |-----|--------|---------|
           | 🧪 Tests | ${{ needs.test.result == 'success' && '✅ Passed' || '❌ Failed' }} | Cross-platform testing |
@@ -357,13 +411,8 @@ jobs:
           
           ${{ (needs.test.result == 'success' && needs.lint.result == 'success' && needs.security.result == 'success') && '### 🎉 All checks passed! Ready to merge.' || '### ⚠️ Some checks failed. Please review the errors.' }}
           
-          <details>
-          <summary>📊 Pipeline Details</summary>
-          
-          - **Workflow run**: [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-          - **Commit**: ${{ github.sha }}
-          - **Branch**: ${{ github.head_ref }}
-          </details>
+          ---
+          **Workflow:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) | **Commit:** ${{ github.sha }} | **Branch:** ${{ github.head_ref }}
 
     - name: Set final status
       run: |
