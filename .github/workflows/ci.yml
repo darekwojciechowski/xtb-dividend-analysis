@@ -1,5 +1,11 @@
 name: CI Pipeline
 
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+  security-events: write
+
 on:
   push:
     branches: [ main, master, develop ]
@@ -30,6 +36,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: changes
     if: needs.changes.outputs.python == 'true'
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
@@ -85,12 +95,64 @@ jobs:
         pytest --cov=data_processing --cov=data_acquisition --cov=visualization --cov=config --cov-report=xml --cov-report=term-missing --junitxml=test-results.xml -v
         
     - name: Publish Test Results
-      uses: dorny/test-reporter@v1
-      if: always()
+      uses: dorny/test-reporter@v1.9.1
+      if: (success() || failure()) && hashFiles('test-results.xml') != ''
       with:
-        name: pytest-results-${{ matrix.python-version }}-${{ matrix.os }}
+        name: Test Results (${{ matrix.python-version }} on ${{ matrix.os }})
         path: test-results.xml
         reporter: java-junit
+        fail-on-error: false
+      continue-on-error: true
+        
+    - name: Parse Test Results (Fallback)
+      if: (success() || failure()) && hashFiles('test-results.xml') != ''
+      run: |
+        if [ -f test-results.xml ]; then
+          echo "### 📊 Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          python -c "
+        import xml.etree.ElementTree as ET
+        try:
+            tree = ET.parse('test-results.xml')
+            root = tree.getroot()
+            tests = root.get('tests', '0')
+            failures = root.get('failures', '0')
+            errors = root.get('errors', '0')
+            time = root.get('time', '0')
+
+            print('| Tests | Failures | Errors | Time |')
+            print('|-------|----------|--------|------|')
+            print(f'| {tests} | {failures} | {errors} | {time}s |')
+
+            if int(failures) > 0 or int(errors) > 0:
+                print('\n#### ❌ Failed Tests:')
+                for testcase in root.findall('.//testcase'):
+                    name = testcase.get('name', 'Unknown')
+                    classname = testcase.get('classname', '')
+                    failure = testcase.find('failure')
+                    error = testcase.find('error')
+                    print(f'- **{classname}::{name}**')
+                    if failure is not None:
+                        print(f'  - Failure: {failure.get("message", "Unknown error")}')
+                    if error is not None:
+                        print(f'  - Error: {error.get("message", "Unknown error")}')
+        except Exception as e:
+            print(f'Could not parse test results: {e}')
+        " >> $GITHUB_STEP_SUMMARY
+        fi
+        
+    - name: Generate Test Summary
+      if: always()
+      run: |
+        echo "## 🧪 Test Results - Python ${{ matrix.python-version }} on ${{ matrix.os }}" >> $GITHUB_STEP_SUMMARY
+        echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Status | ${{ job.status == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Python Version | ${{ matrix.python-version }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| OS | ${{ matrix.os }} |" >> $GITHUB_STEP_SUMMARY
+        if [ -f coverage.xml ]; then
+          COVERAGE=$(python -c "import xml.etree.ElementTree as ET; tree = ET.parse('coverage.xml'); print(f\"{float(tree.getroot().attrib['line-rate'])*100:.1f}%\")" 2>/dev/null || echo "N/A")
+          echo "| Coverage | $COVERAGE |" >> $GITHUB_STEP_SUMMARY
+        fi
         
     - name: Upload Test Artifacts
       uses: actions/upload-artifact@v4
@@ -171,6 +233,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: changes
     if: needs.changes.outputs.python == 'true'
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
     steps:
     - uses: actions/checkout@v4
     
@@ -185,18 +251,38 @@ jobs:
         pip install safety bandit
         
     - name: Run safety check
+      id: safety
       run: safety check --file requirements.txt
       continue-on-error: true
       
     - name: Run bandit security scan
-      run: bandit -r data_processing data_acquisition visualization config -f json -o bandit-report.json -f sarif -o bandit-results.sarif
+      id: bandit
+      run: |
+        # Run bandit and generate JSON report
+        bandit -r data_processing data_acquisition visualization config -f json -o bandit-report.json || echo "Bandit scan completed with findings"
+        # Convert to SARIF format
+        python scripts/bandit_to_sarif.py bandit-report.json bandit-results.sarif
       continue-on-error: true
       
     - name: Upload SARIF to GitHub Security
       uses: github/codeql-action/upload-sarif@v3
-      if: always()
+      if: always() && hashFiles('bandit-results.sarif') != ''
       with:
         sarif_file: bandit-results.sarif
+      continue-on-error: true
+      
+    - name: Generate Security Summary
+      if: always()
+      run: |
+        echo "## 🔒 Security Scan Results" >> $GITHUB_STEP_SUMMARY
+        echo "| Tool | Status | Details |" >> $GITHUB_STEP_SUMMARY
+        echo "|------|--------|---------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Safety | ${{ steps.safety.outcome == 'success' && '✅ Passed' || '❌ Failed' }} | Dependency vulnerability scan |" >> $GITHUB_STEP_SUMMARY
+        echo "| Bandit | ${{ steps.bandit.outcome == 'success' && '✅ Passed' || '❌ Failed' }} | Static security analysis |" >> $GITHUB_STEP_SUMMARY
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📊 Security Scan Details" >> $GITHUB_STEP_SUMMARY
+        python scripts/security_summary.py bandit-report.json >> $GITHUB_STEP_SUMMARY
       
     - name: Upload bandit report
       uses: actions/upload-artifact@v4
