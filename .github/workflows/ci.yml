@@ -92,16 +92,14 @@ jobs:
         
     - name: Run tests with pytest
       run: |
-        echo "Current directory: $(pwd)"
-        echo "Python path: $(python -c 'import sys; print(sys.path)')"
-        echo "Files in current directory:"
-        ls -la
-        echo "Files in tests directory:"
-        ls -la tests/
+        python -c "import os, sys; print('Current directory:', os.getcwd()); print('Python path:', sys.path)"
+        python -c "import os; print('Files in current directory:'); [print(f) for f in os.listdir('.')]"
+        python -c "import os; print('Files in tests directory:'); [print(f) for f in os.listdir('tests')] if os.path.exists('tests') else print('tests directory not found')"
         echo "Running pytest with discovery info..."
         pytest --collect-only -q
         echo "Running actual tests..."
         pytest --cov=data_processing --cov=data_acquisition --cov=visualization --cov=config --cov-report=xml --cov-report=term-missing --junitxml=test-results.xml -v tests/
+      shell: bash
         
     - name: Publish Test Results
       uses: dorny/test-reporter@v1.9.1
