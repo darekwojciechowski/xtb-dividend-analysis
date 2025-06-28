@@ -3,11 +3,16 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from pathlib import Path
 import os
+import sys
+
+# Add parent directory to path for imports
+sys.path.append(str(Path(__file__).parent.parent))
 
 # Try both absolute and relative imports for flexibility
 try:
     from visualization.plot_style import apply_github_dark_theme, github_palette
-except ImportError:
+except ModuleNotFoundError:
+    # Fallback to relative import when running from visualization/ directory
     from plot_style import apply_github_dark_theme, github_palette
 
 # Apply the theme
