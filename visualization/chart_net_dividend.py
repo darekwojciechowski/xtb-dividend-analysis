@@ -1,14 +1,25 @@
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from plot_style import apply_github_dark_theme, github_palette
+from pathlib import Path
+import os
+
+# Try both absolute and relative imports for flexibility
+try:
+    from visualization.plot_style import apply_github_dark_theme, github_palette
+except ImportError:
+    from plot_style import apply_github_dark_theme, github_palette
 
 # Apply the theme
 apply_github_dark_theme()
 
+# Find the correct path to the CSV file
+current_dir = Path(__file__).parent
+project_root = current_dir.parent if current_dir.name == 'visualization' else current_dir
+csv_path = project_root / "assets" / "for_google_spreadsheet.csv"
+
 # Load data
-file_path = "for_google_spreadsheet.csv"
-df = pd.read_csv(file_path, sep="\t")
+df = pd.read_csv(csv_path, sep="\t")
 
 # Check required columns
 required_columns = {"Ticker", "Net Dividend"}

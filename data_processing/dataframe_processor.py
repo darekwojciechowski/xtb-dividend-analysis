@@ -6,7 +6,7 @@ from typing import Dict, Optional, List, Tuple
 from .extractor import MultiConditionExtractor
 from .date_converter import DateConverter
 from datetime import datetime
-from visualization.ticker_colors import ticker_colors, get_random_color
+from visualization.ticker_colors import get_random_color
 
 
 class DataFrameProcessor:
