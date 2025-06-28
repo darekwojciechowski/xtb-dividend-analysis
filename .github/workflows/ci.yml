@@ -113,7 +113,7 @@ jobs:
         
         if os.path.exists('test-results.xml'):
             try:
-                with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+                with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as f:
                     f.write("### 📊 Test Results Summary\n")
                     
                 tree = ET.parse('test-results.xml')
@@ -123,7 +123,7 @@ jobs:
                 errors = root.get('errors', '0')
                 time = root.get('time', '0')
 
-                with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+                with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as f:
                     f.write("| Tests | Failures | Errors | Time |\n")
                     f.write("|-------|----------|--------|----- |\n")
                     f.write(f"| {tests} | {failures} | {errors} | {time}s |\n")
@@ -143,7 +143,7 @@ jobs:
                                 msg = error.get('message', 'Unknown error').replace('\n', ' ')
                                 f.write(f"  - Error: {msg}\n")
             except Exception as e:
-                with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+                with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as f:
                     f.write(f"Could not parse test results: {e}\n")
         
     - name: Generate Test Summary
@@ -153,7 +153,7 @@ jobs:
         import os
         import xml.etree.ElementTree as ET
         
-        with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+        with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as f:
             f.write("## 🧪 Test Results - Python ${{ matrix.python-version }} on ${{ matrix.os }}\n")
             f.write("| Metric | Value |\n")
             f.write("|--------|-------|\n")
