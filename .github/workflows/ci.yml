@@ -92,12 +92,6 @@ jobs:
         
     - name: Run tests with pytest
       run: |
-        python -c "import os, sys; print('Current directory:', os.getcwd()); print('Python path:', sys.path)"
-        python -c "import os; print('Files in current directory:'); [print(f) for f in os.listdir('.')]"
-        python -c "import os; print('Files in tests directory:'); [print(f) for f in os.listdir('tests')] if os.path.exists('tests') else print('tests directory not found')"
-        echo "Running pytest with discovery info..."
-        pytest --collect-only -q
-        echo "Running actual tests..."
         pytest --cov=data_processing --cov=data_acquisition --cov=visualization --cov=config --cov-report=xml --cov-report=term-missing --junitxml=test-results.xml -v tests/
       shell: bash
         
@@ -118,7 +112,6 @@ jobs:
         import xml.etree.ElementTree as ET
         import os
         
-        # Simple parsing for debugging - detailed summary will be in summary job
         if os.path.exists('test-results.xml'):
             try:
                 tree = ET.parse('test-results.xml')
@@ -127,12 +120,7 @@ jobs:
                 failures = root.get('failures', '0')
                 errors = root.get('errors', '0')
                 
-                print(f"Tests run: {tests}, Failures: {failures}, Errors: {errors}")
-                
-                # Only write to summary if there are failures/errors
-                if int(failures) > 0 or int(errors) > 0:
-                    with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as f:
-                        f.write(f"⚠️ Python ${{ matrix.python-version }} on ${{ matrix.os }}: {failures} failures, {errors} errors\n")
+                print(f"Tests: {tests}, Failures: {failures}, Errors: {errors}")
             except Exception as e:
                 print(f"Could not parse test results: {e}")
         
@@ -140,11 +128,9 @@ jobs:
       if: always()
       shell: python
       run: |
-        import os
-        
-        # Minimal summary - detailed report will be in summary job
-        with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as f:
-            f.write(f"✅ Python ${{ matrix.python-version }} on ${{ matrix.os }} completed\n")
+        # Don't write individual job results to main summary
+        # All reporting will be handled by the summary job
+        print(f"✅ Python ${{ matrix.python-version }} on ${{ matrix.os }} test job completed")
         
     - name: Upload Test Artifacts
       uses: actions/upload-artifact@v4
@@ -348,40 +334,30 @@ jobs:
         
         # Generate summary
         with open(os.environ['GITHUB_STEP_SUMMARY'], 'w', encoding='utf-8') as f:
-            f.write("# 🚀 CI Pipeline Complete Summary\n\n")
+            f.write("# 🚀 CI Pipeline Summary\n\n")
             
             # Overall status
             all_passed = '${{ needs.test.result }}' == 'success' and '${{ needs.lint.result }}' == 'success' and '${{ needs.security.result }}' == 'success'
-            if all_passed:
-                f.write("## ✅ All Checks Passed! Ready to merge.\n\n")
-            else:
-                f.write("## ⚠️ Some checks failed. Please review below.\n\n")
+            status_emoji = "✅" if all_passed else "⚠️"
+            status_text = "All checks passed! Ready to merge." if all_passed else "Some checks failed. Please review."
+            
+            f.write(f"## {status_emoji} {status_text}\n\n")
             
             # Job results table
-            f.write("## 📊 Job Results\n\n")
-            f.write("| Job | Status | Details |\n")
-            f.write("|-----|--------|---------|\n")
-            f.write("| 🧪 Tests | ${{ needs.test.result == 'success' && '✅ Passed' || '❌ Failed' }} | Cross-platform testing |\n")
-            f.write("| 🔍 Linting | ${{ needs.lint.result == 'success' && '✅ Passed' || '❌ Failed' }} | Code quality checks |\n")
-            f.write("| 🔒 Security | ${{ needs.security.result == 'success' && '✅ Passed' || '❌ Failed' }} | Security scanning |\n\n")
+            f.write("## 📊 Results\n\n")
+            f.write("| Job | Status |\n")
+            f.write("|-----|--------|\n")
+            f.write("| 🧪 Tests | ${{ needs.test.result == 'success' && '✅ Passed' || '❌ Failed' }} |\n")
+            f.write("| 🔍 Linting | ${{ needs.lint.result == 'success' && '✅ Passed' || '❌ Failed' }} |\n")
+            f.write("| 🔒 Security | ${{ needs.security.result == 'success' && '✅ Passed' || '❌ Failed' }} |\n\n")
             
-            # Test results summary
-            f.write("## 🧪 Combined Test Results\n\n")
-            f.write("| Metric | Value |\n")
-            f.write("|--------|-------|\n")
-            f.write(f"| Total Tests | {total_tests} |\n")
-            f.write(f"| Failures | {total_failures} |\n")
-            f.write(f"| Errors | {total_errors} |\n")
-            f.write(f"| Execution Time | {total_time:.2f}s |\n")
-            f.write(f"| Success Rate | {((total_tests - total_failures - total_errors) / max(total_tests, 1) * 100):.1f}% |\n\n")
-            
-            # Failed tests details
+            # Failed tests (if any)
             if failed_tests:
-                f.write("### ❌ Failed Tests\n")
-                for test in failed_tests[:10]:  # Limit to first 10
+                f.write("## ❌ Failed Tests\n")
+                for test in failed_tests[:5]:  # Limit to 5
                     f.write(f"- {test}\n")
-                if len(failed_tests) > 10:
-                    f.write(f"- ... and {len(failed_tests) - 10} more\n")
+                if len(failed_tests) > 5:
+                    f.write(f"- ... and {len(failed_tests) - 5} more\n")
                 f.write("\n")
             
             # Pipeline metrics
@@ -414,6 +390,17 @@ jobs:
 
     - name: Set final status
       run: |
+        echo "📊 Pipeline completed"
+        echo "- Tests: ${{ needs.test.result }}"
+        echo "- Linting: ${{ needs.lint.result }}"
+        echo "- Security: ${{ needs.security.result }}"
+          ${{ (needs.test.result == 'success' && needs.lint.result == 'success' && needs.security.result == 'success') && '### 🎉 All checks passed! Ready to merge.' || '### ⚠️ Some checks failed. Please review the errors.' }}
+          
+          ---
+          **Workflow:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) | **Commit:** ${{ github.sha }} | **Branch:** ${{ github.head_ref }}
+
+    - name: Set final status
+      run: |
         echo "📊 Final Results Summary:"
         echo "- Test job: ${{ needs.test.result }}"
         echo "- Lint job: ${{ needs.lint.result }}"
@@ -423,6 +410,19 @@ jobs:
           echo "✅ Pipeline completed successfully"
         else
           echo "⚠️ Pipeline completed with some failures - check individual job results"
+          echo "Note: This is informational only, individual jobs may have continue-on-error set"
+        fi
+        echo "Summary job completed"
+          echo "Note: This is informational only, individual jobs may have continue-on-error set"
+        fi
+        echo "Summary job completed"
+        if [ "${{ needs.test.result }}" = "success" ] && [ "${{ needs.lint.result }}" = "success" ] && [ "${{ needs.security.result }}" = "success" ]; then
+          echo "✅ Pipeline completed successfully"
+        else
+          echo "⚠️ Pipeline completed with some failures - check individual job results"
+          echo "Note: This is informational only, individual jobs may have continue-on-error set"
+        fi
+        echo "Summary job completed"
           echo "Note: This is informational only, individual jobs may have continue-on-error set"
         fi
         echo "Summary job completed"
