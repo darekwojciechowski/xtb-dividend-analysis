@@ -1,6 +1,7 @@
 import os
-from playwright.sync_api import sync_playwright
 import re
+
+from playwright.sync_api import sync_playwright
 
 
 def find_and_download_latest_files():
@@ -11,20 +12,21 @@ def find_and_download_latest_files():
         # Navigate to the desired page
         # Replace with the actual URL
         page.goto(
-            'https://nbp.pl/statystyka-i-sprawozdawczosc/kursy/archiwum-tabela-a-csv-xls/')
+            "https://nbp.pl/statystyka-i-sprawozdawczosc/kursy/archiwum-tabela-a-csv-xls/"
+        )
 
         # Initialize a list to store file elements and their names
         file_elements = []
 
         # Iterate over potential child elements within the specified parent div
         for i in range(0, 50):  # Adjust the range as needed
-            selector = f'.wp-block-buttons.is-layout-flex.wp-block-buttons-is-layout-flex div:nth-child({i})'
+            selector = f".wp-block-buttons.is-layout-flex.wp-block-buttons-is-layout-flex div:nth-child({i})"
             element = page.query_selector(selector)
 
             if element:
                 file_name = element.inner_text()
                 # Extract the year or version number using regex
-                match = re.search(r'\d{4}', file_name)
+                match = re.search(r"\d{4}", file_name)
                 if match:
                     year = int(match.group())
                     file_elements.append((year, file_name, element))
@@ -46,10 +48,9 @@ def find_and_download_latest_files():
                 download = download_info.value
                 # Dynamically set the download path to the 'data' directory within the current project
                 script_dir = os.path.dirname(os.path.abspath(__file__))
-                data_dir = os.path.join(script_dir, 'data')
+                data_dir = os.path.join(script_dir, "data")
                 os.makedirs(data_dir, exist_ok=True)
-                download_path = os.path.join(
-                    data_dir, download.suggested_filename)
+                download_path = os.path.join(data_dir, download.suggested_filename)
                 download.save_as(download_path)
                 print(f"File downloaded to: {download_path}")
 

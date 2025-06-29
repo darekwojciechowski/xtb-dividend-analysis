@@ -1,6 +1,5 @@
-import pytest
 import pandas as pd
-from unittest.mock import MagicMock
+import pytest
 
 # Import the class to test
 from data_processing.dataframe_processor import DataFrameProcessor
@@ -12,17 +11,19 @@ def sample_dataframe():
     Provides a sample DataFrame for testing DataFrameProcessor methods.
     Includes all necessary columns required by the tested methods.
     """
-    df = pd.DataFrame({
-        "Date": ["2024-01-01", "2024-01-02"],
-        "Ticker": ["AAPL", "MSFT"],
-        "Amount": [10.1, 20.4],
-        "Type": ["Cash", "Cash"],
-        "Comment": ["Dividend", "Dividend"],
-        "Net Dividend": [8.4, 16.5],
-        "Shares": [1, 2],
-        "Tax Collected": [2.5, 4.9],
-        "Currency": ["USD", "USD"]
-    })
+    df = pd.DataFrame(
+        {
+            "Date": ["2024-01-01", "2024-01-02"],
+            "Ticker": ["AAPL", "MSFT"],
+            "Amount": [10.1, 20.4],
+            "Type": ["Cash", "Cash"],
+            "Comment": ["Dividend", "Dividend"],
+            "Net Dividend": [8.4, 16.5],
+            "Shares": [1, 2],
+            "Tax Collected": [2.5, 4.9],
+            "Currency": ["USD", "USD"],
+        }
+    )
     df["Date"] = pd.to_datetime(df["Date"])
     return df
 
@@ -116,14 +117,16 @@ def test_calculate_dividend(processor):
         (["15%", "20%", "No tax info"], [0.15, 0.20, 0.0]),
         (["5%", "0%", "30%"], [0.05, 0.0, 0.30]),
         (["No info", "25%", ""], [0.0, 0.25, 0.0]),
-    ]
+    ],
 )
 def test_replace_tax_with_percentage_parametrized(comments, expected):
-    df = pd.DataFrame({
-        "Comment": comments,
-        "Tax Collected": [0.0] * len(comments),
-        "Amount": [100.0] * len(comments)
-    })
+    df = pd.DataFrame(
+        {
+            "Comment": comments,
+            "Tax Collected": [0.0] * len(comments),
+            "Amount": [100.0] * len(comments),
+        }
+    )
     processor = DataFrameProcessor(df)
     processor.replace_tax_with_percentage()
     assert list(processor.df["Tax Collected"]) == expected
@@ -163,7 +166,7 @@ def test_methods_on_empty_dataframe():
 
 def test_move_negative_values_with_no_negatives(processor):
     """
-    Tests that the move_negative_values method does not modify the DataFrame 
+    Tests that the move_negative_values method does not modify the DataFrame
     if no negative values are present.
     """
     original_df = processor.df.copy()
@@ -175,10 +178,12 @@ def test_filter_dividends_with_missing_values():
     """
     Tests that the filter_dividends method handles missing values in the 'Type' column correctly.
     """
-    df_with_nans = pd.DataFrame({
-        "Type": ["Dividend", None, "Dywidenda", "Invalid", None],
-        "Amount": [10.0, 20.0, 30.0, 40.0, 50.0]
-    })
+    df_with_nans = pd.DataFrame(
+        {
+            "Type": ["Dividend", None, "Dywidenda", "Invalid", None],
+            "Amount": [10.0, 20.0, 30.0, 40.0, 50.0],
+        }
+    )
     processor = DataFrameProcessor(df_with_nans)
     processor.filter_dividends()
     assert processor.df["Type"].isnull().sum() == 0
@@ -189,23 +194,48 @@ def test_filter_dividends_with_missing_values():
     "periods,tickers,amounts,types,comments,expected_min_length",
     [
         # Small dataset
-        (100, ["AAPL"] * 100, [10.0] * 100,
-         ["Cash"] * 100, ["Dividend"] * 100, 1),
+        (100, ["AAPL"] * 100, [10.0] * 100, ["Cash"] * 100, ["Dividend"] * 100, 1),
         # Medium dataset with mixed tickers
-        (1000, ["AAPL", "MSFT", "GOOGL"] * 334, [15.5, 25.0, 30.75]
-         * 334, ["Cash"] * 1000, ["Dividend"] * 1000, 1),
+        (
+            1000,
+            ["AAPL", "MSFT", "GOOGL"] * 334,
+            [15.5, 25.0, 30.75] * 334,
+            ["Cash"] * 1000,
+            ["Dividend"] * 1000,
+            1,
+        ),
         # Large dataset with varied amounts
-        (5000, ["TSLA"] * 5000, list(range(1, 5001)),
-         ["Cash"] * 5000, ["Dividend"] * 5000, 1),
+        (
+            5000,
+            ["TSLA"] * 5000,
+            list(range(1, 5001)),
+            ["Cash"] * 5000,
+            ["Dividend"] * 5000,
+            1,
+        ),
         # Very large dataset
-        (10000, ["NVDA", "AMD"] * 5000, [50.0, 75.0] *
-         5000, ["Cash"] * 10000, ["Dividend"] * 10000, 1),
+        (
+            10000,
+            ["NVDA", "AMD"] * 5000,
+            [50.0, 75.0] * 5000,
+            ["Cash"] * 10000,
+            ["Dividend"] * 10000,
+            1,
+        ),
         # Mixed types and comments
-        (2000, ["IBM"] * 2000, [100.0] * 2000, ["Cash", "Stock"]
-         * 1000, ["Dividend", "Split"] * 1000, 0),
-    ]
+        (
+            2000,
+            ["IBM"] * 2000,
+            [100.0] * 2000,
+            ["Cash", "Stock"] * 1000,
+            ["Dividend", "Split"] * 1000,
+            0,
+        ),
+    ],
 )
-def test_large_dataframe(periods, tickers, amounts, types, comments, expected_min_length):
+def test_large_dataframe(
+    periods, tickers, amounts, types, comments, expected_min_length
+):
     """
     Tests that all methods handle large DataFrames efficiently without performance issues.
     Uses parametrized inputs to test different scenarios and data sizes.
@@ -216,13 +246,15 @@ def test_large_dataframe(periods, tickers, amounts, types, comments, expected_mi
     types = types[:periods]
     comments = comments[:periods]
 
-    large_df = pd.DataFrame({
-        "Date": pd.date_range(start="2024-01-01", periods=periods, freq="D"),
-        "Ticker": tickers,
-        "Amount": amounts,
-        "Type": types,
-        "Comment": comments
-    })
+    large_df = pd.DataFrame(
+        {
+            "Date": pd.date_range(start="2024-01-01", periods=periods, freq="D"),
+            "Ticker": tickers,
+            "Amount": amounts,
+            "Type": types,
+            "Comment": comments,
+        }
+    )
     processor = DataFrameProcessor(large_df)
     processor.group_by_dividends()
     assert len(processor.df) >= expected_min_length

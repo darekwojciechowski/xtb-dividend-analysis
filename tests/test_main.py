@@ -1,6 +1,5 @@
-import pytest
 import pandas as pd
-from unittest.mock import MagicMock
+import pytest
 
 # Import the class to test
 from data_processing.dataframe_processor import DataFrameProcessor
@@ -12,17 +11,19 @@ def sample_dataframe():
     Provides a sample DataFrame for testing DataFrameProcessor methods.
     Includes all necessary columns required by the tested methods.
     """
-    df = pd.DataFrame({
-        "Date": ["2024-01-01", "2024-01-02"],
-        "Ticker": ["AAPL", "MSFT"],
-        "Amount": [10.3, 20.5],
-        "Type": ["Cash", "Cash"],
-        "Comment": ["Dividend", "Dividend"],
-        "Net Dividend": [8.1, 16.7],
-        "Shares": [1, 2],
-        "Tax Collected": [2.4, 4.7],
-        "Currency": ["USD", "USD"]
-    })
+    df = pd.DataFrame(
+        {
+            "Date": ["2024-01-01", "2024-01-02"],
+            "Ticker": ["AAPL", "MSFT"],
+            "Amount": [10.3, 20.5],
+            "Type": ["Cash", "Cash"],
+            "Comment": ["Dividend", "Dividend"],
+            "Net Dividend": [8.1, 16.7],
+            "Shares": [1, 2],
+            "Tax Collected": [2.4, 4.7],
+            "Currency": ["USD", "USD"],
+        }
+    )
     df["Date"] = pd.to_datetime(df["Date"])
     return df
 
@@ -51,13 +52,15 @@ def test_methods_with_missing_values():
     Tests that methods handle missing values in the DataFrame gracefully.
     Ensures rows with NaN values in critical columns are removed.
     """
-    df_with_nans = pd.DataFrame({
-        "Date": ["2024-01-01", None],
-        "Ticker": ["AAPL", None],
-        "Amount": [10.0, None],
-        "Type": ["Cash", None],
-        "Comment": ["Dividend", None]
-    })
+    df_with_nans = pd.DataFrame(
+        {
+            "Date": ["2024-01-01", None],
+            "Ticker": ["AAPL", None],
+            "Amount": [10.0, None],
+            "Type": ["Cash", None],
+            "Comment": ["Dividend", None],
+        }
+    )
     processor = DataFrameProcessor(df_with_nans)
     processor.filter_dividends()
     # Ensure rows with NaN in 'Type' are removed
@@ -66,7 +69,7 @@ def test_methods_with_missing_values():
 
 def test_replace_tax_with_percentage_logic(processor):
     """
-    Tests that the replace_tax_with_percentage method correctly calculates 
+    Tests that the replace_tax_with_percentage method correctly calculates
     and adds a 'Tax Percentage' column based on 'Tax Collected' and 'Amount'.
     """
     # Prepare input data
@@ -79,8 +82,7 @@ def test_replace_tax_with_percentage_logic(processor):
     # Check if the column was added
     if "Tax Percentage" in processor.df.columns:
         # Verify calculations
-        expected_values = (
-            processor.df["Tax Collected"] / processor.df["Amount"]) * 100
+        expected_values = (processor.df["Tax Collected"] / processor.df["Amount"]) * 100
         assert all(processor.df["Tax Percentage"] == expected_values)
     else:
         # Skip the test if the column is not added
@@ -92,13 +94,15 @@ def test_large_dataframe():
     Tests that methods handle large DataFrames efficiently without performance degradation.
     Verifies that the resulting DataFrame is not empty.
     """
-    large_df = pd.DataFrame({
-        "Date": pd.date_range(start="2024-01-01", periods=10000, freq="D"),
-        "Ticker": ["AAPL"] * 10000,
-        "Amount": [10.0] * 10000,
-        "Type": ["Cash"] * 10000,
-        "Comment": ["Dividend"] * 10000
-    })
+    large_df = pd.DataFrame(
+        {
+            "Date": pd.date_range(start="2024-01-01", periods=10000, freq="D"),
+            "Ticker": ["AAPL"] * 10000,
+            "Amount": [10.0] * 10000,
+            "Type": ["Cash"] * 10000,
+            "Comment": ["Dividend"] * 10000,
+        }
+    )
     processor = DataFrameProcessor(large_df)
     processor.group_by_dividends()
     assert len(processor.df) > 0

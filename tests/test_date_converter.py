@@ -1,4 +1,3 @@
-import pytest
 from data_processing.date_converter import DateConverter
 
 

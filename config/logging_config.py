@@ -14,11 +14,10 @@ def setup_logging(log_level=logging.INFO, log_file="app.log"):
 
     # Ensure the log file is saved in the logs folder, overwrite on each run (no history)
     log_file_path = os.path.join(logs_dir, log_file)
-    handlers.append(logging.FileHandler(
-        log_file_path, encoding='utf-8', mode='w'))
+    handlers.append(logging.FileHandler(log_file_path, encoding="utf-8", mode="w"))
 
     logging.basicConfig(
         level=log_level,
         format="[%(levelname)s] %(name)s: %(message)s",
-        handlers=handlers
+        handlers=handlers,
     )
