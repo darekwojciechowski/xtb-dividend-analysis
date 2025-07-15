@@ -4,6 +4,8 @@
 
 A data processing pipeline designed for financial data analysis, specifically for extracting and processing XTB broker statements for Google Sheets integration. This project demonstrates expertise in data extraction, transformation, and visualization techniques essential for financial data analysis.
 
+![Terminal](assets/xtb-dividend-analysis-terminal.gif)
+
 ## ✨ Key Features
 
 - **Automated Condition Extraction**: Intelligent parsing of financial data
