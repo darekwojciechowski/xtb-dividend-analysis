@@ -13,7 +13,7 @@ try:
     from visualization.plot_style import apply_github_dark_theme, github_palette
 except ModuleNotFoundError:
     # Fallback to relative import when running from visualization/ directory
-    from plot_style import apply_github_dark_theme, github_palette
+    from .plot_style import apply_github_dark_theme, github_palette  # type: ignore
 
 # Apply the theme
 apply_github_dark_theme()

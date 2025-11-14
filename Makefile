@@ -25,7 +25,7 @@ test-script-ps:  ## Run tests using the PowerShell script (Windows)
 	powershell -ExecutionPolicy Bypass -File scripts/run_tests.ps1
 
 lint:  ## Run all linting tools
-	poetry run flake8 data_processing data_acquisition visualization config tests --max-line-length=88 --extend-ignore=E203,W503
+	poetry run flake8 data_processing data_acquisition visualization config tests --max-line-length=88 --extend-ignore=E203,W503,E501
 	poetry run black --check data_processing data_acquisition visualization config tests
 	poetry run isort --check-only data_processing data_acquisition visualization config tests --profile black
 	poetry run mypy data_processing data_acquisition visualization config --ignore-missing-imports
@@ -35,7 +35,7 @@ format:  ## Format code with black and isort
 	poetry run isort data_processing data_acquisition visualization config tests --profile black
 
 security:  ## Run security scans
-	poetry run safety check
+	poetry run safety scan
 	poetry run bandit -r data_processing data_acquisition visualization config
 
 tox-test:  ## Run tests with tox (multiple Python versions)

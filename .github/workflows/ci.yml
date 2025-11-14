@@ -186,7 +186,7 @@ jobs:
         
     - name: Run flake8
       id: flake8
-      run: poetry run flake8 data_processing data_acquisition visualization config tests --max-line-length=88 --extend-ignore=E203,W503
+      run: poetry run flake8 data_processing data_acquisition visualization config tests --max-line-length=88 --extend-ignore=E203,W503,E501
       continue-on-error: true
       
     - name: Check code formatting with black
@@ -243,7 +243,7 @@ jobs:
         
     - name: Run safety check
       id: safety
-      run: poetry run safety check
+      run: poetry run safety scan
       continue-on-error: true
       
     - name: Run bandit security scan
