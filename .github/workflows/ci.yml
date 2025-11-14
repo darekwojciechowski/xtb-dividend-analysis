@@ -27,8 +27,8 @@ jobs:
         filters: |
           python:
             - '**/*.py'
-            - 'requirements*.txt'
             - 'pyproject.toml'
+            - 'poetry.lock'
             - 'tox.ini'
             - '.github/workflows/**'
 
@@ -61,38 +61,41 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
         
-    - name: Cache pip dependencies
+    - name: Install Poetry
+      run: |
+        python -m pip install --upgrade pip
+        pip install poetry
+        
+    - name: Cache Poetry dependencies
       uses: actions/cache@v4
       with:
         path: |
-          ~/.cache/pip
+          ~/.cache/pypoetry
           ~/.cache/playwright
           .mypy_cache
           .pytest_cache
-        key: ${{ runner.os }}-deps-${{ matrix.python-version }}-${{ hashFiles('**/requirements-test.txt', '**/pyproject.toml', '**/requirements.txt') }}
+        key: ${{ runner.os }}-poetry-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock', '**/pyproject.toml') }}
         restore-keys: |
-          ${{ runner.os }}-deps-${{ matrix.python-version }}-
-          ${{ runner.os }}-deps-
+          ${{ runner.os }}-poetry-${{ matrix.python-version }}-
+          ${{ runner.os }}-poetry-
           
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install pytest pytest-cov tox
-        pip install -r requirements-test.txt
+        poetry install --with dev
         
     - name: Install Playwright (optional)
       run: |
-        pip install "playwright>=1.45.0" || echo "Playwright installation failed, continuing without it"
+        poetry run pip install "playwright>=1.45.0" || echo "Playwright installation failed, continuing without it"
       continue-on-error: true
         
     - name: Install Playwright browsers (if needed)
       run: |
-        playwright install
+        poetry run playwright install
       continue-on-error: true
         
     - name: Run tests with pytest
       run: |
-        pytest --cov=data_processing --cov=data_acquisition --cov=visualization --cov=config --cov-report=xml --cov-report=term-missing --junitxml=test-results.xml -v tests/
+        poetry run pytest --cov=data_processing --cov=data_acquisition --cov=visualization --cov=config --cov-report=xml --cov-report=term-missing --junitxml=test-results.xml -v tests/
       shell: bash
         
     - name: Publish Test Results
@@ -171,29 +174,34 @@ jobs:
       with:
         python-version: "3.12"
         
-    - name: Install linting dependencies
+    - name: Install Poetry
       run: |
         python -m pip install --upgrade pip
-        pip install flake8 black isort mypy types-tabulate
+        pip install poetry
+        
+    - name: Install dependencies with linting tools
+      run: |
+        poetry install --with dev
+        poetry run pip install flake8 black isort mypy types-tabulate
         
     - name: Run flake8
       id: flake8
-      run: flake8 data_processing data_acquisition visualization config tests --max-line-length=88 --extend-ignore=E203,W503
+      run: poetry run flake8 data_processing data_acquisition visualization config tests --max-line-length=88 --extend-ignore=E203,W503
       continue-on-error: true
       
     - name: Check code formatting with black
       id: black
-      run: black --check data_processing data_acquisition visualization config tests
+      run: poetry run black --check data_processing data_acquisition visualization config tests
       continue-on-error: true
       
     - name: Check import sorting with isort
       id: isort
-      run: isort --check-only data_processing data_acquisition visualization config tests --profile black
+      run: poetry run isort --check-only data_processing data_acquisition visualization config tests --profile black
       continue-on-error: true
       
     - name: Run mypy type checking
       id: mypy
-      run: mypy data_processing data_acquisition visualization config --ignore-missing-imports
+      run: poetry run mypy data_processing data_acquisition visualization config --ignore-missing-imports
       continue-on-error: true
       
     - name: Generate Lint Summary
@@ -223,23 +231,28 @@ jobs:
       with:
         python-version: "3.12"
         
-    - name: Install security scanning tools
+    - name: Install Poetry
       run: |
         python -m pip install --upgrade pip
-        pip install safety bandit
+        pip install poetry
+        
+    - name: Install dependencies and security scanning tools
+      run: |
+        poetry install --with dev
+        poetry run pip install safety bandit
         
     - name: Run safety check
       id: safety
-      run: safety check --file requirements.txt
+      run: poetry run safety check
       continue-on-error: true
       
     - name: Run bandit security scan
       id: bandit
       run: |
         # Run bandit and generate JSON report
-        bandit -r data_processing data_acquisition visualization config -f json -o bandit-report.json || echo "Bandit scan completed with findings"
+        poetry run bandit -r data_processing data_acquisition visualization config -f json -o bandit-report.json || echo "Bandit scan completed with findings"
         # Convert to SARIF format
-        python scripts/bandit_to_sarif.py bandit-report.json bandit-results.sarif
+        poetry run python scripts/bandit_to_sarif.py bandit-report.json bandit-results.sarif
       continue-on-error: true
       
     - name: Upload SARIF to GitHub Security

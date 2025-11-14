@@ -39,15 +39,22 @@ Your XTB Dividend Analysis project now has comprehensive automated testing with 
 
 ## 🚀 How to Use
 
+### Install Dependencies
+```bash
+pip install poetry
+poetry install --with dev
+```
+
 ### Run Tests Locally
 ```bash
 # Quick test
-python run_tests.py
+poetry run python scripts/run_tests.py
 
 # Or using pytest directly
-pytest
+poetry run pytest
 
 # With coverage
+poetry run pytest --cov
 pytest --cov=data_processing --cov-report=html
 ```
 
@@ -108,7 +115,8 @@ tox
 
 ### 2. Install Development Dependencies
 ```bash
-pip install -r requirements.txt
+pip install poetry
+poetry install --with dev
 ```
 
 ### 3. Set Up Pre-commit (Recommended)
@@ -145,8 +153,8 @@ Add to your README.md:
 If you encounter issues:
 
 1. **Check the logs**: GitHub Actions → Actions tab
-2. **Run locally**: `python run_tests.py`
-3. **Check dependencies**: `pip install -r requirements.txt`
+2. **Run locally**: `poetry run python scripts/run_tests.py`
+3. **Check dependencies**: `poetry install --with dev`
 4. **Review docs**: See `TESTING.md` for detailed guide
 
 ## 📈 Monitoring

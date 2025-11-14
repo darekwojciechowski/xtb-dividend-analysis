@@ -1,45 +1,40 @@
-# Requirements Files
+# Dependency Management
 
-This project uses multiple requirements files for different purposes:
+Project uses **Poetry** for dependency management.
 
-## `requirements.txt` - Production Dependencies
-Contains all dependencies needed to run the application, including:
-- Core data processing libraries (pandas, numpy, matplotlib)
-- Playwright for web automation
-- All production dependencies
+## Installation
 
-**Usage:**
 ```bash
-pip install -r requirements.txt
+# Install Poetry
+pip install poetry
+
+# Install all dependencies
+poetry install
+
+# Production only
+poetry install --only main
 ```
 
-## `requirements-test.txt` - Testing Dependencies
-Contains dependencies needed for testing and development, excluding problematic packages like playwright that may have build issues on certain platforms:
-- All core dependencies
-- Testing frameworks (pytest, pytest-cov)
-- Code quality tools (flake8, black, isort, mypy)
-- Security scanning tools (safety, bandit)
+## Usage
 
-**Usage:**
 ```bash
-pip install -r requirements-test.txt
+# Run script
+poetry run python main.py
+
+# Run tests
+poetry run pytest
+
+# Add package
+poetry add pandas
+
+# Add dev package
+poetry add --group dev pytest
 ```
 
-## When to Use Which
+## Dependencies
 
-### Use `requirements.txt` for:
-- Production deployments
-- Local development when you need all features
-- When playwright functionality is required
+**Production** (`[project.dependencies]`):
+- pandas, numpy, matplotlib, openpyxl
 
-### Use `requirements-test.txt` for:
-- CI/CD pipelines (more reliable)
-- Testing environments
-- Development when playwright is not needed
-- Platforms with known build issues (e.g., macOS + Python 3.13)
-
-## CI/CD Strategy
-
-Our GitHub Actions workflows use `requirements-test.txt` to avoid build failures from optional dependencies like playwright, while still testing the core functionality thoroughly.
-
-Playwright is installed separately with error handling to prevent CI failures on incompatible platform/Python version combinations.
+**Development** (`[tool.poetry.group.dev.dependencies]`):
+- pytest, pytest-cov, flake8, black, isort, mypy, safety, bandit, tox

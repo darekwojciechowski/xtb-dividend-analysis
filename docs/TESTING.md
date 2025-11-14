@@ -4,12 +4,20 @@ This project uses comprehensive automated testing with pytest, tox, and GitHub A
 
 ## Quick Start
 
+### Installing Dependencies
+
+First, ensure Poetry is installed and dependencies are ready:
+```bash
+pip install poetry
+poetry install --with dev
+```
+
 ### Running Tests Locally
 
 **Option 1: Using the test runner script**
 ```bash
 # Python script (cross-platform)
-python scripts/run_tests.py
+poetry run python scripts/run_tests.py
 
 # PowerShell script (Windows)
 .\scripts\run_tests.ps1
@@ -18,16 +26,16 @@ python scripts/run_tests.py
 **Option 2: Direct pytest commands**
 ```bash
 # Run all tests
-pytest
+poetry run pytest
 
 # Run tests with coverage
-pytest --cov=data_processing --cov=data_acquisition --cov=visualization --cov=config --cov-report=term-missing
+poetry run pytest --cov=data_processing --cov=data_acquisition --cov=visualization --cov=config --cov-report=term-missing
 
 # Run specific test file
-pytest tests/test_dataframe_processor.py -v
+poetry run pytest tests/test_dataframe_processor.py -v
 
 # Run tests in verbose mode
-pytest -v
+poetry run pytest -v
 ```
 
 **Option 3: Using Make (if available)**
@@ -192,7 +200,7 @@ python -c "import sys; print(sys.path)"
 **2. Missing Dependencies**
 ```bash
 # Install all dependencies
-pip install -r requirements.txt
+poetry install --with dev
 ```
 
 **3. Playwright Issues**

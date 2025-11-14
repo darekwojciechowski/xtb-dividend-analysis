@@ -6,16 +6,17 @@ help:  ## Show this help message
 
 install:  ## Install all dependencies
 	python -m pip install --upgrade pip
-	pip install -r requirements.txt
+	pip install poetry
+	poetry install
 
 test:  ## Run all tests
-	pytest tests/ -v
+	poetry run pytest tests/ -v
 
 test-fast:  ## Run tests without coverage
-	pytest tests/ -v --tb=short
+	poetry run pytest tests/ -v --tb=short
 
 test-cov:  ## Run tests with coverage reporting
-	pytest tests/ -v --cov=data_processing --cov=data_acquisition --cov=visualization --cov=config --cov-report=term-missing --cov-report=html
+	poetry run pytest tests/ -v --cov=data_processing --cov=data_acquisition --cov=visualization --cov=config --cov-report=term-missing --cov-report=html
 
 test-script:  ## Run tests using the Python test runner script
 	python scripts/run_tests.py
@@ -24,18 +25,18 @@ test-script-ps:  ## Run tests using the PowerShell script (Windows)
 	powershell -ExecutionPolicy Bypass -File scripts/run_tests.ps1
 
 lint:  ## Run all linting tools
-	flake8 data_processing data_acquisition visualization config tests --max-line-length=88 --extend-ignore=E203,W503
-	black --check data_processing data_acquisition visualization config tests
-	isort --check-only data_processing data_acquisition visualization config tests --profile black
-	mypy data_processing data_acquisition visualization config --ignore-missing-imports
+	poetry run flake8 data_processing data_acquisition visualization config tests --max-line-length=88 --extend-ignore=E203,W503
+	poetry run black --check data_processing data_acquisition visualization config tests
+	poetry run isort --check-only data_processing data_acquisition visualization config tests --profile black
+	poetry run mypy data_processing data_acquisition visualization config --ignore-missing-imports
 
 format:  ## Format code with black and isort
-	black data_processing data_acquisition visualization config tests
-	isort data_processing data_acquisition visualization config tests --profile black
+	poetry run black data_processing data_acquisition visualization config tests
+	poetry run isort data_processing data_acquisition visualization config tests --profile black
 
 security:  ## Run security scans
-	safety check --file requirements.txt
-	bandit -r data_processing data_acquisition visualization config
+	poetry run safety check
+	poetry run bandit -r data_processing data_acquisition visualization config
 
 tox-test:  ## Run tests with tox (multiple Python versions)
 	tox
