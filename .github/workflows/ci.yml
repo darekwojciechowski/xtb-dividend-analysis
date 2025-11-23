@@ -74,7 +74,7 @@ jobs:
           ~/.cache/playwright
           .mypy_cache
           .pytest_cache
-        key: ${{ runner.os }}-poetry-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock', '**/pyproject.toml') }}
+        key: ${{ runner.os }}-poetry-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
         restore-keys: |
           ${{ runner.os }}-poetry-${{ matrix.python-version }}-
           ${{ runner.os }}-poetry-
@@ -346,11 +346,15 @@ jobs:
                 print(f"Error parsing {file_path}: {e}")
         
         # Generate summary
+        test_result = "${{ needs.test.result }}"
+        lint_result = "${{ needs.lint.result }}"
+        security_result = "${{ needs.security.result }}"
+        
         with open(os.environ['GITHUB_STEP_SUMMARY'], 'w', encoding='utf-8') as f:
             f.write("# CI Pipeline Summary\n\n")
             
             # Overall status
-            all_passed = '${{ needs.test.result }}' == 'success' and '${{ needs.lint.result }}' == 'success' and '${{ needs.security.result }}' == 'success'
+            all_passed = test_result == 'success' and lint_result == 'success' and security_result == 'success'
             status_text = "All checks passed! Ready to merge." if all_passed else "Some checks failed. Please review."
             
             f.write(f"## {status_text}\n\n")
@@ -359,9 +363,14 @@ jobs:
             f.write("## Results\n\n")
             f.write("| Job | Status |\n")
             f.write("|-----|--------|\n")
-            f.write("| Tests | ${{ needs.test.result == 'success' && '<span style=\"color:green\">✅ Passed</span>' || '<span style=\"color:red\">❌ Failed</span>' }} |\n")
-            f.write("| Linting | ${{ needs.lint.result == 'success' && '<span style=\"color:green\">✅ Passed</span>' || '<span style=\"color:red\">❌ Failed</span>' }} |\n")
-            f.write("| Security | ${{ needs.security.result == 'success' && '<span style=\"color:green\">✅ Passed</span>' || '<span style=\"color:red\">❌ Failed</span>' }} |\n\n")
+            
+            test_status = "✅ Passed" if test_result == 'success' else "❌ Failed"
+            lint_status = "✅ Passed" if lint_result == 'success' else "❌ Failed"
+            security_status = "✅ Passed" if security_result == 'success' else "❌ Failed"
+            
+            f.write(f"| Tests | {test_status} |\n")
+            f.write(f"| Linting | {lint_status} |\n")
+            f.write(f"| Security | {security_status} |\n\n")
             
             # Failed tests (if any)
             if failed_tests:
@@ -379,7 +388,7 @@ jobs:
             f.write("| Workflow Run | [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |\n")
             f.write("| Triggered By | ${{ github.event_name }} |\n")
             f.write("| Branch | ${{ github.ref_name }} |\n")
-            f.write("| Commit | [\`${{ github.sha }}\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) |\n")
+            f.write("| Commit | [`${{ github.sha }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) |\n")
 
     - name: Comment PR with Results
       if: github.event_name == 'pull_request'
