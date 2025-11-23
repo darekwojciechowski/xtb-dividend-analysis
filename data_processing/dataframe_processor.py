@@ -265,10 +265,12 @@ class DataFrameProcessor:
         self.df.drop(columns=drop_columns, errors="ignore", inplace=True)
 
         # Round the numeric columns to 2 decimal places
-        self.df["Net Dividend"] = self.df["Net Dividend"].round(2)
-        self.df["Tax Collected"] = self.df["Tax Collected"].round(2)
+        self.df["Net Dividend"] = pd.to_numeric(
+            self.df["Net Dividend"], errors='coerce').round(2)
+        self.df["Tax Collected"] = pd.to_numeric(
+            self.df["Tax Collected"], errors='coerce').round(2)
         # If Shares column exists and needs rounding
-        self.df["Shares"] = self.df["Shares"].round(2)
+        self.df["Shares"] = pd.to_numeric(self.df["Shares"], errors='coerce').round(2)
 
         # Move 'Shares' column to the end
         shares_col = self.df.pop("Shares")
