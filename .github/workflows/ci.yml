@@ -100,7 +100,7 @@ jobs:
         
     - name: Publish Test Results
       uses: dorny/test-reporter@v1.9.1
-      if: (success() || failure()) && hashFiles('test-results.xml') != ''
+      if: (success() || failure())
       with:
         name: Test Results (${{ matrix.python-version }} on ${{ matrix.os }})
         path: test-results.xml
@@ -109,7 +109,7 @@ jobs:
       continue-on-error: true
         
     - name: Parse Test Results (Fallback)
-      if: (success() || failure()) && hashFiles('test-results.xml') != ''
+      if: (success() || failure())
       shell: python
       run: |
         import xml.etree.ElementTree as ET
@@ -210,10 +210,10 @@ jobs:
         echo "## Code Quality Results" >> $GITHUB_STEP_SUMMARY
         echo "| Tool | Status |" >> $GITHUB_STEP_SUMMARY
         echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
-        echo "| flake8 | ${{ steps.flake8.outcome == 'success' && '<span style=\"color:green\">✅ Passed</span>' || '<span style=\"color:red\">❌ Failed</span>' }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| black | ${{ steps.black.outcome == 'success' && '<span style=\"color:green\">✅ Passed</span>' || '<span style=\"color:red\">❌ Failed</span>' }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| isort | ${{ steps.isort.outcome == 'success' && '<span style=\"color:green\">✅ Passed</span>' || '<span style=\"color:red\">❌ Failed</span>' }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| mypy | ${{ steps.mypy.outcome == 'success' && '<span style=\"color:green\">✅ Passed</span>' || '<span style=\"color:red\">❌ Failed</span>' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| flake8 | ${{ steps.flake8.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| black | ${{ steps.black.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| isort | ${{ steps.isort.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| mypy | ${{ steps.mypy.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
 
   security:
     runs-on: ubuntu-latest
@@ -257,7 +257,7 @@ jobs:
       
     - name: Upload SARIF to GitHub Security
       uses: github/codeql-action/upload-sarif@v3
-      if: always() && hashFiles('bandit-results.sarif') != ''
+      if: always()
       with:
         sarif_file: bandit-results.sarif
       continue-on-error: true
@@ -268,8 +268,8 @@ jobs:
         echo "## Security Scan Results" >> $GITHUB_STEP_SUMMARY
         echo "| Tool | Status | Details |" >> $GITHUB_STEP_SUMMARY
         echo "|------|--------|---------|" >> $GITHUB_STEP_SUMMARY
-        echo "| Safety | ${{ steps.safety.outcome == 'success' && '<span style=\"color:green\">✅ Passed</span>' || '<span style=\"color:red\">❌ Failed</span>' }} | Dependency vulnerability scan |" >> $GITHUB_STEP_SUMMARY
-        echo "| Bandit | ${{ steps.bandit.outcome == 'success' && '<span style=\"color:green\">✅ Passed</span>' || '<span style=\"color:red\">❌ Failed</span>' }} | Static security analysis |" >> $GITHUB_STEP_SUMMARY
+        echo "| Safety | ${{ steps.safety.outcome == 'success' && '✅ Passed' || '❌ Failed' }} | Dependency vulnerability scan |" >> $GITHUB_STEP_SUMMARY
+        echo "| Bandit | ${{ steps.bandit.outcome == 'success' && '✅ Passed' || '❌ Failed' }} | Static security analysis |" >> $GITHUB_STEP_SUMMARY
         
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Security Scan Details" >> $GITHUB_STEP_SUMMARY

@@ -48,6 +48,31 @@ poetry run pytest --cov --cov-report=html
 open htmlcov/index.html
 ```
 
+## ✍️ Writing Effective Tests
+
+We use `pytest` fixtures to create clean, maintainable test code.
+
+**Example Pattern:**
+
+```python
+import pytest
+from my_module import process_data
+
+@pytest.fixture
+def sample_dataset():
+    """Provides a standardized dataset for testing."""
+    return {"id": 1, "value": 100}
+
+def test_data_processing_logic(sample_dataset):
+    """
+    GIVEN a valid sample dataset
+    WHEN processed by the engine
+    THEN the result should be normalized
+    """
+    result = process_data(sample_dataset)
+    assert result["normalized_value"] == 1.0
+```
+
 ## 🔧 Troubleshooting & Debugging
 
 Common issues and how to resolve them.
