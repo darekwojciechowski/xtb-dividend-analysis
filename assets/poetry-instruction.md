@@ -38,11 +38,11 @@ Follow the prompts to set up your project. You can specify the package name, ver
 You can add dependencies to your project using Poetry. For example, to add `pandas`, `scikit-learn`, you can run:
 
 ```bash
-poetry add pandas matplotlib pandas numpy openpyxl
+poetry add pandas matplotlib numpy openpyxl playwright
 ```
 
 ## Step 4: Activate the Virtual Environment
-
+    
 Poetry automatically creates a virtual environment for your project. To activate it, use:
 
 ```bash
