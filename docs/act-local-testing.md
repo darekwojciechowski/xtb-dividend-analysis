@@ -38,3 +38,13 @@ Some steps (e.g., artifact upload, test reporter) expect `GITHUB_TOKEN`/`ACTIONS
 - Guard those steps in the workflow with `if: ${{ !env.ACT }}` so they skip during local dry runs.
 
 With these adjustments, the `act` execution can progress through the relevant jobs without the Docker credential errors or missing-token failures.
+
+## Cleaning up after running `act`
+
+`act` removes its temporary containers automatically, but it leaves downloaded images and cached files on disk. To free space:
+
+- Remove unused Docker images/layers: `docker system prune -f` (add `--volumes` if you also want to drop anonymous volumes).
+- Clear cached actions: `rm -rf ~/.cache/act`.
+- Delete workflow artifacts created in the repo (e.g., `coverage.xml`, `test-results.xml`) using standard `rm`/`git clean -fd` commands.
+
+Run these commands only when you are sure you no longer need the cached data.
