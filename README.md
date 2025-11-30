@@ -25,18 +25,20 @@ This project implements a robust testing infrastructure with comprehensive CI/CD
 - **pytest**: Main testing framework with coverage reporting
 - **tox**: Multi-environment testing across Python 3.9-3.13
 - **GitHub Actions**: Automated CI/CD with matrix testing across Ubuntu, Windows, and macOS
+- **act**: Local workflow testing with Docker (see `docs/act-local-testing.md`)
 
 #### 🚀 CI/CD Pipeline Features
 - **Multi-platform testing**: Tests run on Ubuntu, Windows, and macOS
-- **Multi-version support**: Compatible with Python 3.9, 3.10, 3.11, 3.12, and 3.13
+- **Multi-version support**: Requires Python ≥3.12; CI tests across 3.9-3.13 via tox
 - **Code quality checks**: Automated linting (flake8), formatting (black), import sorting (isort), and type checking (mypy)
 - **Security scanning**: Automated vulnerability detection with bandit and safety
 - **Coverage reporting**: Comprehensive test coverage with Codecov integration
+- **Optimized caching**: Uses SHA256-based dependency cache keys for reliable artifact management
 
 #### ⚡ Development Tools
 - **Pre-commit hooks**: Automated code quality checks before commits
-- **Cross-platform scripts**: Testing utilities for different operating systems
-- **Comprehensive documentation**: Detailed testing guides in `docs/TESTING.md`
+- **CI/Security scripts**: Utilities for bandit→SARIF conversion and security summaries (see `scripts/SCRIPTS_GUIDE.md`)
+- **Comprehensive documentation**: Testing guides in `docs/testing-guide.md`, quality assurance in `docs/quality-assurance.md`
 
 ## 📖 Usage Guide
 

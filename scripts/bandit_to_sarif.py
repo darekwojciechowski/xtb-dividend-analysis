@@ -1,91 +1,125 @@
 #!/usr/bin/env python3
-"""Convert bandit JSON output to SARIF format for GitHub Security."""
+"""Convert bandit JSON output to SARIF format for GitHub Security.
+
+This script converts Bandit security scan results to the SARIF 2.1.0 format,
+enabling integration with GitHub Security Code Scanning alerts.
+"""
 
 import json
 import sys
 from pathlib import Path
+from typing import Any
+
+
+def _map_severity(severity: str) -> str:
+    """Map bandit severity to SARIF level.
+
+    Args:
+        severity: Bandit severity level (LOW, MEDIUM, HIGH)
+
+    Returns:
+        SARIF level (note, warning, error)
+    """
+    severity_map = {"HIGH": "error", "MEDIUM": "warning", "LOW": "note"}
+    return severity_map.get(severity, "note")
+
+
+def _create_sarif_structure() -> dict[str, Any]:
+    """Create base SARIF 2.1.0 structure.
+
+    Returns:
+        Base SARIF dictionary with tool metadata
+    """
+    return {
+        "version": "2.1.0",
+        "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+        "runs": [{
+            "tool": {
+                "driver": {
+                    "name": "bandit",
+                    "version": "1.9.1",
+                    "informationUri": "https://bandit.readthedocs.io/",
+                    "shortDescription": {"text": "Security linter for Python"},
+                    "fullDescription": {
+                        "text": "Bandit is a tool designed to find common security issues in Python code."
+                    }
+                }
+            },
+            "results": []
+        }]
+    }
+
+
+def _convert_result(result: dict[str, Any]) -> dict[str, Any]:
+    """Convert a single bandit result to SARIF format.
+
+    Args:
+        result: Bandit result dictionary
+
+    Returns:
+        SARIF-formatted result
+    """
+    filename = result.get("filename", "unknown").replace("\\", "/")
+    line_number = result.get("line_number", 1)
+
+    return {
+        "ruleId": result.get("test_id", "unknown"),
+        "ruleIndex": 0,
+        "message": {
+            "text": result.get("issue_text", "Security issue detected")
+        },
+        "locations": [{
+            "physicalLocation": {
+                "artifactLocation": {"uri": filename},
+                "region": {
+                    "startLine": line_number,
+                    "startColumn": 1
+                }
+            }
+        }],
+        "level": _map_severity(result.get("issue_severity", "LOW")),
+        "partialFingerprints": {
+            "primaryLocationLineHash": f"{filename}:{line_number}"
+        }
+    }
 
 
 def convert_bandit_to_sarif(bandit_json_path: str, sarif_output_path: str) -> None:
-    """Convert bandit JSON report to SARIF format."""
+    """Convert bandit JSON report to SARIF format.
+
+    Args:
+        bandit_json_path: Path to bandit JSON report
+        sarif_output_path: Path where SARIF file will be written
+
+    Raises:
+        FileNotFoundError: If bandit JSON file doesn't exist
+        json.JSONDecodeError: If bandit JSON is malformed
+    """
     try:
-        with open(bandit_json_path) as f:
+        with Path(bandit_json_path).open() as f:
             bandit_data = json.load(f)
 
-        # Create SARIF structure
-        sarif = {
-            "version": "2.1.0",
-            "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
-            "runs": [{
-                "tool": {
-                    "driver": {
-                        "name": "bandit",
-                        "version": "1.8.5",
-                        "informationUri": "https://bandit.readthedocs.io/",
-                        "shortDescription": {"text": "Security linter for Python"},
-                        "fullDescription": {"text": "Bandit is a tool designed to find common security issues in Python code."}
-                    }
-                },
-                "results": []
-            }]
-        }
+        sarif = _create_sarif_structure()
 
-        # Convert bandit results to SARIF format
+        # Convert all bandit results
         for result in bandit_data.get("results", []):
-            severity_map = {
-                "LOW": "note",
-                "MEDIUM": "warning",
-                "HIGH": "error"
-            }
-
-            sarif_result = {
-                "ruleId": result.get("test_id", "unknown"),
-                "ruleIndex": 0,
-                "message": {
-                    "text": result.get("issue_text", "Security issue detected")
-                },
-                "locations": [{
-                    "physicalLocation": {
-                        "artifactLocation": {
-                            "uri": result.get("filename", "unknown").replace("\\", "/")
-                        },
-                        "region": {
-                            "startLine": result.get("line_number", 1),
-                            "startColumn": 1
-                        }
-                    }
-                }],
-                "level": severity_map.get(result.get("issue_severity", "LOW"), "note"),
-                "partialFingerprints": {
-                    "primaryLocationLineHash": f"{result.get('filename', '')}:{result.get('line_number', 0)}"
-                }
-            }
-            sarif["runs"][0]["results"].append(sarif_result)
+            sarif["runs"][0]["results"].append(_convert_result(result))
 
         # Write SARIF file
-        with open(sarif_output_path, "w") as f:
+        with Path(sarif_output_path).open("w") as f:
             json.dump(sarif, f, indent=2)
 
+        issue_count = len(sarif["runs"][0]["results"])
         print(
-            f"Successfully converted {len(sarif['runs'][0]['results'])} issues to SARIF format")
+            f"Successfully converted {issue_count} issue{'s' if issue_count != 1 else ''} to SARIF format")
 
-    except Exception as e:
-        print(f"Error converting bandit to SARIF: {e}")
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"Error converting bandit to SARIF: {e}", file=sys.stderr)
         # Create minimal valid SARIF file
-        minimal_sarif = {
-            "version": "2.1.0",
-            "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
-            "runs": [{
-                "tool": {
-                    "driver": {
-                        "name": "bandit"
-                    }
-                },
-                "results": []
-            }]
-        }
-        with open(sarif_output_path, "w") as f:
+        minimal_sarif = _create_sarif_structure()
+        with Path(sarif_output_path).open("w") as f:
             json.dump(minimal_sarif, f, indent=2)
+        raise
 
 
 if __name__ == "__main__":
