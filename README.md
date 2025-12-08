@@ -1,5 +1,16 @@
 # 💼 Financial Data Processing Pipeline
 
+![Python](https://img.shields.io/badge/Python-3.12+-blue?style=flat-square)
+![Poetry](https://img.shields.io/badge/Poetry-1.8-blue?style=flat-square)
+![Pandas](https://img.shields.io/badge/Pandas-2.2-green?style=flat-square)
+![NumPy](https://img.shields.io/badge/NumPy-2.2-blue?style=flat-square)
+![Matplotlib](https://img.shields.io/badge/Matplotlib-3.9-orange?style=flat-square)
+![Playwright](https://img.shields.io/badge/Playwright-1.45-green?style=flat-square)
+![Pytest](https://img.shields.io/badge/Pytest-9.0-red?style=flat-square)
+![Tox](https://img.shields.io/badge/Tox-4.32-purple?style=flat-square)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI/CD-blue?style=flat-square)
+![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
+
 ## 📋 Overview
 
 A data processing pipeline designed for financial data analysis, specifically for extracting and processing XTB broker statements for Google Sheets integration. This project demonstrates expertise in data extraction, transformation, and visualization techniques essential for financial data analysis.
@@ -87,7 +98,7 @@ Simply take the exported CSV file from this project and use it as input in the S
 
 - **Visualization**: Leverages `matplotlib` and `seaborn` for creating financial-specific plots and interactive visualizations.
 
-- **Web Automation**: Uses Playwright for automated browser interactions to download currency exchange rate data.
+- **Web Automation**: Uses `Playwright` for automated browser interactions to download currency exchange rate data.
 
 ## 📄 License
 
