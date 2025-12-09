@@ -1,6 +1,6 @@
 # 🧪 Comprehensive Testing Guide
 
-> **2025 Standard**: A practical guide to maintaining code quality and reliability.
+A practical guide to maintaining code quality and reliability.
 
 ## ⚡ Quick Start
 
