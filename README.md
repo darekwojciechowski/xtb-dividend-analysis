@@ -1,14 +1,14 @@
 # 💼 Financial Data Processing Pipeline
 
-![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI/CD-blue?style=flat-square)
-![Tox](https://img.shields.io/badge/Tox-4.0-purple?style=flat-square)
-![Python](https://img.shields.io/badge/Python-3.12+-blue?style=flat-square)
-![Playwright](https://img.shields.io/badge/Playwright-1.57-green?style=flat-square)
-![Pandas](https://img.shields.io/badge/Pandas-2.3-green?style=flat-square)
-![NumPy](https://img.shields.io/badge/NumPy-2.3-blue?style=flat-square)
-![Matplotlib](https://img.shields.io/badge/Matplotlib-3.10-orange?style=flat-square)
-![Pytest](https://img.shields.io/badge/Pytest-9.0-red?style=flat-square)
-![Poetry](https://img.shields.io/badge/Poetry-1.8-blue?style=flat-square)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI/CD-2088FF?style=flat-square&logo=github-actions&logoColor=white)
+![Build Status](https://img.shields.io/github/actions/workflow/status/darekwojciechowski/xtb-dividend-analysis/ci.yml?branch=main&style=flat-square&logo=github&label=Build)
+![Python Version](https://img.shields.io/badge/Python-3.12+-3776AB?style=flat-square&logo=python&logoColor=white)
+![Playwright](https://img.shields.io/pypi/v/playwright?label=Playwright&style=flat-square&logo=playwright&logoColor=white&color=2EAD33)
+![Pandas](https://img.shields.io/pypi/v/pandas?label=Pandas&style=flat-square&logo=pandas&logoColor=white&color=150458)
+![NumPy](https://img.shields.io/pypi/v/numpy?label=NumPy&style=flat-square&logo=numpy&logoColor=white&color=013243)
+![Matplotlib](https://img.shields.io/pypi/v/matplotlib?label=Matplotlib&style=flat-square&color=11557c)
+![Pytest](https://img.shields.io/pypi/v/pytest?label=Pytest&style=flat-square&logo=pytest&logoColor=white&color=0A9EDC)
+![Poetry](https://img.shields.io/badge/Poetry-1.8+-60A5FA?style=flat-square&logo=poetry&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
 
 ## 📋 Overview
@@ -46,11 +46,6 @@ This project implements a robust testing infrastructure with comprehensive CI/CD
 - **Coverage reporting**: Comprehensive test coverage with Codecov integration
 - **Optimized caching**: Uses SHA256-based dependency cache keys for reliable artifact management
 
-#### ⚡ Development Tools
-- **Pre-commit hooks**: Automated code quality checks before commits
-- **CI/Security scripts**: Utilities for bandit→SARIF conversion and security summaries (see `scripts/SCRIPTS_GUIDE.md`)
-- **Comprehensive documentation**: Testing guides in `docs/testing-guide.md`, quality assurance in `docs/quality-assurance.md`
-
 ## 📖 Usage Guide
 
 ### 1. 📥 Data Acquisition
@@ -77,7 +72,7 @@ python main.py
 
 #### Automated Export
 
-Use `GoogleSpreadsheetExporter` to export processed data to Google Sheets. Ensure all dependencies are installed and API credentials are configured for seamless integration.
+Use `GoogleSpreadsheetExporter` to export processed data to Google Sheets.
 
 ### 4. 📈 Visualization (External Repository)
 
@@ -85,6 +80,13 @@ To visualize the exported data, use the [Streamlit Dividend Dashboard](https://g
 Simply take the exported CSV file from this project and use it as input in the Streamlit dashboard for interactive data visualization.
 
 ![Dashboard Demo](assets/streamlit-dashboard-demo.gif)
+
+## 🗺️ System Architecture
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://mermaid.ink/svg/JSV7aW5pdDogeyd0aGVtZSc6ICdkYXJrJywgJ3RoZW1lVmFyaWFibGVzJzogeyAncHJpbWFyeUNvbG9yJzogJyMxZjI5MzcnLCAnbWFpbkJrZyc6ICcjMWYyOTM3JywgJ2NsdXN0ZXJCa2cnOiAnIzExMTgyNycsICdjbHVzdGVyQm9yZGVyJzogJyMzNzQxNTEnLCAnbGluZUNvbG9yJzogJyM5Y2EzYWYnLCAnZm9udEZhbWlseSc6ICdTZWdvZSBVSSwgc2Fucy1zZXJpZicsICdlZGdlTGFiZWxCYWNrZ3JvdW5kJzogJyMxMTE4MjcnIH19fSUlCmdyYXBoIExSCiAgICBzdWJncmFwaCBEYXRhIFsiJm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7RGF0YSBTY3VyY2VzJm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Il0KICAgICAgICBkaXJlY3Rpb24gVEIKICAgICAgICBBW1hUQiBTdGF0ZW1lbnRzXTo6OmRhdGEKICAgICAgICBCW05CUCBBcmNoaXZlXTo6OmRhdGEKICAgIGVuZAoKICAgIHN1YmdyYXBoIExvZ2ljIFsiJm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7UHJvY2Vzc2luZyBQaXBlbGluZSZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyJdCiAgICAgICAgZGlyZWN0aW9uIFRCCiAgICAgICAgQyhQbGF5d3JpZ2h0IERMKTo6OnByb2MKICAgICAgICBEe0RhdGEgRXh0cmFjdG9yfTo6OnByb2MKICAgICAgICBFW0RhdGVDb252ZXJ0ZXJdOjo6cHJvYwogICAgICAgIEZbREYgUHJvY2Vzc29yXTo6OnByb2MKICAgIGVuZAoKICAgIHN1YmdyYXBoIFVJIFsiJm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7T3V0cHV0ICYgVmlzdWFsaXphdGlvbiZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyJdCiAgICAgICAgZGlyZWN0aW9uIFRCCiAgICAgICAgR1tHb29nbGUgU2hlZXRzXTo6OnVpCiAgICAgICAgSFtWaXN1YWxpemF0aW9uc106Ojp1aQogICAgICAgIElbU3RyZWFtbGl0IERhc2hib2FyZF06Ojp1aQogICAgZW5kCgogICAgQiAtLT58RG93bmxvYWR8IEMKICAgIEMgLS0-fENTVnwgRAogICAgQSAtLT58UGFyc2V8IEQKICAgIEQgLS0-fE5vcm1hbGl6ZXwgRQogICAgRSAtLT58VHJhbnNmb3JtfCBGCiAgICBGIC0tPnxFeHBvcnR8IEcKICAgIEYgLS0-fFBsb3R8IEgKICAgIEcgLS0-fFN0cmVhbXwgSQogICAgSCAtLT58RW5oYW5jZXwgSQoKICAgIGNsYXNzRGVmIGRhdGEgZmlsbDojMTcyNTU0LHN0cm9rZTojNjBhNWZhLHN0cm9rZS13aWR0aDoycHgsY29sb3I6I2RiZWFmZSxyeDo4LHJ5Ojg7CiAgICBjbGFzc0RlZiBwcm9jIGZpbGw6IzJlMTA2NSxzdHJva2U6I2E3OGJmYSxzdHJva2Utd2lkdGg6MnB4LGNvbG9yOiNmM2U4ZmYscng6OCxyeTo4OwogICAgY2xhc3NEZWYgdWkgZmlsbDojMDY0ZTNiLHN0cm9rZTojMzRkMzk5LHN0cm9rZS13aWR0aDoycHgsY29sb3I6I2QxZmFlNSxyeDo4LHJ5Ojg7CiAgICBzdHlsZSBEYXRhIGZpbGw6IzExMTgyNyxzdHJva2U6IzM3NDE1MSxzdHJva2Utd2lkdGg6MXB4LHJ4OjEwLHJ5OjEwCiAgICBzdHlsZSBMb2dpYyBmaWxsOiMxMTE4Mjcsc3Ryb2tlOiMzNzQxNTEsc3Ryb2tlLXdpZHRoOjFweCxyeDoxMCxyeToxMAogICAgc3R5bGUgVUkgZmlsbDojMTExODI3LHN0cm9rZTojMzc0MTUxLHN0cm9rZS13aWR0aDoxcHgscng6MTAscnk6MTAK">
+  <img alt="System Architecture" src="https://mermaid.ink/svg/JSV7aW5pdDogeyd0aGVtZSc6ICdiYXNlJywgJ3RoZW1lVmFyaWFibGVzJzogeyAncHJpbWFyeUNvbG9yJzogJyNmZmYnLCAnbWFpbkJrZyc6ICcjZmZmJywgJ2NsdXN0ZXJCa2cnOiAnI2Y5ZmFmYicsICdjbHVzdGVyQm9yZGVyJzogJyNlNWU3ZWInLCAnbGluZUNvbG9yJzogJyM2YjcyODAnLCAnZm9udEZhbWlseSc6ICdTZWdvZSBVSSwgc2Fucy1zZXJpZicsICdlZGdlTGFiZWxCYWNrZ3JvdW5kJzogJyNmOWZhZmInIH19fSUlCmdyYXBoIExSCiAgICBzdWJncmFwaCBEYXRhIFsiJm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7RGF0YSBTY3VyY2VzJm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Il0KICAgICAgICBkaXJlY3Rpb24gVEIKICAgICAgICBBW1hUQiBTdGF0ZW1lbnRzXTo6OmRhdGEKICAgICAgICBCW05CUCBBcmNoaXZlXTo6OmRhdGEKICAgIGVuZAoKICAgIHN1YmdyYXBoIExvZ2ljIFsiJm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7UHJvY2Vzc2luZyBQaXBlbGluZSZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyJdCiAgICAgICAgZGlyZWN0aW9uIFRCCiAgICAgICAgQyhQbGF5d3JpZ2h0IERMKTo6OnByb2MKICAgICAgICBEe0RhdGEgRXh0cmFjdG9yfTo6OnByb2MKICAgICAgICBFW0RhdGVDb252ZXJ0ZXJdOjo6cHJvYwogICAgICAgIEZbREYgUHJvY2Vzc29yXTo6OnByb2MKICAgIGVuZAoKICAgIHN1YmdyYXBoIFVJIFsiJm5ic3A7Jm5ic3A7Jm5ic3A7Jm5ic3A7T3V0cHV0ICYgVmlzdWFsaXphdGlvbiZuYnNwOyZuYnNwOyZuYnNwOyZuYnNwOyJdCiAgICAgICAgZGlyZWN0aW9uIFRCCiAgICAgICAgR1tHb29nbGUgU2hlZXRzXTo6OnVpCiAgICAgICAgSFtWaXN1YWxpemF0aW9uc106Ojp1aQogICAgICAgIElbU3RyZWFtbGl0IERhc2hib2FyZF06Ojp1aQogICAgZW5kCgogICAgQiAtLT58RG93bmxvYWR8IEMKICAgIEMgLS0-fENTVnwgRAogICAgQSAtLT58UGFyc2V8IEQKICAgIEQgLS0-fE5vcm1hbGl6ZXwgRQogICAgRSAtLT58VHJhbnNmb3JtfCBGCiAgICBGIC0tPnxFeHBvcnR8IEcKICAgIEYgLS0-fFBsb3R8IEgKICAgIEcgLS0-fFN0cmVhbXwgSQogICAgSCAtLT58RW5oYW5jZXwgSQoKICAgIGNsYXNzRGVmIGRhdGEgZmlsbDojZWZmNmZmLHN0cm9rZTojM2I4MmY2LHN0cm9rZS13aWR0aDoycHgsY29sb3I6IzFlM2E4YSxyeDo4LHJ5Ojg7CiAgICBjbGFzc0RlZiBwcm9jIGZpbGw6I2Y1ZjNmZixzdHJva2U6IzhiNWNmNixzdHJva2Utd2lkdGg6MnB4LGNvbG9yOiM0YzFkOTUscng6OCxyeTo4OwogICAgY2xhc3NEZWYgdWkgZmlsbDojZWNmZGY1LHN0cm9rZTojMTBiOTgxLHN0cm9rZS13aWR0aDoycHgsY29sb3I6IzA2NGUzYixyeDo4LHJ5Ojg7CiAgICBzdHlsZSBEYXRhIGZpbGw6I2Y5ZmFmYixzdHJva2U6I2U1ZTdlYixzdHJva2Utd2lkdGg6MXB4LHJ4OjEwLHJ5OjEwCiAgICBzdHlsZSBMb2dpYyBmaWxsOiNmOWZhZmIsc3Ryb2tlOiNlNWU3ZWIsc3Ryb2tlLXdpZHRoOjFweCxyeDoxMCxyeToxMAogICAgc3R5bGUgVUkgZmlsbDojZjlmYWZiLHN0cm9rZTojZTVlN2ViLHN0cm9rZS13aWR0aDoxcHgscng6MTAscnk6MTAK">
+</picture>
 
 ## 🔧 Core Components
 
