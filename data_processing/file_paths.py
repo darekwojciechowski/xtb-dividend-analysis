@@ -1,4 +1,4 @@
-import logging
+from loguru import logger
 import os
 
 
@@ -20,7 +20,7 @@ def get_file_paths(file_path):
 
     # Check if the main file exists
     if not os.path.exists(file_path):
-        logging.error(f"The file '{file_path}' does not exist. Please check the path.")
+        logger.error(f"The file '{file_path}' does not exist. Please check the path.")
         raise FileNotFoundError(
             f"The file '{file_path}' does not exist. Please check the path."
         )
@@ -28,7 +28,7 @@ def get_file_paths(file_path):
     # Check if each course file exists
     for course_path in courses_paths:
         if not os.path.exists(course_path):
-            logging.error(
+            logger.error(
                 f"The file '{course_path}' does not exist. Please check the path."
             )
             raise FileNotFoundError(

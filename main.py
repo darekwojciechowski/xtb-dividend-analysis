@@ -2,7 +2,7 @@
 # XTB Dividend Analysis Pipeline
 # Main entry point for processing XTB broker statements and calculating dividend data
 
-import logging
+from loguru import logger
 from config.logging_config import setup_logging
 from data_processing.file_paths import get_file_paths
 from data_processing.dataframe_processor import DataFrameProcessor
@@ -52,7 +52,7 @@ def process_data(file_path, courses_paths):
     processor.add_currency_to_dividends()
 
     # Log processed data
-    logging.info(
+    logger.info(
         "\n" + tabulate(
             processor.get_processed_df(),
             headers="keys",
@@ -69,7 +69,7 @@ def main():
     Main function to orchestrate the workflow.
     """
     # Set up logging
-    setup_logging(log_level=logging.INFO)
+    setup_logging(log_level="INFO")
 
     # Use default input file path
     file_path = DEFAULT_INPUT_FILE

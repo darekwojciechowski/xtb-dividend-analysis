@@ -1,7 +1,6 @@
-import logging
+from loguru import logger
 import re
 from datetime import datetime
-from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -13,7 +12,7 @@ from .extractor import MultiConditionExtractor
 
 
 class DataFrameProcessor:
-    def __init__(self, df: Optional[pd.DataFrame] = None):
+    def __init__(self, df: pd.DataFrame | None = None):
         """
         Initializes the DataFrameProcessor with a DataFrame.
 
@@ -24,7 +23,7 @@ class DataFrameProcessor:
                 "The DataFrame 'df' cannot be None. Please provide a valid DataFrame."
             )
         self.df = df.copy()
-        logging.info("Step 1 - Initialized DataFrameProcessor with a DataFrame.")
+        logger.info("Step 1 - Initialized DataFrameProcessor with a DataFrame.")
 
     def detect_language(self) -> str:
         """
@@ -42,7 +41,7 @@ class DataFrameProcessor:
             > len(english_columns.intersection(self.df.columns))
             else "ENG"
         )
-        logging.info(f"Step 2 - Detected language: {language}.")
+        logger.info(f"Step 2 - Detected language: {language}.")
         return language
 
     def get_column_name(self, english_name: str, polish_name: str) -> str:
@@ -65,7 +64,7 @@ class DataFrameProcessor:
                 f"Neither '{english_name}' nor '{polish_name}' column found in the DataFrame."
             )
 
-    def drop_columns(self, columns: List[str]) -> None:
+    def drop_columns(self, columns: list[str]) -> None:
         """
         Drops specified columns from the DataFrame.
 
@@ -80,7 +79,7 @@ class DataFrameProcessor:
 
         self.df.drop(columns=columns, inplace=True)
 
-    def rename_columns(self, columns_dict: Dict[str, str]) -> None:
+    def rename_columns(self, columns_dict: dict[str, str]) -> None:
         """
         Renames columns in the DataFrame based on a dictionary mapping.
 
@@ -96,7 +95,7 @@ class DataFrameProcessor:
 
         self.df.rename(columns=columns_dict, inplace=True)
 
-    def convert_dates(self, date_col: Optional[str] = None) -> None:
+    def convert_dates(self, date_col: str | None = None) -> None:
         """
         Converts date strings in the specified column to datetime objects.
 
@@ -134,7 +133,7 @@ class DataFrameProcessor:
         Converts date strings in the 'Date' column to datetime objects.
         """
 
-        def apply_converter(date_string: str) -> Optional[pd.Timestamp]:
+        def apply_converter(date_string: str) -> pd.Timestamp | None:
             converter = DateConverter(date_string)
             converter.convert_to_date()
             return converter.get_date()
@@ -160,7 +159,7 @@ class DataFrameProcessor:
                 ]
             )
         ]
-        logging.info("Step 3 - Filtered rows to include only dividend-related data.")
+        logger.info("Step 3 - Filtered rows to include only dividend-related data.")
 
     def group_by_dividends(self) -> None:
         """
@@ -179,7 +178,7 @@ class DataFrameProcessor:
             .reset_index()
         )
         self.df.rename(columns={amount_col: "Net Dividend"}, inplace=True)
-        logging.info(
+        logger.info(
             "Step 4 - Grouped data by date, ticker, and type; aggregated amounts."
         )
 
@@ -500,7 +499,7 @@ class DataFrameProcessor:
             ),
             axis=1,
         )
-        logging.info(
+        logger.info(
             "Step 5 - Calculated dividends and updated shares using exchange rates."
         )
 
@@ -569,7 +568,7 @@ class DataFrameProcessor:
                     percentage_value = float(match.group(1)) / 100
                     # Replace the value in Tax Collected with the extracted percentage
                     self.df.at[index, tax_col] = percentage_value
-        logging.info(
+        logger.info(
             "Step 6 - Updated 'Tax Collected' column with extracted percentages."
         )
 
@@ -581,7 +580,7 @@ class DataFrameProcessor:
 
         :return: The processed DataFrame.
         """
-        logging.info("Step 7 - Returning the processed DataFrame.")  # Log here
+        logger.info("Step 7 - Returning the processed DataFrame.")  # Log here
         return self.df
 
     def process(self) -> pd.DataFrame:
@@ -591,7 +590,7 @@ class DataFrameProcessor:
         Returns:
             pd.DataFrame: The processed DataFrame.
         """
-        logging.info("Starting DataFrame processing.")
+        logger.info("Starting DataFrame processing.")
         # Convert dates if needed
         self.convert_dates()
 
@@ -608,6 +607,6 @@ class DataFrameProcessor:
 
         # Merge and clean up
         self.merge_and_sum()
-        logging.info("DataFrame processing completed.")
+        logger.info("DataFrame processing completed.")
 
         return self.df

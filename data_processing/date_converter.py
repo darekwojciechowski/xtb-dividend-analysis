@@ -1,5 +1,3 @@
-from typing import Optional
-
 import pandas as pd
 
 
@@ -11,7 +9,7 @@ class DateConverter:
         :param date_string: The date string to be converted.
         """
         self.date_string = date_string
-        self.date_only: Optional[pd.Timestamp] = None
+        self.date_only: pd.Timestamp | None = None
 
     def convert_to_date(self, format: str = "%d.%m.%Y %H:%M:%S") -> None:
         """
@@ -28,7 +26,7 @@ class DateConverter:
             print(f"Error converting date: {e}")
             self.date_only = None
 
-    def get_date(self) -> Optional[pd.Timestamp]:
+    def get_date(self) -> pd.Timestamp | None:
         """
         Returns the converted date object.
 

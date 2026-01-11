@@ -1,5 +1,4 @@
 import re
-from typing import Dict
 
 
 class MultiConditionExtractor:
@@ -18,7 +17,7 @@ class MultiConditionExtractor:
         :return: A string representing the extracted condition based on keywords, or the original input string if no match is found.
         """
         # Define a mapping of keywords to their corresponding conditions
-        keyword_map: Dict[str, str] = {
+        keyword_map: dict[str, str] = {
             "Blik": "Blik(Payu) deposit",
             "Pekao": "Pekao S.A. deposit",
         }
