@@ -1,9 +1,11 @@
-from loguru import logger
+from __future__ import annotations
+
 import re
 from datetime import datetime
 
 import numpy as np
 import pandas as pd
+from loguru import logger
 
 from visualization.ticker_colors import get_random_color
 
@@ -108,7 +110,7 @@ class DataFrameProcessor:
 
         self.df[date_col] = pd.to_datetime(self.df[date_col], errors="coerce")
 
-    def apply_colorize_ticker(self):
+    def apply_colorize_ticker(self) -> None:
         """
         Applies random color formatting to the 'Ticker' column.
         Creates a new 'Colored Ticker' column without modifying the original 'Ticker' column.
@@ -311,8 +313,8 @@ class DataFrameProcessor:
         self.df["Extracted Number"] = self.df["Comment"].apply(extract_number)
 
     def calculate_dividend(
-        self, courses_paths, language, comment_col=None, amount_col=None, date_col=None
-    ):
+        self, courses_paths: list[str], language: str, comment_col: str | None = None, amount_col: str | None = None, date_col: str | None = None
+    ) -> pd.DataFrame:
         """
         Modify the Net Dividend column based on the number extracted from the Comment column
         and calculate shares based on the extracted dividend amount and the retrieved exchange rate
@@ -506,8 +508,8 @@ class DataFrameProcessor:
         return self.df
 
     def replace_tax_values(
-        self, ticker_col=None, amount_col=None, tax_col="Tax Collected"
-    ):
+        self, ticker_col: str | None = None, amount_col: str | None = None, tax_col: str = "Tax Collected"
+    ) -> pd.DataFrame:
         """
         Update the 'Tax Collected' column based on the 'Net Dividend' column and ticker type.
 
@@ -547,7 +549,7 @@ class DataFrameProcessor:
 
         return self.df
 
-    def replace_tax_with_percentage(self, tax_col="Tax Collected"):
+    def replace_tax_with_percentage(self, tax_col: str = "Tax Collected") -> pd.DataFrame:
         """
         Replace values in the Tax Collected column with percentages extracted from the Comment/Komentarz column.
 

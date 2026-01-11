@@ -1,14 +1,17 @@
-from loguru import logger
+from __future__ import annotations
+
 import os
 
+from loguru import logger
 
-def get_file_paths(file_path):
+
+def get_file_paths(file_path: str) -> tuple[str, list[str]]:
     """
     Define file paths and validate their existence.
     Args:
-        file_path (str): Path to the main file.
+        file_path: Path to the main file.
     Returns:
-        tuple: file_path (str), courses_paths (list)
+        tuple: file_path (str), courses_paths (list[str])
     """
     # Dynamically find all files starting with "archiwum_tab_a_" in the data folder
     data_folder = "data"

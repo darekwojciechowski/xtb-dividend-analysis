@@ -1,8 +1,10 @@
 # ticker_colors.py
 
+from __future__ import annotations
+
 import random
 
-ticker_colors = [
+ticker_colors: list[str] = [
     "\033[92m",  # Green
     "\033[91m",  # Red
     "\033[90m",  # Dark Gray
@@ -25,7 +27,7 @@ ticker_colors = [
 # Function to get a random color from ticker_colors
 
 
-def get_random_color():
+def get_random_color() -> str:
     """Return a randomly selected color from the ticker_colors list."""
     return random.choice(
         ticker_colors

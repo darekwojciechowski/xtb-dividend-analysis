@@ -2,20 +2,24 @@
 # XTB Dividend Analysis Pipeline
 # Main entry point for processing XTB broker statements and calculating dividend data
 
+from __future__ import annotations
+
+import pandas as pd
 from loguru import logger
+from tabulate import tabulate
+
 from config.logging_config import setup_logging
-from data_processing.file_paths import get_file_paths
 from data_processing.dataframe_processor import DataFrameProcessor
 from data_processing.exporter import GoogleSpreadsheetExporter
+from data_processing.file_paths import get_file_paths
 from data_processing.import_data_xlsx import import_and_process_data
-from tabulate import tabulate
 
 # Configuration constants
 DEFAULT_INPUT_FILE = "data/demo_XTB_broker_statement.xlsx"
 DEFAULT_OUTPUT_FILE = "for_google_spreadsheet.csv"
 
 
-def process_data(file_path, courses_paths):
+def process_data(file_path: str, courses_paths: list[str]) -> pd.DataFrame:
     """
     Process the data using DataFrameProcessor and return the processed DataFrame.
     """
@@ -64,7 +68,7 @@ def process_data(file_path, courses_paths):
     return processor.get_processed_df()
 
 
-def main():
+def main() -> None:
     """
     Main function to orchestrate the workflow.
     """

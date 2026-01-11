@@ -1,15 +1,26 @@
+from __future__ import annotations
+
 import os
 import sys
+
 from loguru import logger
 
 
-def setup_logging(log_level="INFO", log_file="app.log"):
+def setup_logging(log_level: str = "INFO", log_file: str = "app.log"):
     """
     Set up logging configuration for the application using loguru.
     Applies modern 2026 color trends: deep teal, warm coral, sage green, and muted purple.
     """
     # Remove default handler
     logger.remove()
+
+    # Configure custom colors for levels
+    logger.level("DEBUG", color="<cyan>")
+    logger.level("INFO", color="<white>")
+    logger.level("SUCCESS", color="<green>")
+    logger.level("WARNING", color="<yellow>")
+    logger.level("ERROR", color="<red>")
+    logger.level("CRITICAL", color="<RED><bold>")
 
     # Create logs directory if it doesn't exist
     logs_dir = "logs"
@@ -52,12 +63,5 @@ def setup_logging(log_level="INFO", log_file="app.log"):
         backtrace=True,
         diagnose=True,
     )
-
-    # Configure custom colors for log levels (2026 trends)
-    logger.level("DEBUG", color="<fg #2C7A7B>")      # Deep Teal
-    logger.level("INFO", color="<fg #68A691>")       # Sage Green
-    logger.level("WARNING", color="<fg #E8927C>")    # Warm Coral
-    logger.level("ERROR", color="<fg #8B7BA8>")      # Muted Purple
-    logger.level("CRITICAL", color="<fg #6B2C3E>")   # Deep Burgundy
 
     return logger

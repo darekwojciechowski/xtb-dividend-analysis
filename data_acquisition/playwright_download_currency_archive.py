@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 import os
-from loguru import logger
-from playwright.sync_api import sync_playwright
 import re
 
+from loguru import logger
+from playwright.sync_api import sync_playwright
 
-def find_and_download_latest_files():
+
+def find_and_download_latest_files() -> None:
     logger.info("Starting the Playwright script.")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False)

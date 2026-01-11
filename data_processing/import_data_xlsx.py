@@ -1,9 +1,11 @@
 # import_data_xlsx.py
 
+from __future__ import annotations
+
 import pandas as pd
 
 
-def import_and_process_data(file_path, sheet_name="CASH OPERATION HISTORY"):
+def import_and_process_data(file_path: str, sheet_name: str = "CASH OPERATION HISTORY") -> pd.DataFrame | None:
     try:
         # Load the entire sheet
         all_data = pd.read_excel(file_path, sheet_name=sheet_name, header=None)

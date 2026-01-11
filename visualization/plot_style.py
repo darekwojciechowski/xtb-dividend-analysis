@@ -1,7 +1,9 @@
 # plot_style.py
 
+from __future__ import annotations
 
-def apply_github_dark_theme():
+
+def apply_github_dark_theme() -> None:
     """
     Apply a GitHub Dark-inspired theme to matplotlib and seaborn plots.
     """
