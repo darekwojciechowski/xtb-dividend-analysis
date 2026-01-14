@@ -41,6 +41,7 @@ pre-commit = "^4.5.0"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
+python_classes = ["Test*"]
 addopts = [
     "-v",
     "--tb=short",
@@ -50,7 +51,14 @@ addopts = [
     "--cov=config",
     "--cov-report=term-missing",
     "--cov-report=html",
-    "--cov-report=xml"
+    "--cov-report=xml",
+    "--strict-markers"
+]
+markers = [
+    "unit: Unit tests for individual functions",
+    "integration: Integration tests for multiple components",
+    "performance: Performance and stress tests",
+    "edge_case: Edge case and boundary tests"
 ]
 
 [tool.coverage.run]
