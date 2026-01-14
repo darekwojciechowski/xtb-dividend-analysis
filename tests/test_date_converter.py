@@ -1,7 +1,9 @@
+"""Tests for DateConverter module."""
+
 from data_processing.date_converter import DateConverter
 
 
-def test_valid_date_conversion():
+def test_valid_date_conversion() -> None:
     """
     Tests that a valid date string is correctly converted to a date object.
     """
@@ -10,7 +12,7 @@ def test_valid_date_conversion():
     assert converter.get_date().strftime("%Y-%m-%d") == "2024-01-01"
 
 
-def test_invalid_date_format():
+def test_invalid_date_format() -> None:
     """
     Tests that an invalid date string format results in None for the converted date.
     """
@@ -19,7 +21,7 @@ def test_invalid_date_format():
     assert converter.get_date() is None
 
 
-def test_custom_date_format():
+def test_custom_date_format() -> None:
     """
     Tests that a valid date string with a custom format is correctly converted.
     """
@@ -28,7 +30,7 @@ def test_custom_date_format():
     assert converter.get_date().strftime("%Y-%m-%d") == "2024-01-01"
 
 
-def test_empty_date_string():
+def test_empty_date_string() -> None:
     """
     Tests that an empty date string results in None for the converted date.
     """
@@ -37,7 +39,7 @@ def test_empty_date_string():
     assert converter.get_date() is None
 
 
-def test_none_date_string():
+def test_none_date_string() -> None:
     """
     Tests that initializing with None as the date string results in None for the converted date.
     """
@@ -46,7 +48,7 @@ def test_none_date_string():
     assert converter.get_date() is None
 
 
-def test_edge_case_leap_year():
+def test_edge_case_leap_year() -> None:
     """
     Tests that a leap year date is correctly converted.
     """
@@ -55,7 +57,7 @@ def test_edge_case_leap_year():
     assert converter.get_date().strftime("%Y-%m-%d") == "2024-02-29"
 
 
-def test_edge_case_non_leap_year():
+def test_edge_case_non_leap_year() -> None:
     """
     Tests that an invalid leap year date results in None for the converted date.
     """

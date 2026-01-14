@@ -1,42 +1,26 @@
+"""Tests for DataFrameProcessor module."""
+
 import pandas as pd
 import pytest
 
-# Import the class to test
 from data_processing.dataframe_processor import DataFrameProcessor
 
 
 @pytest.fixture
-def sample_dataframe():
-    """
-    Provides a sample DataFrame for testing DataFrameProcessor methods.
-    Includes all necessary columns required by the tested methods.
-    """
-    df = pd.DataFrame(
-        {
-            "Date": ["2024-01-01", "2024-01-02"],
-            "Ticker": ["AAPL", "MSFT"],
-            "Amount": [10.1, 20.4],
-            "Type": ["Cash", "Cash"],
-            "Comment": ["Dividend", "Dividend"],
-            "Net Dividend": [8.4, 16.5],
-            "Shares": [1, 2],
-            "Tax Collected": [2.5, 4.9],
-            "Currency": ["USD", "USD"],
-        }
-    )
-    df["Date"] = pd.to_datetime(df["Date"])
-    return df
-
-
-@pytest.fixture
-def processor(sample_dataframe):
+def processor(sample_dataframe: pd.DataFrame) -> DataFrameProcessor:
     """
     Provides a DataFrameProcessor instance initialized with the sample DataFrame.
+
+    Args:
+        sample_dataframe: Sample DataFrame fixture from conftest.py.
+
+    Returns:
+        DataFrameProcessor instance.
     """
     return DataFrameProcessor(sample_dataframe)
 
 
-def test_rename_columns(processor):
+def test_rename_columns(processor: DataFrameProcessor) -> None:
     """
     Tests that the rename_columns method correctly updates column names in the DataFrame.
     """
@@ -45,7 +29,7 @@ def test_rename_columns(processor):
     assert "Value" in processor.df.columns
 
 
-def test_get_column_name(processor):
+def test_get_column_name(processor: DataFrameProcessor) -> None:
     """
     Tests that the get_column_name method returns the correct column name if it exists.
     """
@@ -53,7 +37,7 @@ def test_get_column_name(processor):
     assert result in ["Ticker", "Symbol"]
 
 
-def test_apply_colorize_ticker(processor):
+def test_apply_colorize_ticker(processor: DataFrameProcessor) -> None:
     """
     Tests that the apply_colorize_ticker method executes without errors and retains the 'Ticker' column.
     """
@@ -61,7 +45,7 @@ def test_apply_colorize_ticker(processor):
     assert "Ticker" in processor.df.columns
 
 
-def test_apply_extractor(processor):
+def test_apply_extractor(processor: DataFrameProcessor) -> None:
     """
     Tests that the apply_extractor method executes without errors and returns a valid DataFrame.
     """
@@ -69,7 +53,7 @@ def test_apply_extractor(processor):
     assert isinstance(processor.df, pd.DataFrame)
 
 
-def test_filter_dividends(processor):
+def test_filter_dividends(processor: DataFrameProcessor) -> None:
     """
     Tests that the filter_dividends method filters rows correctly without increasing the row count.
     """
@@ -78,7 +62,7 @@ def test_filter_dividends(processor):
     assert len(processor.df) <= original_len
 
 
-def test_group_by_dividends(processor):
+def test_group_by_dividends(processor: DataFrameProcessor) -> None:
     """
     Tests that the group_by_dividends method executes without errors and returns a grouped DataFrame.
     """
@@ -86,7 +70,7 @@ def test_group_by_dividends(processor):
     assert isinstance(processor.df, pd.DataFrame)
 
 
-def test_add_empty_column(processor):
+def test_add_empty_column(processor: DataFrameProcessor) -> None:
     """
     Tests that the add_empty_column method adds a new column with NaN values to the DataFrame.
     """
@@ -95,7 +79,7 @@ def test_add_empty_column(processor):
     assert processor.df["New Column"].isnull().all()
 
 
-def test_move_negative_values(processor):
+def test_move_negative_values(processor: DataFrameProcessor) -> None:
     """
     Tests that the move_negative_values method executes without errors and returns a valid DataFrame.
     """
@@ -103,7 +87,7 @@ def test_move_negative_values(processor):
     assert isinstance(processor.df, pd.DataFrame)
 
 
-def test_calculate_dividend(processor):
+def test_calculate_dividend(processor: DataFrameProcessor) -> None:
     """
     Tests that the calculate_dividend method executes without errors and returns a valid DataFrame.
     """
@@ -119,7 +103,9 @@ def test_calculate_dividend(processor):
         (["No info", "25%", ""], [0.0, 0.25, 0.0]),
     ],
 )
-def test_replace_tax_with_percentage_parametrized(comments, expected):
+def test_replace_tax_with_percentage_parametrized(
+    comments: list[str], expected: list[float]
+) -> None:
     df = pd.DataFrame(
         {
             "Comment": comments,
@@ -132,7 +118,7 @@ def test_replace_tax_with_percentage_parametrized(comments, expected):
     assert list(processor.df["Tax Collected"]) == expected
 
 
-def test_add_currency_to_dividends(processor):
+def test_add_currency_to_dividends(processor: DataFrameProcessor) -> None:
     """
     Tests that the add_currency_to_dividends method executes without errors and returns a valid DataFrame.
     """
@@ -140,7 +126,7 @@ def test_add_currency_to_dividends(processor):
     assert isinstance(processor.df, pd.DataFrame)
 
 
-def test_get_processed_df(processor):
+def test_get_processed_df(processor: DataFrameProcessor) -> None:
     """
     Tests that the get_processed_df method returns a valid DataFrame.
     """
@@ -148,7 +134,7 @@ def test_get_processed_df(processor):
     assert isinstance(result, pd.DataFrame)
 
 
-def test_methods_on_empty_dataframe():
+def test_methods_on_empty_dataframe() -> None:
     """
     Tests that all methods handle an empty DataFrame without raising errors.
     """
@@ -164,7 +150,7 @@ def test_methods_on_empty_dataframe():
     assert empty_processor.df.empty
 
 
-def test_move_negative_values_with_no_negatives(processor):
+def test_move_negative_values_with_no_negatives(processor: DataFrameProcessor) -> None:
     """
     Tests that the move_negative_values method does not modify the DataFrame
     if no negative values are present.
@@ -174,7 +160,7 @@ def test_move_negative_values_with_no_negatives(processor):
     pd.testing.assert_frame_equal(processor.df, original_df)
 
 
-def test_filter_dividends_with_missing_values():
+def test_filter_dividends_with_missing_values() -> None:
     """
     Tests that the filter_dividends method handles missing values in the 'Type' column correctly.
     """
@@ -234,8 +220,13 @@ def test_filter_dividends_with_missing_values():
     ],
 )
 def test_large_dataframe(
-    periods, tickers, amounts, types, comments, expected_min_length
-):
+    periods: int,
+    tickers: list[str],
+    amounts: list[float],
+    types: list[str],
+    comments: list[str],
+    expected_min_length: int,
+) -> None:
     """
     Tests that all methods handle large DataFrames efficiently without performance issues.
     Uses parametrized inputs to test different scenarios and data sizes.

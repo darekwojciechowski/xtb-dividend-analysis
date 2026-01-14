@@ -1,42 +1,26 @@
+"""Integration tests for DataFrameProcessor workflows."""
+
 import pandas as pd
 import pytest
 
-# Import the class to test
 from data_processing.dataframe_processor import DataFrameProcessor
 
 
 @pytest.fixture
-def sample_dataframe():
-    """
-    Provides a sample DataFrame for testing DataFrameProcessor methods.
-    Includes all necessary columns required by the tested methods.
-    """
-    df = pd.DataFrame(
-        {
-            "Date": ["2024-01-01", "2024-01-02"],
-            "Ticker": ["AAPL", "MSFT"],
-            "Amount": [10.3, 20.5],
-            "Type": ["Cash", "Cash"],
-            "Comment": ["Dividend", "Dividend"],
-            "Net Dividend": [8.1, 16.7],
-            "Shares": [1, 2],
-            "Tax Collected": [2.4, 4.7],
-            "Currency": ["USD", "USD"],
-        }
-    )
-    df["Date"] = pd.to_datetime(df["Date"])
-    return df
-
-
-@pytest.fixture
-def processor(sample_dataframe):
+def processor(sample_dataframe: pd.DataFrame) -> DataFrameProcessor:
     """
     Provides a DataFrameProcessor instance initialized with the sample DataFrame.
+
+    Args:
+        sample_dataframe: Sample DataFrame fixture from conftest.py.
+
+    Returns:
+        DataFrameProcessor instance.
     """
     return DataFrameProcessor(sample_dataframe)
 
 
-def test_combined_methods(processor):
+def test_combined_methods(processor: DataFrameProcessor) -> None:
     """
     Tests that multiple methods can be executed sequentially without errors.
     Verifies that the resulting DataFrame is valid.
@@ -47,7 +31,7 @@ def test_combined_methods(processor):
     assert isinstance(processor.df, pd.DataFrame)
 
 
-def test_methods_with_missing_values():
+def test_methods_with_missing_values() -> None:
     """
     Tests that methods handle missing values in the DataFrame gracefully.
     Ensures rows with NaN values in critical columns are removed.
@@ -67,7 +51,7 @@ def test_methods_with_missing_values():
     assert processor.df["Type"].isnull().sum() == 0
 
 
-def test_replace_tax_with_percentage_logic(processor):
+def test_replace_tax_with_percentage_logic(processor: DataFrameProcessor) -> None:
     """
     Tests that the replace_tax_with_percentage method correctly calculates
     and adds a 'Tax Percentage' column based on 'Tax Collected' and 'Amount'.
@@ -89,7 +73,7 @@ def test_replace_tax_with_percentage_logic(processor):
         pytest.skip("Function does not add 'Tax Percentage' column.")
 
 
-def test_large_dataframe():
+def test_large_dataframe() -> None:
     """
     Tests that methods handle large DataFrames efficiently without performance degradation.
     Verifies that the resulting DataFrame is not empty.
@@ -108,7 +92,7 @@ def test_large_dataframe():
     assert len(processor.df) > 0
 
 
-def test_methods_on_empty_dataframe():
+def test_methods_on_empty_dataframe() -> None:
     """
     Tests that all methods handle an empty DataFrame without raising errors.
     Ensures the DataFrame remains empty after processing.
