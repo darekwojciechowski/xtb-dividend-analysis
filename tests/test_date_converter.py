@@ -9,17 +9,46 @@ from data_processing.date_converter import DateConverter
 class TestValidDateConversion:
     """Test suite for valid date conversion operations."""
 
-    def test_converts_standard_format(self) -> None:
-        """Tests that a valid date string is correctly converted to a date object."""
-        converter = DateConverter("01.01.2024 12:00:00")
-        converter.convert_to_date()
-        assert converter.get_date().strftime("%Y-%m-%d") == "2024-01-01"
+    @classmethod
+    def setup_class(cls) -> None:
+        """Setup class-level fixtures before all tests."""
+        cls.standard_date_string = "01.01.2024 12:00:00"
+        cls.custom_date_string = "2024/01/01"
+        cls.custom_format = "%Y/%m/%d"
+        cls.expected_date = "2024-01-01"
 
-    def test_converts_custom_format(self) -> None:
-        """Tests that a valid date string with a custom format is correctly converted."""
-        converter = DateConverter("2024/01/01")
-        converter.convert_to_date(format="%Y/%m/%d")
-        assert converter.get_date().strftime("%Y-%m-%d") == "2024-01-01"
+    @classmethod
+    def teardown_class(cls) -> None:
+        """Cleanup class-level fixtures after all tests."""
+        pass
+
+    def test_convert_when_standard_format_provided_then_returns_correct_date(
+        self,
+    ) -> None:
+        """Tests conversion of standard format date string."""
+        # Arrange
+        converter = DateConverter(self.standard_date_string)
+
+        # Act
+        converter.convert_to_date()
+        result = converter.get_date()
+
+        # Assert
+        assert result.strftime("%Y-%m-%d") == self.expected_date
+
+    def test_convert_when_custom_format_provided_then_returns_correct_date(
+        self,
+    ) -> None:
+        """Tests conversion of custom format date string."""
+        # Arrange
+        converter = DateConverter(self.custom_date_string)
+
+        # Act
+        converter.convert_to_date(format=self.custom_format)
+        result = converter.get_date()
+
+        # Assert
+        assert result.strftime("%Y-%m-%d") == self.expected_date
 
 
 @pytest.mark.unit
@@ -27,29 +56,65 @@ class TestValidDateConversion:
 class TestInvalidDateHandling:
     """Test suite for invalid date handling and edge cases."""
 
-    def test_invalid_format_returns_none(self) -> None:
-        """Tests that an invalid date string format results in None."""
-        converter = DateConverter("invalid-date")
-        converter.convert_to_date()
-        assert converter.get_date() is None
+    @classmethod
+    def setup_class(cls) -> None:
+        """Setup class-level fixtures before all tests."""
+        cls.invalid_format_string = "invalid-date"
+        cls.empty_string = ""
+        cls.non_leap_year_date = "29.02.2023 00:00:00"
 
-    def test_empty_string_returns_none(self) -> None:
-        """Tests that an empty date string results in None."""
-        converter = DateConverter("")
-        converter.convert_to_date()
-        assert converter.get_date() is None
+    @classmethod
+    def teardown_class(cls) -> None:
+        """Cleanup class-level fixtures after all tests."""
+        pass
 
-    def test_none_value_returns_none(self) -> None:
-        """Tests that initializing with None results in None for the converted date."""
+    def test_convert_when_invalid_format_then_returns_none(self) -> None:
+        """Tests that invalid date format returns None."""
+        # Arrange
+        converter = DateConverter(self.invalid_format_string)
+
+        # Act
+        converter.convert_to_date()
+        result = converter.get_date()
+
+        # Assert
+        assert result is None
+
+    def test_convert_when_empty_string_then_returns_none(self) -> None:
+        """Tests that empty string returns None."""
+        # Arrange
+        converter = DateConverter(self.empty_string)
+
+        # Act
+        converter.convert_to_date()
+        result = converter.get_date()
+
+        # Assert
+        assert result is None
+
+    def test_convert_when_none_value_then_returns_none(self) -> None:
+        """Tests that None value returns None."""
+        # Arrange
         converter = DateConverter(None)
-        converter.convert_to_date()
-        assert converter.get_date() is None
 
-    def test_non_leap_year_feb_29_returns_none(self) -> None:
-        """Tests that an invalid leap year date results in None."""
-        converter = DateConverter("29.02.2023 00:00:00")
+        # Act
         converter.convert_to_date()
-        assert converter.get_date() is None
+        result = converter.get_date()
+
+        # Assert
+        assert result is None
+
+    def test_convert_when_non_leap_year_feb_29_then_returns_none(self) -> None:
+        """Tests that invalid leap year date returns None."""
+        # Arrange
+        converter = DateConverter(self.non_leap_year_date)
+
+        # Act
+        converter.convert_to_date()
+        result = converter.get_date()
+
+        # Assert
+        assert result is None
 
 
 @pytest.mark.unit
@@ -57,8 +122,25 @@ class TestInvalidDateHandling:
 class TestLeapYearHandling:
     """Test suite for leap year date handling."""
 
-    def test_leap_year_feb_29_converts_correctly(self) -> None:
-        """Tests that a leap year date is correctly converted."""
-        converter = DateConverter("29.02.2024 00:00:00")
+    @classmethod
+    def setup_class(cls) -> None:
+        """Setup class-level fixtures before all tests."""
+        cls.leap_year_date = "29.02.2024 00:00:00"
+        cls.expected_result = "2024-02-29"
+
+    @classmethod
+    def teardown_class(cls) -> None:
+        """Cleanup class-level fixtures after all tests."""
+        pass
+
+    def test_convert_when_leap_year_feb_29_then_converts_correctly(self) -> None:
+        """Tests that leap year February 29th is correctly converted."""
+        # Arrange
+        converter = DateConverter(self.leap_year_date)
+
+        # Act
         converter.convert_to_date()
-        assert converter.get_date().strftime("%Y-%m-%d") == "2024-02-29"
+        result = converter.get_date()
+
+        # Assert
+        assert result.strftime("%Y-%m-%d") == self.expected_result

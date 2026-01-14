@@ -24,33 +24,47 @@ def processor(sample_dataframe: pd.DataFrame) -> DataFrameProcessor:
 class TestWorkflowIntegration:
     """Test suite for integrated workflow operations."""
 
-    def test_combined_methods_workflow(self, processor: DataFrameProcessor) -> None:
-        """Tests that multiple methods can be executed sequentially without errors."""
+    def setup_method(self) -> None:
+        """Setup test fixtures before each test method."""
+        self.tax_test_amounts = [100.0, 200.0]
+        self.tax_test_collected = [10.0, 20.0]
+
+    def teardown_method(self) -> None:
+        """Cleanup after each test method."""
+        pass
+
+    def test_workflow_when_methods_combined_then_executes_successfully(
+        self, processor: DataFrameProcessor
+    ) -> None:
+        """Tests that multiple workflow methods execute sequentially without errors."""
+        # Arrange - processor from fixture
+
+        # Act
         processor.apply_date_converter()
         processor.filter_dividends()
         processor.group_by_dividends()
+
+        # Assert
         assert isinstance(processor.df, pd.DataFrame)
 
-    def test_tax_percentage_calculation_workflow(
+    def test_workflow_when_calculating_tax_percentage_then_computes_correctly(
         self, processor: DataFrameProcessor
     ) -> None:
-        """Tests that tax percentage calculation workflow works correctly."""
-        # Prepare input data
-        processor.df["Amount"] = [100.0, 200.0]
-        processor.df["Tax Collected"] = [10.0, 20.0]
+        """Tests that tax percentage calculation workflow computes correctly."""
+        # Arrange
+        processor.df["Amount"] = self.tax_test_amounts
+        processor.df["Tax Collected"] = self.tax_test_collected
 
-        # Call the method
+        # Act
         processor.replace_tax_with_percentage()
 
-        # Check if the column was added
+        # Assert
         if "Tax Percentage" in processor.df.columns:
-            # Verify calculations
             expected_values = (
                 processor.df["Tax Collected"] / processor.df["Amount"]
             ) * 100
             assert all(processor.df["Tax Percentage"] == expected_values)
         else:
-            # Skip the test if the column is not added
             pytest.skip("Function does not add 'Tax Percentage' column.")
 
 
@@ -58,9 +72,9 @@ class TestWorkflowIntegration:
 class TestDataQualityHandling:
     """Test suite for handling data quality issues."""
 
-    def test_handles_missing_values_gracefully(self) -> None:
-        """Tests that methods handle missing values in the DataFrame gracefully."""
-        df_with_nans = pd.DataFrame(
+    def setup_method(self) -> None:
+        """Setup test fixtures before each test method."""
+        self.nan_test_data = pd.DataFrame(
             {
                 "Date": ["2024-01-01", None],
                 "Ticker": ["AAPL", None],
@@ -69,9 +83,20 @@ class TestDataQualityHandling:
                 "Comment": ["Dividend", None],
             }
         )
-        processor = DataFrameProcessor(df_with_nans)
+
+    def teardown_method(self) -> None:
+        """Cleanup after each test method."""
+        pass
+
+    def test_filter_when_missing_values_then_removes_invalid_rows(self) -> None:
+        """Tests that missing values are handled gracefully during filtering."""
+        # Arrange
+        processor = DataFrameProcessor(self.nan_test_data)
+
+        # Act
         processor.filter_dividends()
-        # Ensure rows with NaN in 'Type' are removed
+
+        # Assert
         assert processor.df["Type"].isnull().sum() == 0
 
 
@@ -80,19 +105,38 @@ class TestDataQualityHandling:
 class TestLargeDatasetProcessing:
     """Test suite for processing large datasets."""
 
-    def test_processes_large_dataframe_efficiently(self) -> None:
-        """Tests that methods handle large DataFrames efficiently."""
+    @classmethod
+    def setup_class(cls) -> None:
+        """Setup class-level fixtures before all tests."""
+        cls.large_dataset_size = 10000
+        cls.date_start = "2024-01-01"
+        cls.frequency = "D"
+
+    @classmethod
+    def teardown_class(cls) -> None:
+        """Cleanup class-level fixtures after all tests."""
+        pass
+
+    def test_group_when_large_dataframe_then_processes_efficiently(self) -> None:
+        """Tests that large DataFrames are processed efficiently."""
+        # Arrange
         large_df = pd.DataFrame(
             {
-                "Date": pd.date_range(start="2024-01-01", periods=10000, freq="D"),
-                "Ticker": ["AAPL"] * 10000,
-                "Amount": [10.0] * 10000,
-                "Type": ["Cash"] * 10000,
-                "Comment": ["Dividend"] * 10000,
+                "Date": pd.date_range(
+                    start=self.date_start, periods=self.large_dataset_size, freq=self.frequency
+                ),
+                "Ticker": ["AAPL"] * self.large_dataset_size,
+                "Amount": [10.0] * self.large_dataset_size,
+                "Type": ["Cash"] * self.large_dataset_size,
+                "Comment": ["Dividend"] * self.large_dataset_size,
             }
         )
         processor = DataFrameProcessor(large_df)
+
+        # Act
         processor.group_by_dividends()
+
+        # Assert
         assert len(processor.df) > 0
 
 
@@ -101,8 +145,20 @@ class TestLargeDatasetProcessing:
 class TestEdgeCaseWorkflows:
     """Test suite for edge case workflow scenarios."""
 
-    def test_processes_empty_dataframe_without_errors(self) -> None:
-        """Tests that all methods handle an empty DataFrame without raising errors."""
-        empty_processor = DataFrameProcessor(pd.DataFrame())
-        # Ensure no errors occur with an empty DataFrame
+    def setup_method(self) -> None:
+        """Setup test fixtures before each test method."""
+        self.empty_df = pd.DataFrame()
+
+    def teardown_method(self) -> None:
+        """Cleanup after each test method."""
+        pass
+
+    def test_workflow_when_empty_dataframe_then_handles_without_error(self) -> None:
+        """Tests that empty DataFrame is handled gracefully in workflows."""
+        # Arrange
+        empty_processor = DataFrameProcessor(self.empty_df)
+
+        # Act - no operations performed on empty DataFrame
+
+        # Assert
         assert empty_processor.df.empty

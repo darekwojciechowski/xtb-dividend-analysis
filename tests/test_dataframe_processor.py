@@ -24,54 +24,126 @@ def processor(sample_dataframe: pd.DataFrame) -> DataFrameProcessor:
 class TestColumnOperations:
     """Test suite for column manipulation operations."""
 
-    def test_rename_columns(self, processor: DataFrameProcessor) -> None:
-        """Tests that the rename_columns method correctly updates column names."""
-        processor.rename_columns({"Date": "TransactionDate", "Amount": "Value"})
+    def setup_method(self) -> None:
+        """Setup test fixtures before each test method."""
+        self.rename_mapping = {"Date": "TransactionDate", "Amount": "Value"}
+        self.column_alternatives = ("Ticker", "Symbol")
+        self.new_column_name = "New Column"
+
+    def teardown_method(self) -> None:
+        """Cleanup after each test method."""
+        pass
+
+    def test_rename_when_valid_mapping_then_columns_updated(
+        self, processor: DataFrameProcessor
+    ) -> None:
+        """Tests that columns are renamed correctly with valid mapping."""
+        # Arrange - processor from fixture
+
+        # Act
+        processor.rename_columns(self.rename_mapping)
+
+        # Assert
         assert "TransactionDate" in processor.df.columns
         assert "Value" in processor.df.columns
 
-    def test_get_column_name(self, processor: DataFrameProcessor) -> None:
-        """Tests that the get_column_name method returns the correct column name."""
-        result = processor.get_column_name("Ticker", "Symbol")
-        assert result in ["Ticker", "Symbol"]
+    def test_get_column_name_when_column_exists_then_returns_correct_name(
+        self, processor: DataFrameProcessor
+    ) -> None:
+        """Tests that correct column name is returned when it exists."""
+        # Arrange - processor from fixture
 
-    def test_add_empty_column(self, processor: DataFrameProcessor) -> None:
-        """Tests that the add_empty_column method adds a new column with NaN values."""
-        processor.add_empty_column("New Column")
-        assert "New Column" in processor.df.columns
-        assert processor.df["New Column"].isnull().all()
+        # Act
+        result = processor.get_column_name(*self.column_alternatives)
+
+        # Assert
+        assert result in self.column_alternatives
+
+    def test_add_empty_column_when_called_then_column_with_nans_added(
+        self, processor: DataFrameProcessor
+    ) -> None:
+        """Tests that new column with NaN values is added."""
+        # Arrange - processor from fixture
+
+        # Act
+        processor.add_empty_column(self.new_column_name)
+
+        # Assert
+        assert self.new_column_name in processor.df.columns
+        assert processor.df[self.new_column_name].isnull().all()
 
 
 @pytest.mark.unit
 class TestDataTransformation:
     """Test suite for data transformation operations."""
 
-    def test_apply_colorize_ticker(self, processor: DataFrameProcessor) -> None:
-        """Tests that the apply_colorize_ticker method retains the Ticker column."""
-        processor.apply_colorize_ticker()
-        assert "Ticker" in processor.df.columns
+    def setup_method(self) -> None:
+        """Setup test fixtures before each test method."""
+        self.required_ticker_column = "Ticker"
 
-    def test_apply_extractor(self, processor: DataFrameProcessor) -> None:
-        """Tests that the apply_extractor method returns a valid DataFrame."""
-        processor.apply_extractor()
-        assert isinstance(processor.df, pd.DataFrame)
+    def teardown_method(self) -> None:
+        """Cleanup after each test method."""
+        pass
 
-    def test_move_negative_values(self, processor: DataFrameProcessor) -> None:
-        """Tests that the move_negative_values method executes without errors."""
-        processor.move_negative_values()
-        assert isinstance(processor.df, pd.DataFrame)
-
-    def test_move_negative_values_with_no_negatives(
+    def test_colorize_when_applied_then_ticker_column_retained(
         self, processor: DataFrameProcessor
     ) -> None:
-        """Tests that move_negative_values does not modify DataFrame without negatives."""
-        original_df = processor.df.copy()
+        """Tests that Ticker column is retained after colorization."""
+        # Arrange - processor from fixture
+
+        # Act
+        processor.apply_colorize_ticker()
+
+        # Assert
+        assert self.required_ticker_column in processor.df.columns
+
+    def test_extract_when_applied_then_returns_valid_dataframe(
+        self, processor: DataFrameProcessor
+    ) -> None:
+        """Tests that extractor returns a valid DataFrame."""
+        # Arrange - processor from fixture
+
+        # Act
+        processor.apply_extractor()
+
+        # Assert
+        assert isinstance(processor.df, pd.DataFrame)
+
+    def test_move_negative_when_executed_then_returns_dataframe(
+        self, processor: DataFrameProcessor
+    ) -> None:
+        """Tests that move_negative_values executes successfully."""
+        # Arrange - processor from fixture
+
+        # Act
         processor.move_negative_values()
+
+        # Assert
+        assert isinstance(processor.df, pd.DataFrame)
+
+    def test_move_negative_when_no_negatives_then_dataframe_unchanged(
+        self, processor: DataFrameProcessor
+    ) -> None:
+        """Tests that DataFrame remains unchanged when no negative values exist."""
+        # Arrange
+        original_df = processor.df.copy()
+
+        # Act
+        processor.move_negative_values()
+
+        # Assert
         pd.testing.assert_frame_equal(processor.df, original_df)
 
-    def test_add_currency_to_dividends(self, processor: DataFrameProcessor) -> None:
-        """Tests that add_currency_to_dividends executes without errors."""
+    def test_add_currency_when_called_then_executes_without_error(
+        self, processor: DataFrameProcessor
+    ) -> None:
+        """Tests that currency addition executes without errors."""
+        # Arrange - processor from fixture
+
+        # Act
         processor.add_currency_to_dividends()
+
+        # Assert
         assert isinstance(processor.df, pd.DataFrame)
 
 
@@ -79,14 +151,30 @@ class TestDataTransformation:
 class TestFilteringOperations:
     """Test suite for data filtering operations."""
 
-    def test_filter_dividends(self, processor: DataFrameProcessor) -> None:
-        """Tests that filter_dividends filters rows correctly."""
+    def setup_method(self) -> None:
+        """Setup test fixtures before each test method."""
+        self.valid_dividend_types = ["Dividend", "Dywidenda"]
+
+    def teardown_method(self) -> None:
+        """Cleanup after each test method."""
+        pass
+
+    def test_filter_when_called_then_row_count_not_increased(
+        self, processor: DataFrameProcessor
+    ) -> None:
+        """Tests that filtering does not increase row count."""
+        # Arrange
         original_len = len(processor.df)
+
+        # Act
         processor.filter_dividends()
+
+        # Assert
         assert len(processor.df) <= original_len
 
-    def test_filter_dividends_with_missing_values(self) -> None:
-        """Tests that filter_dividends handles missing values correctly."""
+    def test_filter_when_missing_values_then_removes_invalid_rows(self) -> None:
+        """Tests that filtering removes rows with missing Type values."""
+        # Arrange
         df_with_nans = pd.DataFrame(
             {
                 "Type": ["Dividend", None, "Dywidenda", "Invalid", None],
@@ -94,29 +182,66 @@ class TestFilteringOperations:
             }
         )
         processor = DataFrameProcessor(df_with_nans)
+
+        # Act
         processor.filter_dividends()
+
+        # Assert
         assert processor.df["Type"].isnull().sum() == 0
-        assert all(processor.df["Type"].isin(["Dividend", "Dywidenda"]))
+        assert all(processor.df["Type"].isin(self.valid_dividend_types))
 
 
 @pytest.mark.unit
 class TestAggregationOperations:
     """Test suite for data aggregation operations."""
 
-    def test_group_by_dividends(self, processor: DataFrameProcessor) -> None:
-        """Tests that group_by_dividends returns a grouped DataFrame."""
+    def setup_method(self) -> None:
+        """Setup test fixtures before each test method."""
+        self.dummy_paths = ["dummy_path"]
+        self.language = "en"
+
+    def teardown_method(self) -> None:
+        """Cleanup after each test method."""
+        pass
+
+    def test_group_when_called_then_returns_grouped_dataframe(
+        self, processor: DataFrameProcessor
+    ) -> None:
+        """Tests that grouping returns a valid grouped DataFrame."""
+        # Arrange - processor from fixture
+
+        # Act
         processor.group_by_dividends()
+
+        # Assert
         assert isinstance(processor.df, pd.DataFrame)
 
-    def test_calculate_dividend(self, processor: DataFrameProcessor) -> None:
-        """Tests that calculate_dividend executes without errors."""
-        processor.calculate_dividend(["dummy_path"], language="en")
+    def test_calculate_when_called_then_executes_without_error(
+        self, processor: DataFrameProcessor
+    ) -> None:
+        """Tests that dividend calculation executes successfully."""
+        # Arrange - processor from fixture
+
+        # Act
+        processor.calculate_dividend(self.dummy_paths, language=self.language)
+
+        # Assert
         assert isinstance(processor.df, pd.DataFrame)
 
 
 @pytest.mark.unit
 class TestTaxProcessing:
     """Test suite for tax-related processing operations."""
+
+    @classmethod
+    def setup_class(cls) -> None:
+        """Setup class-level fixtures before all tests."""
+        cls.base_amount = 100.0
+
+    @classmethod
+    def teardown_class(cls) -> None:
+        """Cleanup class-level fixtures after all tests."""
+        pass
 
     @pytest.mark.parametrize(
         "comments,expected",
@@ -126,19 +251,24 @@ class TestTaxProcessing:
             (["No info", "25%", ""], [0.0, 0.25, 0.0]),
         ],
     )
-    def test_replace_tax_with_percentage_parametrized(
+    def test_replace_when_various_formats_then_extracts_percentage_correctly(
         self, comments: list[str], expected: list[float]
     ) -> None:
-        """Tests tax percentage extraction from comments with various formats."""
+        """Tests tax percentage extraction from various comment formats."""
+        # Arrange
         df = pd.DataFrame(
             {
                 "Comment": comments,
                 "Tax Collected": [0.0] * len(comments),
-                "Amount": [100.0] * len(comments),
+                "Amount": [self.base_amount] * len(comments),
             }
         )
         processor = DataFrameProcessor(df)
+
+        # Act
         processor.replace_tax_with_percentage()
+
+        # Assert
         assert list(processor.df["Tax Collected"]) == expected
 
 
@@ -146,9 +276,24 @@ class TestTaxProcessing:
 class TestDataFrameAccess:
     """Test suite for DataFrame access methods."""
 
-    def test_get_processed_df(self, processor: DataFrameProcessor) -> None:
+    def setup_method(self) -> None:
+        """Setup test fixtures before each test method."""
+        pass
+
+    def teardown_method(self) -> None:
+        """Cleanup after each test method."""
+        pass
+
+    def test_get_processed_when_called_then_returns_valid_dataframe(
+        self, processor: DataFrameProcessor
+    ) -> None:
         """Tests that get_processed_df returns a valid DataFrame."""
+        # Arrange - processor from fixture
+
+        # Act
         result = processor.get_processed_df()
+
+        # Assert
         assert isinstance(result, pd.DataFrame)
 
 
@@ -156,23 +301,42 @@ class TestDataFrameAccess:
 class TestEdgeCases:
     """Test suite for edge cases and boundary conditions."""
 
-    def test_methods_on_empty_dataframe(self) -> None:
-        """Tests that all methods handle an empty DataFrame without raising errors."""
+    def setup_method(self) -> None:
+        """Setup test fixtures before each test method."""
+        self.rename_mapping = {"Date": "TransactionDate"}
+
+    def teardown_method(self) -> None:
+        """Cleanup after each test method."""
+        pass
+
+    def test_process_when_empty_dataframe_then_handles_gracefully(self) -> None:
+        """Tests that empty DataFrame is handled without errors."""
+        # Arrange
         empty_processor = DataFrameProcessor(pd.DataFrame())
 
-        # Ensure no errors occur when renaming columns in an empty DataFrame
+        # Act & Assert - should handle gracefully
         try:
-            empty_processor.rename_columns({"Date": "TransactionDate"})
+            empty_processor.rename_columns(self.rename_mapping)
         except KeyError:
-            pass  # Expected behavior for an empty DataFrame
+            pass  # Expected behavior for empty DataFrame
 
-        # Ensure the DataFrame remains empty
         assert empty_processor.df.empty
 
 
 @pytest.mark.performance
 class TestPerformance:
     """Test suite for performance with large datasets."""
+
+    @classmethod
+    def setup_class(cls) -> None:
+        """Setup class-level fixtures before all tests."""
+        cls.date_start = "2024-01-01"
+        cls.frequency = "D"
+
+    @classmethod
+    def teardown_class(cls) -> None:
+        """Cleanup class-level fixtures after all tests."""
+        pass
 
     @pytest.mark.parametrize(
         "periods,tickers,amounts,types,comments,expected_min_length",
@@ -224,7 +388,7 @@ class TestPerformance:
             ),
         ],
     )
-    def test_large_dataframe(
+    def test_group_when_large_dataset_then_handles_efficiently(
         self,
         periods: int,
         tickers: list[str],
@@ -233,8 +397,8 @@ class TestPerformance:
         comments: list[str],
         expected_min_length: int,
     ) -> None:
-        """Tests that methods handle large DataFrames efficiently."""
-        # Ensure all lists have the correct length
+        """Tests that large DataFrames are processed efficiently."""
+        # Arrange
         tickers = tickers[:periods]
         amounts = amounts[:periods]
         types = types[:periods]
@@ -242,7 +406,9 @@ class TestPerformance:
 
         large_df = pd.DataFrame(
             {
-                "Date": pd.date_range(start="2024-01-01", periods=periods, freq="D"),
+                "Date": pd.date_range(
+                    start=self.date_start, periods=periods, freq=self.frequency
+                ),
                 "Ticker": tickers,
                 "Amount": amounts,
                 "Type": types,
@@ -250,5 +416,9 @@ class TestPerformance:
             }
         )
         processor = DataFrameProcessor(large_df)
+
+        # Act
         processor.group_by_dividends()
+
+        # Assert
         assert len(processor.df) >= expected_min_length
