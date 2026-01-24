@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import os
 import sys
+from pathlib import Path
 
 from loguru import logger
 
@@ -23,11 +23,11 @@ def setup_logging(log_level: str = "INFO", log_file: str = "app.log"):
     logger.level("CRITICAL", color="<RED><bold>")
 
     # Create logs directory if it doesn't exist
-    logs_dir = "logs"
-    os.makedirs(logs_dir, exist_ok=True)
+    logs_dir = Path("logs")
+    logs_dir.mkdir(parents=True, exist_ok=True)
 
     # Ensure the log file is saved in the logs folder, overwrite on each run (no history)
-    log_file_path = os.path.join(logs_dir, log_file)
+    log_file_path = logs_dir / log_file
 
     # Modern 2026 color palette - trendy, sophisticated colors
     # Deep Teal (#2C7A7B) for DEBUG

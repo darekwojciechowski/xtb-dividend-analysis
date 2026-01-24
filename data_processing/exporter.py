@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import os
 import re
+from pathlib import Path
 
 import pandas as pd
 
@@ -47,11 +47,11 @@ class GoogleSpreadsheetExporter:
         self.df[numeric_cols] = self.df[numeric_cols].round(2)
 
         # Create output directory if it doesn't exist
-        output_dir = "output"
-        os.makedirs(output_dir, exist_ok=True)
+        output_dir = Path("output")
+        output_dir.mkdir(parents=True, exist_ok=True)
 
         # Create full file path
-        file_path = os.path.join(output_dir, filename)
+        file_path = output_dir / filename
 
         # Export to CSV with tab as separator
         self.df.to_csv(file_path, sep="\t", index=False)

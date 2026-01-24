@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 from loguru import logger
 from tabulate import tabulate
@@ -15,7 +17,7 @@ from data_processing.file_paths import get_file_paths
 from data_processing.import_data_xlsx import import_and_process_data
 
 # Configuration constants
-DEFAULT_INPUT_FILE = "data/demo_XTB_broker_statement.xlsx"
+DEFAULT_INPUT_FILE = Path("data") / "demo_XTB_broker_statement.xlsx"
 DEFAULT_OUTPUT_FILE = "for_google_spreadsheet.csv"
 
 
@@ -71,7 +73,7 @@ def main() -> None:
     file_path = DEFAULT_INPUT_FILE
 
     # Get file paths and validate them
-    file_path, courses_paths = get_file_paths(file_path)
+    file_path, courses_paths = get_file_paths(str(file_path))
 
     # Process data
     df_processed = process_data(file_path, courses_paths)
