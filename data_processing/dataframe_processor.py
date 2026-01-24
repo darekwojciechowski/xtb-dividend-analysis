@@ -97,6 +97,21 @@ class DataFrameProcessor:
 
         self.df.rename(columns=columns_dict, inplace=True)
 
+    def normalize_column_names(self) -> None:
+        """
+        Normalizes column names to English standard names based on detected language.
+        Maps Polish or English column names to standardized English names.
+        """
+        column_mapping = {
+            self.get_column_name("Time", "Czas"): "Date",
+            self.get_column_name("Symbol", "Ticker"): "Ticker",
+            self.get_column_name("Comment", "Komentarz"): "Comment",
+            self.get_column_name("Amount", "Kwota"): "Amount",
+            self.get_column_name("Type", "Typ"): "Type",
+        }
+        self.rename_columns(column_mapping)
+        logger.info("Normalized column names to English standard.")
+
     def convert_dates(self, date_col: str | None = None) -> None:
         """
         Converts date strings in the specified column to datetime objects.
@@ -277,6 +292,62 @@ class DataFrameProcessor:
         shares_col = self.df.pop("Shares")
         self.df["Shares"] = shares_col
 
+    def _extract_dividend_from_comment(self, comment: str) -> tuple[float | None, str | None]:
+        """
+        Extract dividend per share and currency from the comment string.
+
+        Args:
+            comment (str): The comment containing dividend details.
+
+        Returns:
+            tuple: (dividend_per_share, currency) or (None, None) if not found.
+        """
+        if not isinstance(comment, str):
+            return None, None
+
+        # Try to match the pattern "USD X.XX/ SHR" or "PLN X.XX/ SHR"
+        match = re.search(r"(USD|PLN) ([\d.]+)/ SHR", comment)
+        if match:
+            return float(match.group(2)), match.group(1)
+
+        # Try alternative pattern "X.XX USD/SHR" or "X.XX PLN/SHR"
+        match = re.search(r"([\d.]+) (USD|PLN)/SHR", comment)
+        if match:
+            return float(match.group(1)), match.group(2)
+
+        # Try to match just a number (assume default currency based on ticker)
+        match = re.search(r"([\d.]+)", comment)
+        if match:
+            return float(match.group(1)), None
+
+        return None, None
+
+    def _determine_currency(self, ticker: str, extracted_currency: str | None) -> str:
+        """
+        Determine the currency based on ticker and extracted currency.
+
+        Args:
+            ticker (str): The stock ticker.
+            extracted_currency (str): Currency extracted from comment.
+
+        Returns:
+            str: Determined currency ('USD' or 'PLN')
+        """
+        if extracted_currency:
+            return extracted_currency
+
+        # If no currency in comment, infer from ticker
+        if ".US" in ticker:
+            return "USD"
+        elif ".PL" in ticker:
+            # Special case for ASB.PL which uses USD
+            if "ASB.PL" in ticker:
+                return "USD"
+            return "PLN"
+
+        # Default to USD if can't determine
+        return "USD"
+
     def add_currency_to_dividends(self) -> None:
         """
         Appends currency symbols to the 'Net Dividend' column based on the ticker:
@@ -299,18 +370,6 @@ class DataFrameProcessor:
 
         # Apply the currency formatting
         self.df["Net Dividend"] = self.df.apply(append_currency, axis=1)
-
-    def extract_number_from_comment(self) -> None:
-        """
-        Extracts the first number (float or integer) found in the 'Comment' column
-        and creates a new column 'Extracted Number' to store the extracted values.
-        """
-
-        def extract_number(comment: str) -> float:
-            match = re.search(r"\d+(\.\d+)?", comment)
-            return float(match.group()) if match else np.nan
-
-        self.df["Extracted Number"] = self.df["Comment"].apply(extract_number)
 
     def calculate_dividend(
         self, courses_paths: list[str], language: str, comment_col: str | None = None, amount_col: str | None = None, date_col: str | None = None
@@ -385,62 +444,6 @@ class DataFrameProcessor:
             shares = total_dividend / (dividend_per_share * exchange_rate)
             return round(shares, 2)
 
-        def extract_number(comment):
-            """
-            Extract dividend per share and currency from the comment string.
-
-            Args:
-                comment (str): The comment containing dividend details.
-
-            Returns:
-                tuple: (dividend_per_share, currency) or (None, None) if not found.
-            """
-            if not isinstance(comment, str):
-                return None, None
-
-            # Try to match the pattern "USD X.XX/ SHR" or "PLN X.XX/ SHR"
-            match = re.search(r"(USD|PLN) ([\d.]+)/ SHR", comment)
-            if match:
-                return float(match.group(2)), match.group(1)
-
-            # Try alternative pattern "X.XX USD/SHR" or "X.XX PLN/SHR"
-            match = re.search(r"([\d.]+) (USD|PLN)/SHR", comment)
-            if match:
-                return float(match.group(1)), match.group(2)
-
-            # Try to match just a number (assume default currency based on ticker)
-            match = re.search(r"([\d.]+)", comment)
-            if match:
-                return float(match.group(1)), None
-
-            return None, None
-
-        def determine_currency(ticker, extracted_currency):
-            """
-            Determine the currency based on ticker and extracted currency.
-
-            Args:
-                ticker (str): The stock ticker.
-                extracted_currency (str): Currency extracted from comment.
-
-            Returns:
-                str: Determined currency ('USD' or 'PLN')
-            """
-            if extracted_currency:
-                return extracted_currency
-
-            # If no currency in comment, infer from ticker
-            if ".US" in ticker:
-                return "USD"
-            elif ".PL" in ticker:
-                # Special case for ASB.PL which uses USD
-                if "ASB.PL" in ticker:
-                    return "USD"
-                return "PLN"
-
-            # Default to USD if can't determine
-            return "USD"
-
         # Add Shares column if it doesn't exist
         if "Shares" not in self.df.columns:
             self.df["Shares"] = np.nan
@@ -461,14 +464,15 @@ class DataFrameProcessor:
             total_dividend = float(row[amount_col])
             ticker = row["Ticker"]
 
-            extracted_value, extracted_currency = extract_number(row[comment_col])
+            extracted_value, extracted_currency = self._extract_dividend_from_comment(
+                row[comment_col])
 
             if extracted_value is not None and extracted_value > 0:
                 # Store the dividend per share
                 dividend_per_share = extracted_value
 
                 # Determine currency based on ticker and extracted info
-                currency = determine_currency(ticker, extracted_currency)
+                currency = self._determine_currency(ticker, extracted_currency)
                 self.df.at[index, "Currency"] = currency
 
                 # Apply exchange rate based on language and currency
@@ -531,7 +535,7 @@ class DataFrameProcessor:
         for index, row in self.df.iterrows():
             ticker = row[ticker_col]  # Get the ticker for the current row
             # Get the value from 'Net Dividend'
-            dywidenda_netto = row[amount_col]
+            net_dividend = row[amount_col]
 
             # Determine the tax rate based on the ticker
             if "US" in ticker:
@@ -542,10 +546,10 @@ class DataFrameProcessor:
                 tax_rate = 0.0  # No tax if ticker is neither US nor PL
 
             # Calculate the tax based on 'Net Dividend'
-            podatek_pobrany = dywidenda_netto * tax_rate
+            tax_collected = net_dividend * tax_rate
 
             # Update the 'Tax Collected' column
-            self.df.at[index, tax_col] = podatek_pobrany
+            self.df.at[index, tax_col] = tax_collected
 
         return self.df
 

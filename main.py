@@ -34,15 +34,7 @@ def process_data(file_path: str, courses_paths: list[str]) -> pd.DataFrame:
 
     # Perform data processing steps
     processor.drop_columns(["ID"])
-    processor.rename_columns(
-        {
-            processor.get_column_name("Time", "Czas"): "Date",
-            processor.get_column_name("Symbol", "Ticker"): "Ticker",
-            processor.get_column_name("Comment", "Komentarz"): "Comment",
-            processor.get_column_name("Amount", "Kwota"): "Amount",
-            processor.get_column_name("Type", "Typ"): "Type",
-        }
-    )
+    processor.normalize_column_names()
     processor.apply_colorize_ticker()
     processor.apply_extractor()
     processor.apply_date_converter()
