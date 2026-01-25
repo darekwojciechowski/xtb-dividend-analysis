@@ -331,7 +331,7 @@ class DataFrameProcessor:
             extracted_currency (str): Currency extracted from comment.
 
         Returns:
-            str: Determined currency ('USD' or 'PLN')
+            str: Determined currency ('USD', 'PLN', 'EUR', 'DKK', 'GBP')
         """
         if extracted_currency:
             return extracted_currency
@@ -344,6 +344,12 @@ class DataFrameProcessor:
             if "ASB.PL" in ticker:
                 return "USD"
             return "PLN"
+        elif ".DK" in ticker:
+            return "DKK"
+        elif ".UK" in ticker:
+            return "GBP"
+        elif any(suffix in ticker for suffix in [".FR", ".DE", ".IE", ".NL", ".ES", ".IT", ".BE", ".AT", ".FI", ".PT"]):
+            return "EUR"
 
         # Default to USD if can't determine
         return "USD"
@@ -351,22 +357,32 @@ class DataFrameProcessor:
     def add_currency_to_dividends(self) -> None:
         """
         Appends currency symbols to the 'Net Dividend' column based on the ticker:
-        - Adds '$' if the ticker contains '.US'
-        - Adds 'PLN' if the ticker contains '.PL', except for 'ASB.PL' where it adds '$'.
+        - USD for .US tickers
+        - PLN for .PL tickers (except ASB.PL which uses USD)
+        - EUR for eurozone tickers (.FR, .DE, .IE, .NL, .ES, .IT, .BE, .AT, .FI, .PT)
+        - DKK for .DK tickers
+        - GBP for .UK tickers
         """
 
         def append_currency(row):
-            if ".US" in row["Ticker"]:
-                # Add dollar sign for US tickers
-                return f"{row['Net Dividend']} USD"
-            elif "ASB.PL" in row["Ticker"]:
-                # Exception for ASB.PL (use dollar)
-                return f"{row['Net Dividend']} USD"
-            elif ".PL" in row["Ticker"]:
-                # Add PLN for Polish tickers
-                return f"{row['Net Dividend']} PLN"
+            ticker = row["Ticker"]
+            dividend = row["Net Dividend"]
+
+            if ".US" in ticker:
+                return f"{dividend} USD"
+            elif "ASB.PL" in ticker:
+                # Exception for ASB.PL (uses USD)
+                return f"{dividend} USD"
+            elif ".PL" in ticker:
+                return f"{dividend} PLN"
+            elif ".DK" in ticker:
+                return f"{dividend} DKK"
+            elif ".UK" in ticker:
+                return f"{dividend} GBP"
+            elif any(suffix in ticker for suffix in [".FR", ".DE", ".IE", ".NL", ".ES", ".IT", ".BE", ".AT", ".FI", ".PT"]):
+                return f"{dividend} EUR"
             # No change if the condition doesn't match
-            return row["Net Dividend"]
+            return dividend
 
         # Apply the currency formatting
         self.df["Net Dividend"] = self.df.apply(append_currency, axis=1)
@@ -516,6 +532,7 @@ class DataFrameProcessor:
     ) -> pd.DataFrame:
         """
         Update the 'Tax Collected' column based on the 'Net Dividend' column and ticker type.
+        Applies withholding tax rates at source: 15% for US stocks and 19% for Polish stocks.
 
         Args:
             ticker_col (str, optional): The name of the column containing the ticker information.
@@ -525,10 +542,17 @@ class DataFrameProcessor:
         # Use get_column_name to handle multilingual column names
         ticker_col = ticker_col or self.get_column_name("Ticker", "Symbol")
         amount_col = amount_col or "Net Dividend"
-        # Define the tax rates for US and PL
+        # Define the withholding tax rates at source for US, PL, DK, UK, IE and FR
         tax_rates = {
-            "US": 0.15,  # Example: 15% tax for US
-            "PL": 0.19,  # Example: 19% tax for PL
+            "US": 0.15,  # 15% withholding tax for US stocks
+            "PL": 0.19,  # 19% withholding tax for PL stocks (Belka tax)
+            "DK": 0.15,  # 15% withholding tax for DK stocks (Denmark)
+            # 0% withholding tax for UK stocks (no UK withholding tax for non-residents)
+            "UK": 0.0,
+            # 15% withholding tax for IE stocks (Ireland, reduced rate for Polish residents)
+            "IE": 0.15,
+            # 0% withholding tax for FR stocks (France, under Poland-France tax treaty)
+            "FR": 0.0,
         }
 
         # Iterate over each row in the DataFrame
@@ -542,8 +566,16 @@ class DataFrameProcessor:
                 tax_rate = tax_rates["US"]
             elif "PL" in ticker:
                 tax_rate = tax_rates["PL"]
+            elif "DK" in ticker:
+                tax_rate = tax_rates["DK"]
+            elif "UK" in ticker:
+                tax_rate = tax_rates["UK"]
+            elif "IE" in ticker:
+                tax_rate = tax_rates["IE"]
+            elif "FR" in ticker:
+                tax_rate = tax_rates["FR"]
             else:
-                tax_rate = 0.0  # No tax if ticker is neither US nor PL
+                tax_rate = 0.0  # No tax if ticker is not recognized
 
             # Calculate the tax based on 'Net Dividend'
             tax_collected = net_dividend * tax_rate

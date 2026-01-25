@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import os
+from pathlib import Path
 
 from loguru import logger
 
@@ -14,15 +14,15 @@ def get_file_paths(file_path: str) -> tuple[str, list[str]]:
         tuple: file_path (str), courses_paths (list[str])
     """
     # Dynamically find all files starting with "archiwum_tab_a_" in the data folder
-    data_folder = "data"
+    data_folder = Path("data")
     courses_paths = [
-        os.path.join(data_folder, f)
-        for f in os.listdir(data_folder)
-        if f.startswith("archiwum_tab_a_") and f.endswith(".csv")
+        str(data_folder / f.name)
+        for f in data_folder.glob("archiwum_tab_a_*.csv")
     ]
 
     # Check if the main file exists
-    if not os.path.exists(file_path):
+    main_file = Path(file_path)
+    if not main_file.exists():
         logger.error(f"The file '{file_path}' does not exist. Please check the path.")
         raise FileNotFoundError(
             f"The file '{file_path}' does not exist. Please check the path."
@@ -30,7 +30,8 @@ def get_file_paths(file_path: str) -> tuple[str, list[str]]:
 
     # Check if each course file exists
     for course_path in courses_paths:
-        if not os.path.exists(course_path):
+        course_file = Path(course_path)
+        if not course_file.exists():
             logger.error(
                 f"The file '{course_path}' does not exist. Please check the path."
             )
