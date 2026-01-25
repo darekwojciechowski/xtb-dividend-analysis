@@ -45,8 +45,8 @@ def process_data(file_path: str, courses_paths: list[str]) -> pd.DataFrame:
     processor.add_empty_column()
     processor.move_negative_values()
     processor.calculate_dividend(courses_paths, language=language)
-    processor.replace_tax_with_percentage()
     processor.merge_rows_and_reorder()
+    processor.replace_tax_with_percentage()  # Calculate percentage AFTER merging
     processor.add_currency_to_dividends()
 
     # Log processed data

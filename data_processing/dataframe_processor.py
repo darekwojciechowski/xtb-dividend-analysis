@@ -506,6 +506,20 @@ class DataFrameProcessor:
                 shares = calculate_shares(
                     total_dividend, dividend_per_share, exchange_rate
                 )
+
+                # Validate that shares is a whole number (not fractional)
+                # Allow small tolerance for rounding errors (0.01)
+                fractional_part = abs(shares - round(shares))
+                if fractional_part > 0.01:
+                    error_msg = (
+                        f"Non-integer share count detected for {ticker} on {target_date_str}: "
+                        f"{shares} shares (Total: {total_dividend} {currency}, Per share: {dividend_per_share} {currency}). "
+                        f"Data inconsistency - expected whole number of shares. "
+                        f"Please verify source data in the Excel file."
+                    )
+                    logger.error(error_msg)
+                    raise ValueError(error_msg)
+
                 # Round shares to the nearest integer
                 self.df.at[index, "Shares"] = round(shares)
 
@@ -585,29 +599,33 @@ class DataFrameProcessor:
 
         return self.df
 
-    def replace_tax_with_percentage(self, tax_col: str = "Tax Collected") -> pd.DataFrame:
+    def replace_tax_with_percentage(self, tax_col: str = "Tax Collected", amount_col: str = "Net Dividend") -> pd.DataFrame:
         """
-        Replace values in the Tax Collected column with percentages extracted from the Comment/Komentarz column.
+        Calculate tax percentage based on actual tax amount and net dividend amount.
+        Replaces absolute tax values with percentages (Tax Collected / Net Dividend).
 
         Args:
-            tax_col (str): The name of the column to be replaced with the extracted percentages.
+            tax_col (str): The name of the column containing tax amounts.
+            amount_col (str): The name of the column containing net dividend amounts.
         """
-        comment_col = self.get_column_name("Comment", "Komentarz")
-        # Regular expression to find percentage values
-        percentage_pattern = r"(\d+(\.\d+)?)%"
-
-        # Iterate over each row to extract percentage
+        # Iterate over each row to calculate percentage
         for index, row in self.df.iterrows():
-            comment = row[comment_col]
-            if isinstance(comment, str):  # Check if comment is a string
-                match = re.search(percentage_pattern, comment)
-                if match:
-                    # Convert percentage to float
-                    percentage_value = float(match.group(1)) / 100
-                    # Replace the value in Tax Collected with the extracted percentage
-                    self.df.at[index, tax_col] = percentage_value
+            tax_amount = row[tax_col]
+            net_dividend = row[amount_col]
+
+            # Calculate percentage if both values are valid
+            if pd.notna(tax_amount) and pd.notna(net_dividend) and net_dividend != 0:
+                # Tax amount should be negative or positive absolute value
+                # Convert to percentage: abs(tax) / dividend
+                tax_percentage = abs(tax_amount) / abs(net_dividend)
+                # Round to 2 decimal places
+                self.df.at[index, tax_col] = round(tax_percentage, 2)
+            else:
+                # If cannot calculate, set to NaN
+                self.df.at[index, tax_col] = np.nan
+
         logger.info(
-            "Step 6 - Updated 'Tax Collected' column with extracted percentages."
+            "Step 6 - Updated 'Tax Collected' column with calculated tax percentages."
         )
 
         return self.df
