@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pandas as pd
+from loguru import logger
 
 
 class DateConverter:
@@ -25,7 +26,7 @@ class DateConverter:
         try:
             self.date_only = pd.to_datetime(self.date_string, format=format).date()
         except (ValueError, TypeError) as e:
-            print(f"Error converting date: {e}")
+            logger.error(f"Error converting date: {e}")
             self.date_only = None
 
     def get_date(self) -> pd.Timestamp | None:

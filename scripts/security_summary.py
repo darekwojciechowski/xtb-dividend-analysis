@@ -11,6 +11,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from loguru import logger
+
 
 def _format_severity_stats(metrics: dict[str, Any]) -> None:
     """Print severity breakdown.
@@ -25,7 +27,7 @@ def _format_severity_stats(metrics: dict[str, Any]) -> None:
     ]
 
     for name, count in severities:
-        print(f"- **{name} Severity**: {count}")
+        logger.info(f"- **{name} Severity**: {count}")
 
 
 def _format_common_issues(results: list[dict[str, Any]], top_n: int = 3) -> None:
@@ -41,9 +43,9 @@ def _format_common_issues(results: list[dict[str, Any]], top_n: int = 3) -> None
     )
 
     if issue_types:
-        print("- **Most Common Issues**:")
+        logger.info("- **Most Common Issues**:")
         for test_id, count in issue_types.most_common(top_n):
-            print(f"  - {test_id}: {count}")
+            logger.info(f"  - {test_id}: {count}")
 
 
 def generate_security_summary(bandit_json_path: str) -> None:
@@ -58,7 +60,7 @@ def generate_security_summary(bandit_json_path: str) -> None:
     report_path = Path(bandit_json_path)
 
     if not report_path.exists():
-        print("- **Bandit scan**: No report file found")
+        logger.info("- **Bandit scan**: No report file found")
         return
 
     try:
@@ -71,17 +73,17 @@ def generate_security_summary(bandit_json_path: str) -> None:
         total_lines = metrics.get('loc', 0)
         total_issues = len(results)
 
-        print(f"- **Lines of Code Scanned**: {total_lines:,}")
-        print(f"- **Total Security Issues**: {total_issues}")
+        logger.info(f"- **Lines of Code Scanned**: {total_lines:,}")
+        logger.info(f"- **Total Security Issues**: {total_issues}")
 
         if total_issues > 0:
             _format_severity_stats(metrics)
             _format_common_issues(results)
         else:
-            print("- **Result**: No security issues found! 🎉")
+            logger.info("- **Result**: No security issues found! 🎉")
 
     except (json.JSONDecodeError, KeyError) as e:
-        print(f"- **Error**: Could not parse bandit report: {e}", file=sys.stderr)
+        logger.error(f"- **Error**: Could not parse bandit report: {e}")
 
 
 if __name__ == "__main__":

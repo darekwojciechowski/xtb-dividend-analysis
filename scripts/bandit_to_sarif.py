@@ -10,6 +10,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from loguru import logger
+
 
 def _map_severity(severity: str) -> str:
     """Map bandit severity to SARIF level.
@@ -110,11 +112,11 @@ def convert_bandit_to_sarif(bandit_json_path: str, sarif_output_path: str) -> No
             json.dump(sarif, f, indent=2)
 
         issue_count = len(sarif["runs"][0]["results"])
-        print(
+        logger.info(
             f"Successfully converted {issue_count} issue{'s' if issue_count != 1 else ''} to SARIF format")
 
     except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(f"Error converting bandit to SARIF: {e}", file=sys.stderr)
+        logger.error(f"Error converting bandit to SARIF: {e}")
         # Create minimal valid SARIF file
         minimal_sarif = _create_sarif_structure()
         with Path(sarif_output_path).open("w") as f:
@@ -131,7 +133,7 @@ if __name__ == "__main__":
     sarif_output_path = sys.argv[2]
 
     if not Path(bandit_json_path).exists():
-        print(f"Error: Bandit JSON file not found: {bandit_json_path}")
+        logger.error(f"Bandit JSON file not found: {bandit_json_path}")
         sys.exit(1)
 
     convert_bandit_to_sarif(bandit_json_path, sarif_output_path)

@@ -603,6 +603,7 @@ class DataFrameProcessor:
     def replace_tax_with_percentage(self, tax_col: str = "Tax Collected", amount_col: str = "Net Dividend") -> pd.DataFrame:
         """
         Calculate tax percentage based on actual tax amount and net dividend amount.
+        First tries to extract percentage from Comment column, then calculates from tax/dividend ratio.
         Replaces absolute tax values with percentages (Tax Collected / Net Dividend).
 
         Args:
@@ -616,12 +617,26 @@ class DataFrameProcessor:
             tax_amount = row[tax_col]
             net_dividend = row[amount_col]
             ticker = row.get("Ticker", "")
+            comment = row.get("Comment", "")
 
-            # Calculate percentage if both values are valid
-            if pd.notna(tax_amount) and pd.notna(net_dividend) and net_dividend != 0:
+            tax_percentage = None
+
+            # First, try to extract percentage from Comment column
+            if pd.notna(comment) and isinstance(comment, str):
+                # Look for percentage pattern in comment (e.g., "15%", "20%")
+                match = re.search(r'(\d+(?:\.\d+)?)\s*%', str(comment))
+                if match:
+                    # Convert percentage string to decimal (e.g., "15%" -> 0.15)
+                    tax_percentage = float(match.group(1)) / 100
+
+            # If no percentage found in comment, calculate from tax amount
+            if tax_percentage is None and pd.notna(tax_amount) and pd.notna(net_dividend) and net_dividend != 0:
                 # Tax amount should be negative or positive absolute value
                 # Convert to percentage: abs(tax) / dividend
                 tax_percentage = abs(tax_amount) / abs(net_dividend)
+
+            # Set the tax percentage value
+            if tax_percentage is not None:
                 # Round to 2 decimal places
                 self.df.at[index, tax_col] = round(tax_percentage, 2)
 
@@ -634,8 +649,8 @@ class DataFrameProcessor:
                     )
                     us_tax_30_warning_shown = True
             else:
-                # If cannot calculate, set to NaN
-                self.df.at[index, tax_col] = np.nan
+                # If cannot calculate or extract, set to 0.0
+                self.df.at[index, tax_col] = 0.0
 
         logger.info(
             "Step 6 - Updated 'Tax Collected' column with calculated tax percentages."

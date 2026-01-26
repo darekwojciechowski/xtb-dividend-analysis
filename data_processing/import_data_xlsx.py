@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pandas as pd
+from loguru import logger
 
 
 def import_and_process_data(file_path: str, sheet_name: str = "CASH OPERATION HISTORY") -> pd.DataFrame | None:
@@ -27,10 +28,10 @@ def import_and_process_data(file_path: str, sheet_name: str = "CASH OPERATION HI
         return data
 
     except FileNotFoundError:
-        print(f"Error: The file '{file_path}' was not found.")
+        logger.error(f"The file '{file_path}' was not found.")
     except pd.errors.EmptyDataError:
-        print("Error: No data found in the file.")
+        logger.error("No data found in the file.")
     except Exception as e:
-        print(f"An error occurred while importing the data: {e}")
+        logger.error(f"An error occurred while importing the data: {e}")
 
     return None
