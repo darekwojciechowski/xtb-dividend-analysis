@@ -557,8 +557,9 @@ class DataFrameProcessor:
         ticker_col = ticker_col or self.get_column_name("Ticker", "Symbol")
         amount_col = amount_col or "Net Dividend"
         # Define the withholding tax rates at source for US, PL, DK, UK, IE and FR
+        # Note: US default is 15% with W8BEN form. Without W8BEN, the rate is 30%.
         tax_rates = {
-            "US": 0.15,  # 15% withholding tax for US stocks
+            "US": 0.15,  # 15% withholding tax for US stocks (with W8BEN form)
             "PL": 0.19,  # 19% withholding tax for PL stocks (Belka tax)
             "DK": 0.15,  # 15% withholding tax for DK stocks (Denmark)
             # 0% withholding tax for UK stocks (no UK withholding tax for non-residents)
@@ -608,10 +609,13 @@ class DataFrameProcessor:
             tax_col (str): The name of the column containing tax amounts.
             amount_col (str): The name of the column containing net dividend amounts.
         """
+        us_tax_30_warning_shown = False
+
         # Iterate over each row to calculate percentage
         for index, row in self.df.iterrows():
             tax_amount = row[tax_col]
             net_dividend = row[amount_col]
+            ticker = row.get("Ticker", "")
 
             # Calculate percentage if both values are valid
             if pd.notna(tax_amount) and pd.notna(net_dividend) and net_dividend != 0:
@@ -620,6 +624,15 @@ class DataFrameProcessor:
                 tax_percentage = abs(tax_amount) / abs(net_dividend)
                 # Round to 2 decimal places
                 self.df.at[index, tax_col] = round(tax_percentage, 2)
+
+                # Check if US dividend has 30% tax rate
+                if "US" in ticker and abs(tax_percentage - 0.30) < 0.01 and not us_tax_30_warning_shown:
+                    logger.warning(
+                        f"⚠️  WARNING: 30% tax rate detected for US dividend {ticker}. "
+                        f"In Poland, you can file a W8BEN form with your broker, "
+                        f"which reduces the withholding tax from 30% to 15% according to the double taxation treaty."
+                    )
+                    us_tax_30_warning_shown = True
             else:
                 # If cannot calculate, set to NaN
                 self.df.at[index, tax_col] = np.nan

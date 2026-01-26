@@ -260,7 +260,8 @@ class TestTaxProcessing:
             {
                 "Comment": comments,
                 "Tax Collected": [0.0] * len(comments),
-                "Amount": [self.base_amount] * len(comments),
+                "Net Dividend": [self.base_amount] * len(comments),
+                "Ticker": ["TEST.US"] * len(comments),
             }
         )
         processor = DataFrameProcessor(df)
