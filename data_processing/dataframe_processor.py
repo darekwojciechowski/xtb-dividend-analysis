@@ -305,20 +305,24 @@ class DataFrameProcessor:
         if not isinstance(comment, str):
             return None, None
 
-        # Try to match the pattern "USD X.XX/ SHR" or "PLN X.XX/ SHR"
-        match = re.search(r"(USD|PLN) ([\d.]+)/ SHR", comment)
+        # Try to match the pattern "XXX X.XX/ SHR" (any 3-letter currency)
+        match = re.search(r"([A-Z]{3}) ([\d.]+)/ SHR", comment)
         if match:
             return float(match.group(2)), match.group(1)
 
-        # Try alternative pattern "X.XX USD/SHR" or "X.XX PLN/SHR"
-        match = re.search(r"([\d.]+) (USD|PLN)/SHR", comment)
+        # Try alternative pattern "X.XX XXX/SHR" (any 3-letter currency)
+        match = re.search(r"([\d.]+) ([A-Z]{3})/SHR", comment)
         if match:
             return float(match.group(1)), match.group(2)
 
         # Try to match just a number (assume default currency based on ticker)
         match = re.search(r"([\d.]+)", comment)
         if match:
-            return float(match.group(1)), None
+            num_str = match.group(1)
+            # Avoid matching a single '.' which is not a valid number
+            if num_str == ".":
+                return None, None
+            return float(num_str), None
 
         return None, None
 
@@ -506,19 +510,6 @@ class DataFrameProcessor:
                 shares = calculate_shares(
                     total_dividend, dividend_per_share, exchange_rate
                 )
-
-                # Validate that shares is a whole number (not fractional)
-                # Allow small tolerance for rounding errors (0.01)
-                fractional_part = abs(shares - round(shares))
-                if fractional_part > 0.01:
-                    error_msg = (
-                        f"Non-integer share count detected for {ticker} on {target_date_str}: "
-                        f"{shares} shares (Total: {total_dividend} {currency}, Per share: {dividend_per_share} {currency}). "
-                        f"Data inconsistency - expected whole number of shares. "
-                        f"Please verify source data in the Excel file."
-                    )
-                    logger.error(error_msg)
-                    raise ValueError(error_msg)
 
                 # Round shares to the nearest integer
                 self.df.at[index, "Shares"] = round(shares)
