@@ -562,31 +562,37 @@ class DataFrameProcessor:
         }
 
         # Iterate over each row in the DataFrame
+
         for index, row in self.df.iterrows():
-            ticker = row[ticker_col]  # Get the ticker for the current row
-            # Get the value from 'Net Dividend'
+            ticker = row[ticker_col]
             net_dividend = row[amount_col]
+            comment = row.get("Comment", "")
 
-            # Determine the tax rate based on the ticker
-            if "US" in ticker:
-                tax_rate = tax_rates["US"]
-            elif "PL" in ticker:
-                tax_rate = tax_rates["PL"]
-            elif "DK" in ticker:
-                tax_rate = tax_rates["DK"]
-            elif "UK" in ticker:
-                tax_rate = tax_rates["UK"]
-            elif "IE" in ticker:
-                tax_rate = tax_rates["IE"]
-            elif "FR" in ticker:
-                tax_rate = tax_rates["FR"]
-            else:
-                tax_rate = 0.0  # No tax if ticker is not recognized
+            # First, try to extract the tax rate from the comment (e.g., 'WHT 27%')
+            tax_rate = None
+            if isinstance(comment, str):
+                match = re.search(r"WHT\s*(\d+(?:\.\d+)?)%", comment)
+                if match:
+                    tax_rate = float(match.group(1)) / 100
 
-            # Calculate the tax based on 'Net Dividend'
+            # If not found in the comment, use the default rate based on the ticker
+            if tax_rate is None:
+                if "US" in ticker:
+                    tax_rate = tax_rates["US"]
+                elif "PL" in ticker:
+                    tax_rate = tax_rates["PL"]
+                elif "DK" in ticker:
+                    tax_rate = tax_rates["DK"]
+                elif "UK" in ticker:
+                    tax_rate = tax_rates["UK"]
+                elif "IE" in ticker:
+                    tax_rate = tax_rates["IE"]
+                elif "FR" in ticker:
+                    tax_rate = tax_rates["FR"]
+                else:
+                    tax_rate = 0.0
+
             tax_collected = net_dividend * tax_rate
-
-            # Update the 'Tax Collected' column
             self.df.at[index, tax_col] = tax_collected
 
         return self.df

@@ -9,7 +9,6 @@ from loguru import logger
 def setup_logging(log_level: str = "INFO", log_file: str = "app.log"):
     """
     Set up logging configuration for the application using loguru.
-    Applies modern 2026 color trends: deep teal, warm coral, sage green, and muted purple.
     """
     # Remove default handler
     logger.remove()
@@ -28,13 +27,6 @@ def setup_logging(log_level: str = "INFO", log_file: str = "app.log"):
 
     # Ensure the log file is saved in the logs folder, overwrite on each run (no history)
     log_file_path = logs_dir / log_file
-
-    # Modern 2026 color palette - trendy, sophisticated colors
-    # Deep Teal (#2C7A7B) for DEBUG
-    # Sage Green (#68A691) for INFO
-    # Warm Coral (#E8927C) for WARNING
-    # Muted Purple (#8B7BA8) for ERROR
-    # Deep Burgundy (#6B2C3E) for CRITICAL
 
     format_string = (
         "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
