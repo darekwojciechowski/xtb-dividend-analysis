@@ -275,3 +275,28 @@ class TaxCalculator:
             f"USD statement tax calculation not yet implemented for {statement_currency} statement."
         )
         return self.df
+
+    @staticmethod
+    def calculate_total_tax_amount(df: pd.DataFrame) -> float:
+        """
+        Calculate the total tax amount in PLN from the 'Tax Amount PLN' column.
+
+        Args:
+            df (pd.DataFrame): DataFrame containing 'Tax Amount PLN' column.
+
+        Returns:
+            float: Total tax amount rounded to 2 decimal places.
+        """
+        if "Tax Amount PLN" not in df.columns:
+            return 0.0
+
+        total = 0.0
+        for value in df["Tax Amount PLN"]:
+            # Skip "-" values and convert numeric values
+            if value != "-" and value != 0:
+                try:
+                    total += float(value)
+                except (ValueError, TypeError):
+                    pass
+
+        return round(total, 2)

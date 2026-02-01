@@ -1054,6 +1054,55 @@ class DataFrameProcessor:
         logger.info("Step 11 - Returning the processed DataFrame.")  # Log here
         return self.df
 
+    def log_table_with_tax_summary(self) -> None:
+        """
+        Log the processed DataFrame as a formatted table with tax summary.
+        Removes the numeric 'Tax Collected' column before display and adds
+        a summary footer showing the total tax due in PLN.
+
+        :return: None
+        """
+        from tabulate import tabulate
+        from data_processing.tax_calculator import TaxCalculator
+
+        # Prepare DataFrame for display (remove numeric Tax Collected column)
+        df_display = self.df.copy()
+        if "Tax Collected" in df_display.columns:
+            df_display = df_display.drop(columns=["Tax Collected"])
+
+        # Calculate total tax to pay in PLN
+        total_tax = TaxCalculator.calculate_total_tax_amount(df_display)
+
+        # Create table with data
+        table = tabulate(
+            df_display,
+            headers="keys",
+            tablefmt="pretty",
+            showindex=False,
+        )
+
+        # Format table with tax summary footer
+        table_lines = table.split('\n')
+        table_width = len(table_lines[0]) if table_lines else 80
+
+        # Create separator line
+        separator = "+" + "-" * (table_width - 2) + "+"
+
+        # Create summary text
+        summary_text = f"Total tax due in PLN: {total_tax:.2f} PLN"
+
+        # Center the summary text
+        padding = (table_width - len(summary_text) - 2) // 2
+        centered_summary = "|" + " " * padding + summary_text + " " * (
+            table_width - len(summary_text) - padding - 2
+        ) + "|"
+
+        # Combine table with summary
+        table_with_summary = f"{table}\n{separator}\n{centered_summary}\n{separator}"
+
+        # Log processed data with summary
+        logger.info("\n" + table_with_summary)
+
     def process(self) -> pd.DataFrame:
         """
         Processes the DataFrame by applying a standard sequence of transformations.

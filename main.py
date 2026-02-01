@@ -8,7 +8,6 @@ from pathlib import Path
 
 import pandas as pd
 from loguru import logger
-from tabulate import tabulate
 
 from config.logging_config import setup_logging
 from data_processing.dataframe_processor import DataFrameProcessor
@@ -58,21 +57,7 @@ def process_data(file_path: str, courses_paths: list[str]) -> pd.DataFrame:
     # Calculate tax amount in PLN using helper columns
     processor.calculate_tax_in_pln_for_detected_pln(statement_currency)
     processor.reorder_columns()  # Reorder columns to desired sequence
-
-    # Prepare DataFrame for display (remove numeric Tax Collected column)
-    df_display = processor.get_processed_df().copy()
-    if "Tax Collected" in df_display.columns:
-        df_display = df_display.drop(columns=["Tax Collected"])
-
-    # Log processed data
-    logger.info(
-        "\n" + tabulate(
-            df_display,
-            headers="keys",
-            tablefmt="pretty",
-            showindex=False,
-        )
-    )
+    processor.log_table_with_tax_summary()  # Log table with tax summary
 
     return processor.get_processed_df()
 
