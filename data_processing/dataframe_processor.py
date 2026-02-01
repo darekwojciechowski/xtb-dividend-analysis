@@ -305,6 +305,17 @@ class DataFrameProcessor:
         if not isinstance(comment, str):
             return None, None
 
+        # Try to match the pattern "XXX WHT" (currency with withholding tax, e.g., "PLN WHT 19%")
+        match = re.search(r"([A-Z]{3})\s+WHT", comment)
+        if match:
+            currency = match.group(1)
+            # Try to find a dividend amount in the same comment (e.g., "0.3000/ SHR")
+            dividend_match = re.search(r"([\d.]+)\s*/\s*SHR", comment)
+            if dividend_match:
+                return float(dividend_match.group(1)), currency
+            # If no dividend amount found, return None for dividend but still return currency
+            return None, currency
+
         # Try to match the pattern "XXX X.XX/ SHR" (any 3-letter currency)
         match = re.search(r"([A-Z]{3}) ([\d.]+)/ SHR", comment)
         if match:
@@ -357,6 +368,61 @@ class DataFrameProcessor:
 
         # Default to USD if can't determine
         return "USD"
+
+    def _extract_tax_rate_from_comment(self, comment: str) -> float | None:
+        """
+        Extract tax rate from comment string (e.g., 'WHT 27%' or '19%').
+
+        Args:
+            comment (str): Comment string potentially containing tax rate.
+
+        Returns:
+            float | None: Tax rate as decimal (e.g., 0.27 for 27%) or None if not found.
+        """
+        if not isinstance(comment, str):
+            return None
+
+        # Try to match WHT pattern first (more specific)
+        match = re.search(r"WHT\s*(\d+(?:\.\d+)?)%", comment)
+        if match:
+            return float(match.group(1)) / 100
+
+        # Try to match any percentage pattern
+        match = re.search(r'(\d+(?:\.\d+)?)\s*%', comment)
+        if match:
+            return float(match.group(1)) / 100
+
+        return None
+
+    def _get_default_tax_rate(self, ticker: str) -> float:
+        """
+        Get default withholding tax rate based on ticker suffix.
+
+        Args:
+            ticker (str): Stock ticker symbol.
+
+        Returns:
+            float: Default tax rate as decimal.
+        """
+        # Define the withholding tax rates at source
+        # Note: US default is 15% with W8BEN form. Without W8BEN, the rate is 30%.
+        tax_rates = {
+            "US": 0.15,  # 15% withholding tax for US stocks (with W8BEN form)
+            "PL": 0.19,  # 19% withholding tax for PL stocks (Belka tax)
+            "DK": 0.15,  # 15% withholding tax for DK stocks (Denmark)
+            # 0% withholding tax for UK stocks (no UK withholding tax for non-residents)
+            "UK": 0.0,
+            # 15% withholding tax for IE stocks (Ireland, reduced rate for Polish residents)
+            "IE": 0.15,
+            # 0% withholding tax for FR stocks (France, under Poland-France tax treaty)
+            "FR": 0.0,
+        }
+
+        for suffix, rate in tax_rates.items():
+            if suffix in ticker:
+                return rate
+
+        return 0.0  # Default to 0% if country not recognized
 
     def add_currency_to_dividends(self) -> None:
         """
@@ -537,7 +603,7 @@ class DataFrameProcessor:
     ) -> pd.DataFrame:
         """
         Update the 'Tax Collected' column based on the 'Net Dividend' column and ticker type.
-        Applies withholding tax rates at source: 15% for US stocks and 19% for Polish stocks.
+        First tries to extract tax rate from Comment column, then uses default rates.
 
         Args:
             ticker_col (str, optional): The name of the column containing the ticker information.
@@ -547,53 +613,23 @@ class DataFrameProcessor:
         # Use get_column_name to handle multilingual column names
         ticker_col = ticker_col or self.get_column_name("Ticker", "Symbol")
         amount_col = amount_col or "Net Dividend"
-        # Define the withholding tax rates at source for US, PL, DK, UK, IE and FR
-        # Note: US default is 15% with W8BEN form. Without W8BEN, the rate is 30%.
-        tax_rates = {
-            "US": 0.15,  # 15% withholding tax for US stocks (with W8BEN form)
-            "PL": 0.19,  # 19% withholding tax for PL stocks (Belka tax)
-            "DK": 0.15,  # 15% withholding tax for DK stocks (Denmark)
-            # 0% withholding tax for UK stocks (no UK withholding tax for non-residents)
-            "UK": 0.0,
-            # 15% withholding tax for IE stocks (Ireland, reduced rate for Polish residents)
-            "IE": 0.15,
-            # 0% withholding tax for FR stocks (France, under Poland-France tax treaty)
-            "FR": 0.0,
-        }
 
-        # Iterate over each row in the DataFrame
-
-        for index, row in self.df.iterrows():
-            ticker = row[ticker_col]
-            net_dividend = row[amount_col]
+        def calculate_tax(row):
+            """Calculate tax for a single row."""
             comment = row.get("Comment", "")
 
-            # First, try to extract the tax rate from the comment (e.g., 'WHT 27%')
-            tax_rate = None
-            if isinstance(comment, str):
-                match = re.search(r"WHT\s*(\d+(?:\.\d+)?)%", comment)
-                if match:
-                    tax_rate = float(match.group(1)) / 100
+            # First, try to extract the tax rate from the comment
+            tax_rate = self._extract_tax_rate_from_comment(comment)
 
-            # If not found in the comment, use the default rate based on the ticker
+            # If not found in comment, use default rate based on ticker
             if tax_rate is None:
-                if "US" in ticker:
-                    tax_rate = tax_rates["US"]
-                elif "PL" in ticker:
-                    tax_rate = tax_rates["PL"]
-                elif "DK" in ticker:
-                    tax_rate = tax_rates["DK"]
-                elif "UK" in ticker:
-                    tax_rate = tax_rates["UK"]
-                elif "IE" in ticker:
-                    tax_rate = tax_rates["IE"]
-                elif "FR" in ticker:
-                    tax_rate = tax_rates["FR"]
-                else:
-                    tax_rate = 0.0
+                tax_rate = self._get_default_tax_rate(row[ticker_col])
 
-            tax_collected = net_dividend * tax_rate
-            self.df.at[index, tax_col] = tax_collected
+            # Calculate tax amount
+            return row[amount_col] * tax_rate
+
+        # Apply calculation to all rows using vectorized operation
+        self.df[tax_col] = self.df.apply(calculate_tax, axis=1)
 
         return self.df
 
@@ -607,47 +643,41 @@ class DataFrameProcessor:
             tax_col (str): The name of the column containing tax amounts.
             amount_col (str): The name of the column containing net dividend amounts.
         """
-        us_tax_30_warning_shown = False
-
-        # Iterate over each row to calculate percentage
-        for index, row in self.df.iterrows():
-            tax_amount = row[tax_col]
-            net_dividend = row[amount_col]
-            ticker = row.get("Ticker", "")
+        def calculate_tax_percentage(row):
+            """Calculate tax percentage for a single row."""
             comment = row.get("Comment", "")
 
-            tax_percentage = None
-
             # First, try to extract percentage from Comment column
-            if pd.notna(comment) and isinstance(comment, str):
-                # Look for percentage pattern in comment (e.g., "15%", "20%")
-                match = re.search(r'(\d+(?:\.\d+)?)\s*%', str(comment))
-                if match:
-                    # Convert percentage string to decimal (e.g., "15%" -> 0.15)
-                    tax_percentage = float(match.group(1)) / 100
+            tax_percentage = self._extract_tax_rate_from_comment(comment)
 
-            # If no percentage found in comment, calculate from tax amount
-            if tax_percentage is None and pd.notna(tax_amount) and pd.notna(net_dividend) and net_dividend != 0:
-                # Tax amount should be negative or positive absolute value
-                # Convert to percentage: abs(tax) / dividend
-                tax_percentage = abs(tax_amount) / abs(net_dividend)
+            # If no percentage found in comment, calculate from tax amount and dividend
+            if tax_percentage is None:
+                tax_amount = row[tax_col]
+                net_dividend = row[amount_col]
 
-            # Set the tax percentage value
-            if tax_percentage is not None:
-                # Round to 2 decimal places
-                self.df.at[index, tax_col] = round(tax_percentage, 2)
+                if pd.notna(tax_amount) and pd.notna(net_dividend) and net_dividend != 0:
+                    # Convert to percentage: abs(tax) / dividend
+                    tax_percentage = abs(tax_amount) / abs(net_dividend)
 
-                # Check if US dividend has 30% tax rate
-                if "US" in ticker and abs(tax_percentage - 0.30) < 0.01 and not us_tax_30_warning_shown:
-                    logger.warning(
-                        f"⚠️  WARNING: 30% tax rate detected for US dividend {ticker}. "
-                        f"In Poland, you can file a W8BEN form with your broker, "
-                        f"which reduces the withholding tax from 30% to 15% according to the double taxation treaty."
-                    )
-                    us_tax_30_warning_shown = True
-            else:
-                # If cannot calculate or extract, set to 0.0
-                self.df.at[index, tax_col] = 0.0
+            # Return rounded percentage or 0.0 if not calculable
+            return round(tax_percentage, 2) if tax_percentage is not None else 0.0
+
+        # Apply calculation to all rows
+        self.df[tax_col] = self.df.apply(calculate_tax_percentage, axis=1)
+
+        # Check for 30% US tax and warn user (vectorized check)
+        us_tickers_with_30_tax = self.df[
+            (self.df["Ticker"].str.contains("US", na=False)) &
+            (abs(self.df[tax_col] - 0.30) < 0.01)
+        ]
+
+        if not us_tickers_with_30_tax.empty:
+            ticker_examples = us_tickers_with_30_tax["Ticker"].head(3).tolist()
+            logger.warning(
+                f"⚠️  WARNING: 30% tax rate detected for US dividend(s): {', '.join(ticker_examples)}. "
+                f"In Poland, you can file a W8BEN form with your broker, "
+                f"which reduces the withholding tax from 30% to 15% according to the double taxation treaty."
+            )
 
         logger.info(
             "Step 6 - Updated 'Tax Collected' column with calculated tax percentages."
