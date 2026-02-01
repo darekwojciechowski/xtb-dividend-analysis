@@ -50,6 +50,8 @@ def process_data(file_path: str, courses_paths: list[str]) -> pd.DataFrame:
     processor.calculate_tax_in_pln(courses_paths)  # Calculate tax amount in PLN
     processor.add_tax_percentage_display()  # Add display-friendly percentage column
     processor.add_currency_to_dividends()
+    processor.add_tax_collected_amount()  # Add tax collected amount with currency
+    processor.reorder_columns()  # Reorder columns to desired sequence
 
     # Prepare DataFrame for display (remove numeric Tax Collected column)
     df_display = processor.get_processed_df().copy()

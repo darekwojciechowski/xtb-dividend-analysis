@@ -820,13 +820,88 @@ class DataFrameProcessor:
 
         return self.df
 
+    def add_tax_collected_amount(self) -> pd.DataFrame:
+        """
+        Creates 'Tax Collected Amount' column showing the actual tax amount collected
+        in the same currency as the dividend (not as percentage).
+        This is calculated as: Net Dividend (numeric) * Tax Collected (percentage).
+        
+        Returns:
+            pd.DataFrame: DataFrame with added 'Tax Collected Amount' column.
+        """
+        def calculate_tax_amount(row):
+            """Calculate actual tax amount collected with currency."""
+            net_dividend_str = str(row.get("Net Dividend", ""))
+            tax_percentage = row.get("Tax Collected", 0)
+            
+            # Extract numeric value and currency from Net Dividend
+            # Format: "6.84 USD" or "28.22 PLN"
+            parts = net_dividend_str.split()
+            if len(parts) != 2:
+                return "-"
+            
+            try:
+                dividend_amount = float(parts[0])
+                currency = parts[1]
+            except (ValueError, IndexError):
+                return "-"
+            
+            # Check if tax percentage is valid
+            if pd.isna(tax_percentage) or tax_percentage == 0:
+                return "-"
+            
+            # Calculate tax amount
+            tax_amount = dividend_amount * tax_percentage
+            
+            # Format with currency
+            return f"{tax_amount:.2f} {currency}"
+        
+        # Create Tax Collected Amount column
+        self.df["Tax Collected Amount"] = self.df.apply(calculate_tax_amount, axis=1)
+        
+        logger.info(
+            "Step 9 - Created 'Tax Collected Amount' column with actual tax amounts in respective currencies."
+        )
+        
+        return self.df
+
+    def reorder_columns(self) -> pd.DataFrame:
+        """
+        Reorders the DataFrame columns to the desired sequence:
+        Date, Ticker, Shares, Net Dividend, Tax Collected Amount, Tax Collected %, Tax Amount PLN
+
+        Returns:
+            pd.DataFrame: DataFrame with reordered columns.
+        """
+        desired_order = [
+            "Date",
+            "Ticker",
+            "Shares",
+            "Net Dividend",
+            "Tax Collected Amount",
+            "Tax Collected %",
+            "Tax Amount PLN"
+        ]
+
+        # Filter to only include columns that exist in the DataFrame
+        existing_columns = [col for col in desired_order if col in self.df.columns]
+
+        # Reorder the DataFrame columns
+        self.df = self.df[existing_columns]
+
+        logger.info(
+            f"Step 10 - Reordered columns to: {', '.join(existing_columns)}"
+        )
+
+        return self.df
+
     def get_processed_df(self) -> pd.DataFrame:
         """
         Returns the processed DataFrame.
 
         :return: The processed DataFrame.
         """
-        logger.info("Step 9 - Returning the processed DataFrame.")  # Log here
+        logger.info("Step 11 - Returning the processed DataFrame.")  # Log here
         return self.df
 
     def process(self) -> pd.DataFrame:
