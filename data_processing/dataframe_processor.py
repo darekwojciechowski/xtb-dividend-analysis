@@ -255,6 +255,63 @@ class DataFrameProcessor:
         self.df["Net Dividend"] = self.df["Net Dividend"].replace(0, np.nan)
         self.df["Tax Collected"] = self.df["Tax Collected"].replace(0, np.nan)
 
+    def extract_tax_percentage_from_comment(self) -> None:
+        """
+        Extract tax percentage from Comment column and store in 'Tax Collected' column.
+        This should be called BEFORE merge_rows_and_reorder() to preserve tax percentage values.
+
+        Each dividend has two rows in Excel:
+        1. Row with amount: "SBUX.US USD 0.5700/ SHR"
+        2. Row with tax: "SBUX.US USD WHT 15%"
+
+        This method finds the tax percentage for each Date+Ticker group by searching
+        all rows in that group.
+
+        Special cases (0% withholding tax at source):
+        - ASB.PL: US company listed in Poland, no withholding tax in Excel
+        - UK stocks: No withholding tax for non-residents
+        - FR stocks: 0% withholding under Poland-France tax treaty
+
+        Raises:
+            ValueError: If tax percentage cannot be extracted from any Comment in the group
+                       and default rate is not 0%.
+        """
+        def find_tax_for_group(group):
+            """Find tax percentage for a group of rows with same Date and Ticker."""
+            ticker = group["Ticker"].iloc[0]
+            date = group["Date"].iloc[0]
+
+            # Try to extract tax percentage from each row in the group
+            for comment in group["Comment"]:
+                tax_percentage = self._extract_tax_rate_from_comment(comment)
+                if tax_percentage is not None:
+                    # Found a valid tax percentage, apply to all rows in group
+                    group["Tax Collected"] = round(tax_percentage, 2)
+                    return group
+
+            # If no tax percentage found, check if this ticker has 0% default rate
+            default_rate = self._get_default_tax_rate(ticker)
+            if default_rate == 0.0:
+                # This is expected for certain stocks (ASB.PL, UK, FR, etc.)
+                group["Tax Collected"] = 0.0
+                logger.info(
+                    f"Using 0% tax rate for {ticker} (no withholding tax at source).")
+                return group
+
+            # If no tax percentage found and default is not 0%, raise error
+            comments_list = group["Comment"].tolist()
+            raise ValueError(
+                f"Unable to extract tax percentage from Comment column for ticker '{ticker}' on date '{date}'. "
+                f"Comment values in group: {comments_list}. "
+                f"Expected at least one row with format: 'USD WHT 15%' or similar with percentage."
+            )
+
+        # Group by Date and Ticker, then extract tax percentage for each group
+        self.df = self.df.groupby(
+            ["Date", "Ticker"], group_keys=False).apply(find_tax_for_group)
+        logger.info(
+            "Extracted tax percentages from Comment column for each Date+Ticker group.")
+
     def merge_rows_and_reorder(
         self, drop_columns: list[str] = ["Type", "Comment"]
     ) -> None:
@@ -265,14 +322,18 @@ class DataFrameProcessor:
 
         :param drop_columns: A list of columns to drop after merging. Defaults to ['Type', 'Comment'].
         """
+        # Build aggregation dictionary dynamically based on available columns
+        agg_dict = {
+            "Net Dividend": "sum",
+            "Shares": "sum",
+        }
+
+        # If Tax Collected exists, take first value (they should all be same after extract_tax_percentage_from_comment)
+        if "Tax Collected" in self.df.columns:
+            agg_dict["Tax Collected"] = "first"
+
         # Merge rows with the same 'Date' and 'Ticker'
-        self.df = self.df.groupby(["Date", "Ticker"], as_index=False).agg(
-            {
-                "Net Dividend": "sum",
-                "Tax Collected": "sum",
-                "Shares": "sum",  # Assuming 'Shares' column exists and should also be summed
-            }
-        )
+        self.df = self.df.groupby(["Date", "Ticker"], as_index=False).agg(agg_dict)
 
         # Drop specified columns (if they exist in the DataFrame)
         self.df.drop(columns=drop_columns, errors="ignore", inplace=True)
@@ -401,6 +462,10 @@ class DataFrameProcessor:
         Returns:
             float: Default tax rate as decimal.
         """
+        # Special case: ASB.PL is a US company listed in Poland with 0% withholding at source
+        if "ASB.PL" in ticker:
+            return 0.0
+
         # Define the withholding tax rates at source
         # Note: US default is 15% with W8BEN form. Without W8BEN, the rate is 30%.
         tax_rates = {
@@ -424,6 +489,7 @@ class DataFrameProcessor:
     def _get_exchange_rate(self, courses_paths: list[str], target_date_str: str, currency: str) -> float:
         """
         Retrieve the exchange rate for a specific currency on a specific date from CSV files.
+        If the date is not found (e.g., weekend or holiday), searches backwards for the previous business day.
 
         Args:
             courses_paths (list): List of CSV file paths containing exchange rates.
@@ -439,7 +505,6 @@ class DataFrameProcessor:
             return 1.0
 
         target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
-        target_date_str_formatted = target_date.strftime("%Y%m%d")
 
         # Map currency to column name in NBP data
         currency_column_map = {
@@ -455,26 +520,47 @@ class DataFrameProcessor:
                 f"Currency '{currency}' not supported for exchange rate lookup. Using 1.0")
             return 1.0
 
-        for csv_file in courses_paths:
-            try:
-                df = pd.read_csv(csv_file, sep=";", encoding="ISO-8859-1")
+        # Try to find exchange rate for target date or previous business days
+        max_attempts = 10  # Maximum number of days to search backwards
+        current_date = target_date
 
-                # Check if the column exists
-                if column_name not in df.columns:
-                    continue
+        for attempt in range(max_attempts):
+            current_date_str_formatted = current_date.strftime("%Y%m%d")
 
-                currency_value = df[df["data"] ==
-                                    target_date_str_formatted][column_name].values
+            for csv_file in courses_paths:
+                try:
+                    df = pd.read_csv(csv_file, sep=";", encoding="ISO-8859-1")
 
-                if len(currency_value) > 0:
-                    return float(currency_value[0].replace(",", "."))
-            except FileNotFoundError:
-                logger.warning(f"Exchange rate file '{csv_file}' was not found.")
-            except Exception as e:
-                logger.warning(f"An error occurred while processing '{csv_file}': {e}")
+                    # Check if the column exists
+                    if column_name not in df.columns:
+                        continue
+
+                    currency_value = df[df["data"] ==
+                                        current_date_str_formatted][column_name].values
+
+                    if len(currency_value) > 0:
+                        rate = float(currency_value[0].replace(",", "."))
+                        if attempt > 0:
+                            logger.info(
+                                f"Exchange rate for {currency} not found for {target_date_str}, "
+                                f"using rate from {current_date.strftime('%Y-%m-%d')}: {rate}"
+                            )
+                        return rate
+                except FileNotFoundError:
+                    logger.warning(f"Exchange rate file '{csv_file}' was not found.")
+                except Exception as e:
+                    logger.warning(
+                        f"An error occurred while processing '{csv_file}': {e}")
+
+            # Move to previous day
+            current_date = current_date - timedelta(days=1)
+
+            # Skip weekends (Saturday=5, Sunday=6)
+            while current_date.weekday() in [5, 6]:
+                current_date = current_date - timedelta(days=1)
 
         logger.error(
-            f"No exchange rate data found for {currency} on date '{target_date_str}'. "
+            f"No exchange rate data found for {currency} on date '{target_date_str}' or previous {max_attempts} business days. "
             f"Check if you have downloaded the file 'archiwum_tab_a_XXXX.csv' for the date '{target_date_str}'."
         )
         return 0.0
@@ -568,7 +654,25 @@ class DataFrameProcessor:
             ):
                 continue
 
-            target_date_str = row[date_col].strftime("%Y-%m-%d")
+            # Use Date D-1 for exchange rate lookup - it must be available
+            if "Date D-1" not in self.df.columns:
+                raise ValueError(
+                    "Column 'Date D-1' is required but not found in DataFrame. "
+                    "Please run create_date_d_minus_1_column() before calling this method."
+                )
+
+            if pd.isna(row.get("Date D-1")):
+                raise ValueError(
+                    f"Date D-1 value is missing for row {index}. "
+                    f"All rows must have valid 'Date D-1' values."
+                )
+
+            target_date = row["Date D-1"]
+            if isinstance(target_date, pd.Timestamp):
+                target_date_str = target_date.strftime("%Y-%m-%d")
+            else:
+                target_date_str = target_date.strftime("%Y-%m-%d")
+
             total_dividend = float(row[amount_col])
             ticker = row["Ticker"]
 
@@ -657,37 +761,31 @@ class DataFrameProcessor:
 
     def replace_tax_with_percentage(self, tax_col: str = "Tax Collected", amount_col: str = "Net Dividend") -> pd.DataFrame:
         """
-        Calculate tax percentage based on actual tax amount and net dividend amount.
-        First tries to extract percentage from Comment column, then calculates from tax/dividend ratio.
-        Replaces absolute tax values with percentages (Tax Collected / Net Dividend).
+        This method is deprecated. Tax percentage extraction is now done by
+        extract_tax_percentage_from_comment() before merging.
+
+        This method now just validates that Tax Collected column exists and contains valid values.
 
         Args:
-            tax_col (str): The name of the column containing tax amounts.
+            tax_col (str): The name of the column containing tax percentages.
             amount_col (str): The name of the column containing net dividend amounts.
         """
-        def calculate_tax_percentage(row):
-            """Calculate tax percentage for a single row."""
-            comment = row.get("Comment", "")
+        # Validate that Tax Collected column exists and has values
+        if tax_col not in self.df.columns:
+            raise ValueError(
+                f"Column '{tax_col}' not found. "
+                f"Please call extract_tax_percentage_from_comment() before merge_rows_and_reorder()."
+            )
 
-            # First, try to extract percentage from Comment column
-            tax_percentage = self._extract_tax_rate_from_comment(comment)
+        # Check for any missing or invalid tax percentages
+        invalid_rows = self.df[self.df[tax_col].isna() | (self.df[tax_col] == 0)]
+        if not invalid_rows.empty:
+            logger.warning(
+                f"Found {len(invalid_rows)} rows with missing or zero tax percentages. "
+                f"Tickers: {invalid_rows['Ticker'].tolist()}"
+            )
 
-            # If no percentage found in comment, calculate from tax amount and dividend
-            if tax_percentage is None:
-                tax_amount = row[tax_col]
-                net_dividend = row[amount_col]
-
-                if pd.notna(tax_amount) and pd.notna(net_dividend) and net_dividend != 0:
-                    # Convert to percentage: abs(tax) / dividend
-                    tax_percentage = abs(tax_amount) / abs(net_dividend)
-
-            # Return rounded percentage or 0.0 if not calculable
-            return round(tax_percentage, 2) if tax_percentage is not None else 0.0
-
-        # Apply calculation to all rows
-        self.df[tax_col] = self.df.apply(calculate_tax_percentage, axis=1)
-
-        # Check for 30% US tax and warn user (vectorized check)
+        logger.info("Tax Collected column validated.")
         us_tickers_with_30_tax = self.df[
             (self.df["Ticker"].str.contains("US", na=False)) &
             (abs(self.df[tax_col] - 0.30) < 0.01)
@@ -707,19 +805,21 @@ class DataFrameProcessor:
 
         return self.df
 
-    def calculate_tax_in_pln(
-        self, courses_paths: list[str], date_col: str = "Date"
+    def calculate_tax_in_pln_for_detected_usd(
+        self, courses_paths: list[str], statement_currency: str, date_col: str = "Date"
     ) -> pd.DataFrame:
         """
-        Calculate tax amount in PLN based on net dividend, tax percentage, currency, and exchange rate.
+        Calculate tax amount in PLN to pay in Poland for USD statement currency.
         Adds 'Tax Amount PLN' column to the DataFrame.
 
         Polish tax logic (Belka tax = 19%):
-        - If Tax Collected >= 19%: Tax Amount PLN = 0 (tax already paid at source)
-        - If Tax Collected < 19%: Tax Amount PLN = Net Dividend * (19% - Tax Collected) * Exchange Rate
+        - For USD statements: If Tax Collected >= 19%: Tax Amount PLN = 0 (tax already paid at source)
+        - For USD statements: If Tax Collected < 19%: Tax Amount PLN = Net Dividend * (19% - Tax Collected) * Exchange Rate
+        - For PLN statements: Placeholder logic (to be implemented)
 
         Args:
             courses_paths (list): List of CSV file paths for retrieving exchange rates.
+            statement_currency (str): The currency of the statement from cell F6 (e.g., 'PLN', 'USD').
             date_col (str): The name of the column containing dates.
 
         Returns:
@@ -732,59 +832,80 @@ class DataFrameProcessor:
         # Polish Belka tax rate
         POLISH_TAX_RATE = 0.19  # 19%
 
-        def calculate_tax_pln(row):
-            """Calculate tax amount in PLN for a single row."""
-            # Get required values
-            net_dividend = row.get("Net Dividend", 0)
-            tax_percentage = row.get("Tax Collected", 0)
-            currency = row.get("Currency", "PLN")
-            date = row.get(date_col)
+        if statement_currency == "USD":
+            # Logic for USD statement currency
+            def calculate_tax_pln(row):
+                """Calculate tax amount in PLN for a single row."""
+                # Get required values
+                net_dividend = row.get("Net Dividend", 0)
+                tax_percentage = row.get("Tax Collected", 0)
+                currency = row.get("Currency", "PLN")
+                date = row.get(date_col)
 
-            # Validate data
-            if pd.isna(net_dividend) or pd.isna(tax_percentage) or pd.isna(date):
-                return 0.0
+                # Validate data
+                if pd.isna(net_dividend) or pd.isna(tax_percentage) or pd.isna(date):
+                    return 0.0
 
-            # Convert to numeric if needed
-            try:
-                net_dividend = float(net_dividend)
-                tax_percentage = float(tax_percentage)
-            except (ValueError, TypeError):
-                return 0.0
+                # Convert to numeric if needed
+                try:
+                    net_dividend = float(net_dividend)
+                    tax_percentage = float(tax_percentage)
+                except (ValueError, TypeError):
+                    return 0.0
 
-            # If tax already paid at source is >= 19%, no additional tax in Poland
-            if tax_percentage >= POLISH_TAX_RATE:
-                return 0.0
+                # If tax already paid at source is >= 19%, no additional tax in Poland
+                if tax_percentage >= POLISH_TAX_RATE:
+                    return 0.0
 
-            # Get exchange rate for the currency
-            if isinstance(date, pd.Timestamp):
-                date_str = date.strftime("%Y-%m-%d")
-            else:
-                date_str = str(date)
+                # Get exchange rate for the currency
+                if isinstance(date, pd.Timestamp):
+                    date_str = date.strftime("%Y-%m-%d")
+                else:
+                    date_str = str(date)
 
-            exchange_rate = self._get_exchange_rate(courses_paths, date_str, currency)
+                exchange_rate = self._get_exchange_rate(
+                    courses_paths, date_str, currency)
 
-            if exchange_rate == 0:
-                logger.warning(
-                    f"Could not get exchange rate for {currency} on {date_str}. "
-                    f"Tax amount in PLN will be 0 for this row."
-                )
-                return 0.0
+                if exchange_rate == 0:
+                    logger.warning(
+                        f"Could not get exchange rate for {currency} on {date_str}. "
+                        f"Tax amount in PLN will be 0 for this row."
+                    )
+                    return 0.0
 
-            # Calculate tax amount to pay in PLN (difference between Polish rate and already paid)
-            # Tax Amount PLN = Net Dividend * (19% - Tax Already Paid) * Exchange Rate
-            tax_difference = POLISH_TAX_RATE - tax_percentage
-            tax_amount_pln = net_dividend * tax_difference * exchange_rate
+                # Calculate tax amount to pay in PLN (difference between Polish rate and already paid)
+                # Tax Amount PLN = Net Dividend * (19% - Tax Already Paid) * Exchange Rate
+                tax_difference = POLISH_TAX_RATE - tax_percentage
+                tax_amount_pln = net_dividend * tax_difference * exchange_rate
 
-            return round(tax_amount_pln, 2)
+                return round(tax_amount_pln, 2)
 
-        # Apply calculation to all rows
-        self.df["Tax Amount PLN"] = self.df.apply(calculate_tax_pln, axis=1)
+            # Apply calculation to all rows
+            self.df["Tax Amount PLN"] = self.df.apply(calculate_tax_pln, axis=1)
 
         # Replace 0 with "-" for better readability
         self.df["Tax Amount PLN"] = self.df["Tax Amount PLN"].replace(0.0, "-")
 
         logger.info(
-            "Step 7 - Calculated tax amounts in PLN based on exchange rates and Polish tax rules (19% Belka tax)."
+            f"Step 7 - Calculated tax amounts in PLN based on exchange rates and Polish tax rules (19% Belka tax) for {statement_currency} statement."
+        )
+
+        return self.df
+
+    def calculate_tax_in_pln_for_detected_pln(
+        self, courses_paths: list[str], statement_currency: str, date_col: str = "Date"
+    ) -> pd.DataFrame:
+
+        # Add Tax Amount PLN column if it doesn't exist
+        if "Tax Amount PLN" not in self.df.columns:
+            self.df["Tax Amount PLN"] = "-"
+
+        # TODO: Implement PLN-specific calculation logic
+        # Placeholder: Set all values to "-"
+        self.df["Tax Amount PLN"] = "-"
+
+        logger.info(
+            f"Step 7 - PLN statement processing - Tax Amount PLN column placeholder created for {statement_currency} statement."
         )
 
         return self.df

@@ -17,7 +17,7 @@ from data_processing.file_paths import get_file_paths
 from data_processing.import_data_xlsx import import_and_process_data
 
 # Configuration constants
-DEFAULT_INPUT_FILE = Path("data") / "demo_XTB_broker_statement.xlsx"
+DEFAULT_INPUT_FILE = Path("data") / "demo_XTB_broker_statement_currency_PLN.xlsx"
 DEFAULT_OUTPUT_FILE = "for_google_spreadsheet.csv"
 
 
@@ -44,12 +44,15 @@ def process_data(file_path: str, courses_paths: list[str]) -> pd.DataFrame:
     processor.group_by_dividends()
     processor.add_empty_column()
     processor.move_negative_values()
+    processor.create_date_d_minus_1_column()  # Add Date D-1 column BEFORE calculate_dividend
     processor.calculate_dividend(courses_paths, statement_currency)
+    processor.extract_tax_percentage_from_comment()  # Extract tax % BEFORE merging
     processor.merge_rows_and_reorder()
-    processor.replace_tax_with_percentage()  # Calculate percentage AFTER merging
-    processor.calculate_tax_in_pln(courses_paths)  # Calculate tax amount in PLN
+    processor.replace_tax_with_percentage()  # Validate tax percentages AFTER merging
+    # Calculate tax amount in PLN
+    processor.calculate_tax_in_pln_for_detected_usd(courses_paths, statement_currency)
     processor.add_tax_percentage_display()  # Add display-friendly percentage column
-    processor.create_date_d_minus_1_column()  # Add Date D-1 column
+    processor.create_date_d_minus_1_column()  # Recreate Date D-1 after merge
     processor.add_currency_to_dividends()
     processor.create_exchange_rate_d_minus_1_column(
         courses_paths)  # Add Exchange Rate D-1 column
