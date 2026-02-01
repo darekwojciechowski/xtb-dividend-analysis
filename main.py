@@ -49,14 +49,14 @@ def process_data(file_path: str, courses_paths: list[str]) -> pd.DataFrame:
     processor.extract_tax_percentage_from_comment()  # Extract tax % BEFORE merging
     processor.merge_rows_and_reorder()
     processor.replace_tax_with_percentage()  # Validate tax percentages AFTER merging
-    # Calculate tax amount in PLN
-    processor.calculate_tax_in_pln_for_detected_usd(courses_paths, statement_currency)
     processor.add_tax_percentage_display()  # Add display-friendly percentage column
     processor.create_date_d_minus_1_column()  # Recreate Date D-1 after merge
     processor.add_currency_to_dividends()
     processor.create_exchange_rate_d_minus_1_column(
         courses_paths)  # Add Exchange Rate D-1 column
     processor.add_tax_collected_amount()  # Add tax collected amount with currency
+    # Calculate tax amount in PLN using helper columns
+    processor.calculate_tax_in_pln_for_detected_pln(statement_currency)
     processor.reorder_columns()  # Reorder columns to desired sequence
 
     # Prepare DataFrame for display (remove numeric Tax Collected column)

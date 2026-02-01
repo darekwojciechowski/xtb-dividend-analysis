@@ -11,6 +11,8 @@ from visualization.ticker_colors import get_random_color
 
 from .date_converter import DateConverter
 from .extractor import MultiConditionExtractor
+from .tax_calculator import TaxCalculator
+from .tax_calculator import TaxCalculator
 
 
 class DataFrameProcessor:
@@ -806,108 +808,38 @@ class DataFrameProcessor:
         return self.df
 
     def calculate_tax_in_pln_for_detected_usd(
-        self, courses_paths: list[str], statement_currency: str, date_col: str = "Date"
+        self, courses_paths: list[str], statement_currency: str
     ) -> pd.DataFrame:
-        """
-        Calculate tax amount in PLN to pay in Poland for USD statement currency.
-        Adds 'Tax Amount PLN' column to the DataFrame.
+        """Calculate tax amount in PLN for USD statement currency.
 
-        Polish tax logic (Belka tax = 19%):
-        - For USD statements: If Tax Collected >= 19%: Tax Amount PLN = 0 (tax already paid at source)
-        - For USD statements: If Tax Collected < 19%: Tax Amount PLN = Net Dividend * (19% - Tax Collected) * Exchange Rate
-        - For PLN statements: Placeholder logic (to be implemented)
+        Delegates to TaxCalculator class.
 
         Args:
-            courses_paths (list): List of CSV file paths for retrieving exchange rates.
-            statement_currency (str): The currency of the statement from cell F6 (e.g., 'PLN', 'USD').
-            date_col (str): The name of the column containing dates.
+            courses_paths (list[str]): Not used, kept for backward compatibility.
+            statement_currency (str): The currency of the statement from cell F6.
 
         Returns:
             pd.DataFrame: DataFrame with added 'Tax Amount PLN' column.
         """
-        # Add Tax Amount PLN column if it doesn't exist
-        if "Tax Amount PLN" not in self.df.columns:
-            self.df["Tax Amount PLN"] = 0.0
-
-        # Polish Belka tax rate
-        POLISH_TAX_RATE = 0.19  # 19%
-
-        if statement_currency == "USD":
-            # Logic for USD statement currency
-            def calculate_tax_pln(row):
-                """Calculate tax amount in PLN for a single row."""
-                # Get required values
-                net_dividend = row.get("Net Dividend", 0)
-                tax_percentage = row.get("Tax Collected", 0)
-                currency = row.get("Currency", "PLN")
-                date = row.get(date_col)
-
-                # Validate data
-                if pd.isna(net_dividend) or pd.isna(tax_percentage) or pd.isna(date):
-                    return 0.0
-
-                # Convert to numeric if needed
-                try:
-                    net_dividend = float(net_dividend)
-                    tax_percentage = float(tax_percentage)
-                except (ValueError, TypeError):
-                    return 0.0
-
-                # If tax already paid at source is >= 19%, no additional tax in Poland
-                if tax_percentage >= POLISH_TAX_RATE:
-                    return 0.0
-
-                # Get exchange rate for the currency
-                if isinstance(date, pd.Timestamp):
-                    date_str = date.strftime("%Y-%m-%d")
-                else:
-                    date_str = str(date)
-
-                exchange_rate = self._get_exchange_rate(
-                    courses_paths, date_str, currency)
-
-                if exchange_rate == 0:
-                    logger.warning(
-                        f"Could not get exchange rate for {currency} on {date_str}. "
-                        f"Tax amount in PLN will be 0 for this row."
-                    )
-                    return 0.0
-
-                # Calculate tax amount to pay in PLN (difference between Polish rate and already paid)
-                # Tax Amount PLN = Net Dividend * (19% - Tax Already Paid) * Exchange Rate
-                tax_difference = POLISH_TAX_RATE - tax_percentage
-                tax_amount_pln = net_dividend * tax_difference * exchange_rate
-
-                return round(tax_amount_pln, 2)
-
-            # Apply calculation to all rows
-            self.df["Tax Amount PLN"] = self.df.apply(calculate_tax_pln, axis=1)
-
-        # Replace 0 with "-" for better readability
-        self.df["Tax Amount PLN"] = self.df["Tax Amount PLN"].replace(0.0, "-")
-
-        logger.info(
-            f"Step 7 - Calculated tax amounts in PLN based on exchange rates and Polish tax rules (19% Belka tax) for {statement_currency} statement."
-        )
-
+        calculator = TaxCalculator(self.df)
+        self.df = calculator.calculate_tax_for_usd_statement(statement_currency)
         return self.df
 
     def calculate_tax_in_pln_for_detected_pln(
-        self, courses_paths: list[str], statement_currency: str, date_col: str = "Date"
+        self, statement_currency: str
     ) -> pd.DataFrame:
+        """Calculate tax amount in PLN for PLN statement currency.
 
-        # Add Tax Amount PLN column if it doesn't exist
-        if "Tax Amount PLN" not in self.df.columns:
-            self.df["Tax Amount PLN"] = "-"
+        Delegates to TaxCalculator class.
 
-        # TODO: Implement PLN-specific calculation logic
-        # Placeholder: Set all values to "-"
-        self.df["Tax Amount PLN"] = "-"
+        Args:
+            statement_currency (str): The currency of the statement from cell F6.
 
-        logger.info(
-            f"Step 7 - PLN statement processing - Tax Amount PLN column placeholder created for {statement_currency} statement."
-        )
-
+        Returns:
+            pd.DataFrame: DataFrame with added 'Tax Amount PLN' column.
+        """
+        calculator = TaxCalculator(self.df)
+        self.df = calculator.calculate_tax_for_pln_statement(statement_currency)
         return self.df
 
     def add_tax_percentage_display(self) -> pd.DataFrame:
@@ -1025,7 +957,7 @@ class DataFrameProcessor:
             elif rate == 1.0 and currency == "PLN":
                 return "-"  # No need to show rate for PLN
             else:
-                return f"{rate:.4f}"
+                return f"{rate:.4f} PLN"
 
         # Create Exchange Rate D-1 column
         self.df["Exchange Rate D-1"] = self.df.apply(get_exchange_rate_for_row, axis=1)
