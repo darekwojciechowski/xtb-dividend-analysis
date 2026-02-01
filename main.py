@@ -25,14 +25,14 @@ def process_data(file_path: str, courses_paths: list[str]) -> pd.DataFrame:
     """
     Process the data using DataFrameProcessor and return the processed DataFrame.
     """
-    # Load data from XLSX file
-    df = import_and_process_data(file_path)
+    # Load data from XLSX file and extract currency
+    df, currency = import_and_process_data(file_path)
 
     # Initialize the DataFrameProcessor with the DataFrame
     processor = DataFrameProcessor(df)
 
-    # Detect language before renaming columns
-    language = processor.detect_language()
+    # Detect statement currency from cell F6
+    statement_currency = processor.detect_statement_currency(currency)
 
     # Perform data processing steps
     processor.drop_columns(["ID"])
@@ -44,7 +44,7 @@ def process_data(file_path: str, courses_paths: list[str]) -> pd.DataFrame:
     processor.group_by_dividends()
     processor.add_empty_column()
     processor.move_negative_values()
-    processor.calculate_dividend(courses_paths, language=language)
+    processor.calculate_dividend(courses_paths, statement_currency)
     processor.merge_rows_and_reorder()
     processor.replace_tax_with_percentage()  # Calculate percentage AFTER merging
     processor.calculate_tax_in_pln(courses_paths)  # Calculate tax amount in PLN

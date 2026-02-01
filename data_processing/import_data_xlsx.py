@@ -2,12 +2,30 @@
 
 from __future__ import annotations
 
+import openpyxl
 import pandas as pd
 from loguru import logger
 
 
-def import_and_process_data(file_path: str, sheet_name: str = "CASH OPERATION HISTORY") -> pd.DataFrame | None:
+def import_and_process_data(file_path: str, sheet_name: str = "CASH OPERATION HISTORY") -> tuple[pd.DataFrame | None, str | None]:
+    """
+    Import and process data from XTB broker statement.
+
+    Args:
+        file_path: Path to the XLSX file
+        sheet_name: Name of the sheet to read
+
+    Returns:
+        tuple: (DataFrame with transaction data, currency code from cell F6)
+               Returns (None, None) if an error occurs
+    """
     try:
+        # First, extract currency from cell F6 using openpyxl
+        wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+        ws = wb[sheet_name]
+        currency = ws['F6'].value
+        wb.close()
+
         # Load the entire sheet
         all_data = pd.read_excel(file_path, sheet_name=sheet_name, header=None)
 
@@ -25,7 +43,9 @@ def import_and_process_data(file_path: str, sheet_name: str = "CASH OPERATION HI
             ~data.apply(lambda row: row.astype(str).str.contains("Total").any(), axis=1)
         ]
 
-        return data
+        logger.info(f"Detected currency from cell F6: {currency}")
+
+        return data, currency
 
     except FileNotFoundError:
         logger.error(f"The file '{file_path}' was not found.")
@@ -34,4 +54,4 @@ def import_and_process_data(file_path: str, sheet_name: str = "CASH OPERATION HI
     except Exception as e:
         logger.error(f"An error occurred while importing the data: {e}")
 
-    return None
+    return None, None

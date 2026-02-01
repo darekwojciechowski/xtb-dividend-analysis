@@ -27,24 +27,21 @@ class DataFrameProcessor:
         self.df = df.copy()
         logger.info("Step 1 - Initialized DataFrameProcessor with a DataFrame.")
 
-    def detect_language(self) -> str:
+    def detect_statement_currency(self, currency: str) -> str:
         """
-        Detects the language of the DataFrame based on column names.
+        Detects the currency of the statement from cell F6 in the XTB broker statement.
+
+        The currency in cell F6 defines:
+        1. The currency of all amounts in the 'Amount' column
+        2. The statement interface language (PLN = Polish, others = English)
+
+        Args:
+            currency: Currency code from cell F6 (e.g., 'USD', 'PLN', 'EUR')
 
         Returns:
-            str: 'PL' if Polish columns are detected, 'ENG' if English columns are detected.
+            str: Currency code (e.g., 'USD', 'PLN', 'EUR')
         """
-        polish_columns = {"Data", "Symbol", "Komentarz", "Kwota", "Typ"}
-        english_columns = {"Date", "Ticker", "Comment", "Amount", "Type"}
-
-        language = (
-            "PL"
-            if len(polish_columns.intersection(self.df.columns))
-            > len(english_columns.intersection(self.df.columns))
-            else "ENG"
-        )
-        logger.info(f"Step 2 - Detected language: {language}.")
-        return language
+        return currency
 
     def get_column_name(self, english_name: str, polish_name: str) -> str:
         """
@@ -516,7 +513,7 @@ class DataFrameProcessor:
         self.df["Net Dividend"] = self.df.apply(append_currency, axis=1)
 
     def calculate_dividend(
-        self, courses_paths: list[str], language: str, comment_col: str | None = None, amount_col: str | None = None, date_col: str | None = None
+        self, courses_paths: list[str], statement_currency: str, comment_col: str | None = None, amount_col: str | None = None, date_col: str | None = None
     ) -> pd.DataFrame:
         """
         Modify the Net Dividend column based on the number extracted from the Comment column
@@ -524,8 +521,8 @@ class DataFrameProcessor:
         for the specific date in each row.
 
         Args:
-            courses_paths (list): A list of CSV file paths for retrieving USD exchange rates.
-            language (str): The detected language of the DataFrame ('PL' or 'ENG').
+            courses_paths (list): A list of CSV file paths for retrieving exchange rates.
+            statement_currency (str): The currency of the statement from cell F6 (e.g., 'PLN', 'USD').
             comment_col (str, optional): The name of the column containing the comments to extract numbers from.
             amount_col (str, optional): The name of the column (Net Dividend) to update with the extracted values.
             date_col (str, optional): The name of the column containing the date for retrieving the exchange rate.
@@ -586,11 +583,11 @@ class DataFrameProcessor:
                 currency = self._determine_currency(ticker, extracted_currency)
                 self.df.at[index, "Currency"] = currency
 
-                # Apply exchange rate based on language and currency
+                # Apply exchange rate based on statement currency and dividend currency
                 exchange_rate = 1.0  # Default exchange rate
 
-                # Only apply exchange rate conversion for Polish interface with USD dividends
-                if language == "PL" and currency == "USD":
+                # Only apply exchange rate conversion for Polish statements (PLN) with USD dividends
+                if statement_currency == "PLN" and currency == "USD":
                     exchange_rate = self._get_exchange_rate(
                         courses_paths, target_date_str, currency
                     )
