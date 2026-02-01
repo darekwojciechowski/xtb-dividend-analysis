@@ -424,6 +424,64 @@ class DataFrameProcessor:
 
         return 0.0  # Default to 0% if country not recognized
 
+    def _get_exchange_rate(self, courses_paths: list[str], target_date_str: str, currency: str) -> float:
+        """
+        Retrieve the exchange rate for a specific currency on a specific date from CSV files.
+
+        Args:
+            courses_paths (list): List of CSV file paths containing exchange rates.
+            target_date_str (str): The date in 'YYYY-MM-DD' format to search for.
+            currency (str): Currency code ('USD', 'EUR', 'DKK', 'GBP', etc.)
+
+        Returns:
+            float: The exchange rate for the specified currency on the specified date.
+                   Returns 1.0 for PLN. Returns 0.0 if rate not found.
+        """
+        # PLN is the base currency, so exchange rate is always 1.0
+        if currency == "PLN":
+            return 1.0
+
+        target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
+        target_date_str_formatted = target_date.strftime("%Y%m%d")
+
+        # Map currency to column name in NBP data
+        currency_column_map = {
+            "USD": "1USD",
+            "EUR": "1EUR",
+            "GBP": "1GBP",
+            "DKK": "1DKK",
+        }
+
+        column_name = currency_column_map.get(currency)
+        if not column_name:
+            logger.warning(
+                f"Currency '{currency}' not supported for exchange rate lookup. Using 1.0")
+            return 1.0
+
+        for csv_file in courses_paths:
+            try:
+                df = pd.read_csv(csv_file, sep=";", encoding="ISO-8859-1")
+
+                # Check if the column exists
+                if column_name not in df.columns:
+                    continue
+
+                currency_value = df[df["data"] ==
+                                    target_date_str_formatted][column_name].values
+
+                if len(currency_value) > 0:
+                    return float(currency_value[0].replace(",", "."))
+            except FileNotFoundError:
+                logger.warning(f"Exchange rate file '{csv_file}' was not found.")
+            except Exception as e:
+                logger.warning(f"An error occurred while processing '{csv_file}': {e}")
+
+        logger.error(
+            f"No exchange rate data found for {currency} on date '{target_date_str}'. "
+            f"Check if you have downloaded the file 'archiwum_tab_a_XXXX.csv' for the date '{target_date_str}'."
+        )
+        return 0.0
+
     def add_currency_to_dividends(self) -> None:
         """
         Appends currency symbols to the 'Net Dividend' column based on the ticker:
@@ -476,39 +534,6 @@ class DataFrameProcessor:
         comment_col = comment_col or self.get_column_name("Comment", "Komentarz")
         amount_col = amount_col or "Net Dividend"
         date_col = date_col or self.get_column_name("Date", "Data")
-
-        def get_usd_exchange_rate(courses_paths, target_date_str):
-            """
-            Retrieve the exchange rate for 1 USD on a specific date from multiple CSV files.
-
-            Args:
-                courses_paths (list): List of CSV file paths.
-                target_date_str (str): The date in 'YYYY-MM-DD' format to search for.
-
-            Returns:
-                float: The exchange rate for 1 USD on the specified date.
-            """
-            target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
-            target_date_str_formatted = target_date.strftime("%Y%m%d")
-
-            for csv_file in courses_paths:
-                try:
-                    df = pd.read_csv(csv_file, sep=";", encoding="ISO-8859-1")
-                    usd_value = df[df["data"] == target_date_str_formatted][
-                        "1USD"
-                    ].values
-
-                    if len(usd_value) > 0:
-                        return float(usd_value[0].replace(",", "."))
-                except FileNotFoundError:
-                    print(f"Warning: The file '{csv_file}' was not found.")
-                except Exception as e:
-                    print(f"An error occurred while processing '{csv_file}': {e}")
-
-            print(
-                f"Error: No data found for the date '{target_date_str}'. Check if you have downloaded the file 'archiwum_tab_a_XXXX.csv' for the date '{target_date_str}'."
-            )
-            return 0.0
 
         def calculate_shares(total_dividend, dividend_per_share, exchange_rate):
             """
@@ -566,8 +591,8 @@ class DataFrameProcessor:
 
                 # Only apply exchange rate conversion for Polish interface with USD dividends
                 if language == "PL" and currency == "USD":
-                    exchange_rate = get_usd_exchange_rate(
-                        courses_paths, target_date_str
+                    exchange_rate = self._get_exchange_rate(
+                        courses_paths, target_date_str, currency
                     )
                     if exchange_rate == 0:
                         continue  # Skip if we couldn't get a valid exchange rate
@@ -685,13 +710,123 @@ class DataFrameProcessor:
 
         return self.df
 
+    def calculate_tax_in_pln(
+        self, courses_paths: list[str], date_col: str = "Date"
+    ) -> pd.DataFrame:
+        """
+        Calculate tax amount in PLN based on net dividend, tax percentage, currency, and exchange rate.
+        Adds 'Tax Amount PLN' column to the DataFrame.
+
+        Polish tax logic (Belka tax = 19%):
+        - If Tax Collected >= 19%: Tax Amount PLN = 0 (tax already paid at source)
+        - If Tax Collected < 19%: Tax Amount PLN = Net Dividend * (19% - Tax Collected) * Exchange Rate
+
+        Args:
+            courses_paths (list): List of CSV file paths for retrieving exchange rates.
+            date_col (str): The name of the column containing dates.
+
+        Returns:
+            pd.DataFrame: DataFrame with added 'Tax Amount PLN' column.
+        """
+        # Add Tax Amount PLN column if it doesn't exist
+        if "Tax Amount PLN" not in self.df.columns:
+            self.df["Tax Amount PLN"] = 0.0
+
+        # Polish Belka tax rate
+        POLISH_TAX_RATE = 0.19  # 19%
+
+        def calculate_tax_pln(row):
+            """Calculate tax amount in PLN for a single row."""
+            # Get required values
+            net_dividend = row.get("Net Dividend", 0)
+            tax_percentage = row.get("Tax Collected", 0)
+            currency = row.get("Currency", "PLN")
+            date = row.get(date_col)
+
+            # Validate data
+            if pd.isna(net_dividend) or pd.isna(tax_percentage) or pd.isna(date):
+                return 0.0
+
+            # Convert to numeric if needed
+            try:
+                net_dividend = float(net_dividend)
+                tax_percentage = float(tax_percentage)
+            except (ValueError, TypeError):
+                return 0.0
+
+            # If tax already paid at source is >= 19%, no additional tax in Poland
+            if tax_percentage >= POLISH_TAX_RATE:
+                return 0.0
+
+            # Get exchange rate for the currency
+            if isinstance(date, pd.Timestamp):
+                date_str = date.strftime("%Y-%m-%d")
+            else:
+                date_str = str(date)
+
+            exchange_rate = self._get_exchange_rate(courses_paths, date_str, currency)
+
+            if exchange_rate == 0:
+                logger.warning(
+                    f"Could not get exchange rate for {currency} on {date_str}. "
+                    f"Tax amount in PLN will be 0 for this row."
+                )
+                return 0.0
+
+            # Calculate tax amount to pay in PLN (difference between Polish rate and already paid)
+            # Tax Amount PLN = Net Dividend * (19% - Tax Already Paid) * Exchange Rate
+            tax_difference = POLISH_TAX_RATE - tax_percentage
+            tax_amount_pln = net_dividend * tax_difference * exchange_rate
+
+            return round(tax_amount_pln, 2)
+
+        # Apply calculation to all rows
+        self.df["Tax Amount PLN"] = self.df.apply(calculate_tax_pln, axis=1)
+
+        # Replace 0 with "-" for better readability
+        self.df["Tax Amount PLN"] = self.df["Tax Amount PLN"].replace(0.0, "-")
+
+        logger.info(
+            "Step 7 - Calculated tax amounts in PLN based on exchange rates and Polish tax rules (19% Belka tax)."
+        )
+
+        return self.df
+
+    def add_tax_percentage_display(self) -> pd.DataFrame:
+        """
+        Creates a display-friendly 'Tax Collected %' column with percentage formatting.
+        Keeps the numeric 'Tax Collected' column for calculations.
+
+        The 'Tax Collected %' column will be used for export/display,
+        while 'Tax Collected' remains numeric for calculations.
+
+        Returns:
+            pd.DataFrame: DataFrame with added 'Tax Collected %' column.
+        """
+        def format_tax_percentage(value):
+            """Format tax percentage for display."""
+            if pd.isna(value) or value == 0:
+                return "-"
+            # Convert decimal to percentage (e.g., 0.15 -> "15%")
+            return f"{int(value * 100)}%"
+
+        # Create display column from numeric column
+        self.df["Tax Collected %"] = self.df["Tax Collected"].apply(
+            format_tax_percentage)
+
+        logger.info(
+            "Step 8 - Created 'Tax Collected %' display column with percentage formatting."
+        )
+
+        return self.df
+
     def get_processed_df(self) -> pd.DataFrame:
         """
         Returns the processed DataFrame.
 
         :return: The processed DataFrame.
         """
-        logger.info("Step 7 - Returning the processed DataFrame.")  # Log here
+        logger.info("Step 9 - Returning the processed DataFrame.")  # Log here
         return self.df
 
     def process(self) -> pd.DataFrame:

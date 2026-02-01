@@ -39,6 +39,10 @@ class GoogleSpreadsheetExporter:
         # Remove ANSI sequences from 'Ticker'
         self.df["Ticker"] = self.df["Ticker"].apply(self.remove_ansi)
 
+        # Drop numeric 'Tax Collected' column (keep only 'Tax Collected %' for display)
+        if "Tax Collected" in self.df.columns and "Tax Collected %" in self.df.columns:
+            self.df = self.df.drop(columns=["Tax Collected"])
+
         # Replace NaN values with 0
         self.df.fillna(0, inplace=True)
 

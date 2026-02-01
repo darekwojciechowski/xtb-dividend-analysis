@@ -47,12 +47,19 @@ def process_data(file_path: str, courses_paths: list[str]) -> pd.DataFrame:
     processor.calculate_dividend(courses_paths, language=language)
     processor.merge_rows_and_reorder()
     processor.replace_tax_with_percentage()  # Calculate percentage AFTER merging
+    processor.calculate_tax_in_pln(courses_paths)  # Calculate tax amount in PLN
+    processor.add_tax_percentage_display()  # Add display-friendly percentage column
     processor.add_currency_to_dividends()
+
+    # Prepare DataFrame for display (remove numeric Tax Collected column)
+    df_display = processor.get_processed_df().copy()
+    if "Tax Collected" in df_display.columns:
+        df_display = df_display.drop(columns=["Tax Collected"])
 
     # Log processed data
     logger.info(
         "\n" + tabulate(
-            processor.get_processed_df(),
+            df_display,
             headers="keys",
             tablefmt="pretty",
             showindex=False,
