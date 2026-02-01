@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
@@ -820,12 +820,110 @@ class DataFrameProcessor:
 
         return self.df
 
+    @staticmethod
+    def _get_previous_business_day(date_value) -> datetime:
+        """
+        Calculate the previous business day (D-1) from a given date.
+        Skips weekends (Saturday, Sunday) by going backwards to the last weekday.
+
+        Args:
+            date_value: A datetime.date, pandas Timestamp, or datetime object.
+
+        Returns:
+            datetime.date: The previous business day.
+        """
+        # Convert to datetime.date if needed
+        if isinstance(date_value, pd.Timestamp):
+            date_value = date_value.date()
+        elif isinstance(date_value, datetime):
+            date_value = date_value.date()
+
+        # Start with D-1 (previous day)
+        previous_day = date_value - timedelta(days=1)
+
+        # Skip backwards while it's a weekend (Saturday=5, Sunday=6)
+        while previous_day.weekday() in [5, 6]:
+            previous_day -= timedelta(days=1)
+
+        return previous_day
+
+    def create_date_d_minus_1_column(self) -> pd.DataFrame:
+        """
+        Creates 'Date D-1' column showing the previous business day from the dividend date.
+        If D-1 falls on a weekend, uses the last weekday (typically Friday).
+
+        Returns:
+            pd.DataFrame: DataFrame with added 'Date D-1' column.
+        """
+        self.df["Date D-1"] = self.df["Date"].apply(self._get_previous_business_day)
+
+        logger.info(
+            "Step 8a - Created 'Date D-1' column with previous business day dates."
+        )
+
+        return self.df
+
+    def create_exchange_rate_d_minus_1_column(self, courses_paths: list[str]) -> pd.DataFrame:
+        """
+        Creates 'Exchange Rate D-1' column showing the exchange rate for the currency
+        from Net Dividend column on the D-1 date.
+
+        Args:
+            courses_paths (list[str]): List of paths to exchange rate CSV files.
+
+        Returns:
+            pd.DataFrame: DataFrame with added 'Exchange Rate D-1' column.
+        """
+        def get_exchange_rate_for_row(row):
+            """Extract currency from Net Dividend and get exchange rate for D-1 date."""
+            net_dividend_str = str(row.get("Net Dividend", ""))
+            date_d_minus_1 = row.get("Date D-1")
+
+            # Extract currency from Net Dividend (format: "6.84 USD" or "28.22 PLN")
+            parts = net_dividend_str.split()
+            if len(parts) != 2:
+                return "-"
+
+            currency = parts[1]
+
+            # Convert date to string format for lookup
+            if pd.isna(date_d_minus_1):
+                return "-"
+
+            # Convert date to YYYY-MM-DD format
+            if isinstance(date_d_minus_1, pd.Timestamp):
+                date_str = date_d_minus_1.strftime("%Y-%m-%d")
+            elif isinstance(date_d_minus_1, datetime):
+                date_str = date_d_minus_1.strftime("%Y-%m-%d")
+            else:
+                date_str = date_d_minus_1.strftime("%Y-%m-%d")
+
+            # Get exchange rate
+            rate = self._get_exchange_rate(courses_paths, date_str, currency)
+
+            # Return formatted rate or "-" if not found
+            if rate == 0.0:
+                return "-"
+            elif rate == 1.0 and currency == "PLN":
+                return "-"  # No need to show rate for PLN
+            else:
+                return f"{rate:.4f}"
+
+        # Create Exchange Rate D-1 column
+        self.df["Exchange Rate D-1"] = self.df.apply(get_exchange_rate_for_row, axis=1)
+
+        logger.info(
+            "Step 8b - Created 'Exchange Rate D-1' column with exchange rates for D-1 dates."
+        )
+
+        return self.df
+
     def add_tax_collected_amount(self) -> pd.DataFrame:
         """
         Creates 'Tax Collected Amount' column showing the actual tax amount collected
         in the same currency as the dividend (not as percentage).
         This is calculated as: Net Dividend (numeric) * Tax Collected (percentage).
-        
+
         Returns:
             pd.DataFrame: DataFrame with added 'Tax Collected Amount' column.
         """
@@ -833,36 +931,36 @@ class DataFrameProcessor:
             """Calculate actual tax amount collected with currency."""
             net_dividend_str = str(row.get("Net Dividend", ""))
             tax_percentage = row.get("Tax Collected", 0)
-            
+
             # Extract numeric value and currency from Net Dividend
             # Format: "6.84 USD" or "28.22 PLN"
             parts = net_dividend_str.split()
             if len(parts) != 2:
                 return "-"
-            
+
             try:
                 dividend_amount = float(parts[0])
                 currency = parts[1]
             except (ValueError, IndexError):
                 return "-"
-            
+
             # Check if tax percentage is valid
             if pd.isna(tax_percentage) or tax_percentage == 0:
                 return "-"
-            
+
             # Calculate tax amount
             tax_amount = dividend_amount * tax_percentage
-            
+
             # Format with currency
             return f"{tax_amount:.2f} {currency}"
-        
+
         # Create Tax Collected Amount column
         self.df["Tax Collected Amount"] = self.df.apply(calculate_tax_amount, axis=1)
-        
+
         logger.info(
             "Step 9 - Created 'Tax Collected Amount' column with actual tax amounts in respective currencies."
         )
-        
+
         return self.df
 
     def reorder_columns(self) -> pd.DataFrame:
@@ -880,6 +978,8 @@ class DataFrameProcessor:
             "Net Dividend",
             "Tax Collected Amount",
             "Tax Collected %",
+            "Date D-1",
+            "Exchange Rate D-1",
             "Tax Amount PLN"
         ]
 

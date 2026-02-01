@@ -49,7 +49,10 @@ def process_data(file_path: str, courses_paths: list[str]) -> pd.DataFrame:
     processor.replace_tax_with_percentage()  # Calculate percentage AFTER merging
     processor.calculate_tax_in_pln(courses_paths)  # Calculate tax amount in PLN
     processor.add_tax_percentage_display()  # Add display-friendly percentage column
+    processor.create_date_d_minus_1_column()  # Add Date D-1 column
     processor.add_currency_to_dividends()
+    processor.create_exchange_rate_d_minus_1_column(
+        courses_paths)  # Add Exchange Rate D-1 column
     processor.add_tax_collected_amount()  # Add tax collected amount with currency
     processor.reorder_columns()  # Reorder columns to desired sequence
 
