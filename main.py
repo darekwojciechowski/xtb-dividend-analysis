@@ -61,14 +61,14 @@ def process_data(file_path: str, courses_paths: list[str]) -> pd.DataFrame:
     processor.move_negative_values()
     processor.create_date_d_minus_1_column("4a")
     processor.calculate_dividend(courses_paths, statement_currency)
-    processor.extract_tax_percentage_from_comment()
+    processor.extract_tax_percentage_from_comment(statement_currency)
     processor.merge_rows_and_reorder()
     processor.replace_tax_with_percentage()
     processor.add_tax_percentage_display()
     processor.create_date_d_minus_1_column("8")
     processor.add_currency_to_dividends()
     processor.create_exchange_rate_d_minus_1_column(courses_paths)
-    processor.add_tax_collected_amount()
+    processor.add_tax_collected_amount(statement_currency)
 
     # Calculate tax in PLN based on detected statement currency
     if statement_currency == "USD":

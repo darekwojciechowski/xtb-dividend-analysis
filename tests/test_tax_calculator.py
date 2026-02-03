@@ -241,6 +241,86 @@ class TestTaxCalculation:
         # Assert
         assert result_df.loc[0, "Tax Amount PLN"] == 0.4
 
+    def test_calculate_tax_for_usd_statement_maa_example(self) -> None:
+        """
+        Test tax calculation for USD statement using MAA.US example from 2026-01-30.
+
+        For USD statement, Tax Collected Amount is the actual amount from the file,
+        not calculated from percentage.
+
+        Example calculation:
+        - Net Dividend: 6.12 USD (from file)
+        - Tax Collected Amount: 0.92 USD (actual amount from file)
+        - Tax Collected %: 15%
+        - Exchange Rate D-1: 3.5189 PLN
+
+        Expected calculation for USD statement:
+        - Gross Dividend = Net + Tax Collected = 6.12 + 0.92 = 7.04 USD
+        - Tax due 19%: 7.04 × 0.19 = 1.3376 USD
+        - Tax to pay: 1.3376 - 0.92 = 0.4176 USD
+        - Tax in PLN: 0.4176 × 3.5189 = 1.469 PLN
+        - Rounded: 1.47 PLN
+        """
+        # Arrange
+        df = pd.DataFrame({
+            "Date": ["2026-01-30"],
+            "Ticker": ["MAA.US"],
+            "Shares": [4.0],
+            "Net Dividend": ["6.12 USD"],
+            "Tax Collected": [0.15],  # 15%
+            "Tax Collected Amount": ["0.92 USD"],
+            "Exchange Rate D-1": ["3.5189 PLN"],
+        })
+
+        calculator = TaxCalculator(df)
+
+        # Act
+        result_df = calculator.calculate_tax_for_usd_statement("USD")
+
+        # Assert
+        assert "Tax Amount PLN" in result_df.columns
+        assert result_df.loc[0, "Tax Amount PLN"] == 1.47
+
+    def test_calculate_tax_for_usd_statement_vici_example(self) -> None:
+        """
+        Test tax calculation for USD statement using VICI.US example from 2026-01-08.
+
+        For USD statement, Tax Collected Amount is the actual amount from the file,
+        not calculated from percentage.
+
+        Example calculation:
+        - Net Dividend: 11.7 USD (from file)
+        - Tax Collected Amount: 1.76 USD (actual amount from file)
+        - Tax Collected %: 15%
+        - Exchange Rate D-1: 3.6035 PLN
+
+        Expected calculation for USD statement:
+        - Gross Dividend = Net + Tax Collected = 11.7 + 1.76 = 13.46 USD
+        - Tax due 19%: 13.46 × 0.19 = 2.5574 USD
+        - Tax to pay: 2.5574 - 1.76 = 0.7974 USD
+        - Tax in PLN: 0.7974 × 3.6035 = 2.873 PLN
+        - Rounded: 2.87 PLN
+        """
+        # Arrange
+        df = pd.DataFrame({
+            "Date": ["2026-01-08"],
+            "Ticker": ["VICI.US"],
+            "Shares": [26.0],
+            "Net Dividend": ["11.7 USD"],
+            "Tax Collected": [0.15],  # 15%
+            "Tax Collected Amount": ["1.76 USD"],
+            "Exchange Rate D-1": ["3.6035 PLN"],
+        })
+
+        calculator = TaxCalculator(df)
+
+        # Act
+        result_df = calculator.calculate_tax_for_usd_statement("USD")
+
+        # Assert
+        assert "Tax Amount PLN" in result_df.columns
+        assert result_df.loc[0, "Tax Amount PLN"] == 2.87
+
     def test_calculate_total_tax_amount(self) -> None:
         """Test calculation of total tax amount across multiple rows."""
         # Arrange

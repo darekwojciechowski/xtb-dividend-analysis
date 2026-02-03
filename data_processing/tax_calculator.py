@@ -336,10 +336,10 @@ class TaxCalculator:
             exchange_rate = self._parse_exchange_rate(exchange_rate_str, ticker, date)
 
             # Calculate tax amount to pay in PLN
-            # For USD statement: values are already in USD, calculate Gross Dividend first
+            # For USD statement: Tax Collected Amount is the actual amount from file
             # Formula: (Gross Dividend * 19% - Tax Collected Amount) * Exchange Rate D-1
-            # Gross Dividend = Net Dividend / (1 - tax_percentage)
-            gross_dividend = net_dividend / (1 - tax_percentage)
+            # Gross Dividend = Net Dividend + Tax Collected Amount (actual values from file)
+            gross_dividend = net_dividend + tax_collected_amount
             tax_to_collect_in_currency = (
                 gross_dividend * self.POLISH_TAX_RATE
             ) - tax_collected_amount

@@ -50,22 +50,19 @@ class TestWorkflowIntegration:
     def test_workflow_when_calculating_tax_percentage_then_computes_correctly(
         self, processor: DataFrameProcessor
     ) -> None:
-        """Tests that tax percentage calculation workflow computes correctly."""
+        """Tests that tax percentage validation workflow works correctly."""
         # Arrange
-        processor.df["Amount"] = self.tax_test_amounts
-        processor.df["Tax Collected"] = self.tax_test_collected
+        processor.df["Net Dividend"] = self.tax_test_amounts
+        # Tax percentages (2 values for 2 rows)
+        processor.df["Tax Collected"] = [0.15, 0.19]
 
-        # Act
+        # Act - This function now validates Tax Collected column
         processor.replace_tax_with_percentage()
 
-        # Assert
-        if "Tax Percentage" in processor.df.columns:
-            expected_values = (
-                processor.df["Tax Collected"] / processor.df["Amount"]
-            ) * 100
-            assert all(processor.df["Tax Percentage"] == expected_values)
-        else:
-            pytest.skip("Function does not add 'Tax Percentage' column.")
+        # Assert - Check that Tax Collected column still has valid values
+        assert "Tax Collected" in processor.df.columns
+        assert not processor.df["Tax Collected"].isnull().any()
+        assert all(processor.df["Tax Collected"] > 0)
 
 
 @pytest.mark.integration

@@ -257,10 +257,13 @@ class DataFrameProcessor:
         self.df["Net Dividend"] = self.df["Net Dividend"].replace(0, np.nan)
         self.df["Tax Collected"] = self.df["Tax Collected"].replace(0, np.nan)
 
-    def extract_tax_percentage_from_comment(self) -> None:
+    def extract_tax_percentage_from_comment(self, statement_currency: str = "PLN") -> None:
         """
         Extract tax percentage from Comment column and store in 'Tax Collected' column.
         This should be called BEFORE merge_rows_and_reorder() to preserve tax percentage values.
+
+        For USD statement: preserves the actual tax amount from file in 'Tax Collected Raw' column
+        before converting 'Tax Collected' to percentage.
 
         Each dividend has two rows in Excel:
         1. Row with amount: "SBUX.US USD 0.5700/ SHR"
@@ -274,10 +277,17 @@ class DataFrameProcessor:
         - UK stocks: No withholding tax for non-residents
         - FR stocks: 0% withholding under Poland-France tax treaty
 
+        Args:
+            statement_currency (str): Currency of the statement ('USD' or 'PLN')
+
         Raises:
             ValueError: If tax percentage cannot be extracted from any Comment in the group
                        and default rate is not 0%.
         """
+        # For USD statement, save the actual tax amount before converting to percentage
+        if statement_currency == "USD" and "Tax Collected" in self.df.columns:
+            self.df["Tax Collected Raw"] = self.df["Tax Collected"].copy()
+
         # Group by Date and Ticker, then extract tax percentage for each group
         grouped = self.df.groupby(["Date", "Ticker"], group_keys=False)
 
@@ -367,6 +377,10 @@ class DataFrameProcessor:
         # If Tax Collected exists, take first value (they should all be same after extract_tax_percentage_from_comment)
         if "Tax Collected" in self.df.columns:
             agg_dict["Tax Collected"] = "first"
+
+        # If Tax Collected Raw exists (for USD statement), sum the values
+        if "Tax Collected Raw" in self.df.columns:
+            agg_dict["Tax Collected Raw"] = "sum"
 
         # Merge rows with the same 'Date' and 'Ticker'
         self.df = self.df.groupby(["Date", "Ticker"], as_index=False).agg(agg_dict)
@@ -1005,11 +1019,16 @@ class DataFrameProcessor:
 
         return self.df
 
-    def add_tax_collected_amount(self) -> pd.DataFrame:
+    def add_tax_collected_amount(self, statement_currency: str = "PLN") -> pd.DataFrame:
         """
         Creates 'Tax Collected Amount' column showing the actual tax amount collected
         in the same currency as the dividend (not as percentage).
-        This is calculated as: Net Dividend (numeric) * Tax Collected (percentage).
+
+        For USD statement: uses the raw tax amount from file (Tax Collected Raw column)
+        For PLN statement: calculates from Net Dividend and tax percentage
+
+        Args:
+            statement_currency (str): Currency of the statement ('USD' or 'PLN')
 
         Returns:
             pd.DataFrame: DataFrame with added 'Tax Collected Amount' column.
@@ -1035,7 +1054,15 @@ class DataFrameProcessor:
             if pd.isna(tax_percentage) or tax_percentage == 0:
                 return "-"
 
-            # Calculate gross dividend and tax amount
+            # For USD statement: use raw tax amount from file if available
+            if statement_currency == "USD" and "Tax Collected Raw" in self.df.columns:
+                tax_raw = row.get("Tax Collected Raw", None)
+                if not pd.isna(tax_raw) and tax_raw != 0:
+                    # Tax Collected Raw contains negative value, take absolute
+                    tax_amount = abs(float(tax_raw))
+                    return f"{tax_amount:.2f} {currency}"
+
+            # For PLN statement or if raw amount not available: calculate from percentage
             # Net Dividend = Gross Dividend * (1 - tax_percentage)
             # Therefore: Gross Dividend = Net Dividend / (1 - tax_percentage)
             # Tax Amount = Gross Dividend * tax_percentage
