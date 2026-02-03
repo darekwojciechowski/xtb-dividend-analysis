@@ -69,7 +69,14 @@ def process_data(file_path: str, courses_paths: list[str]) -> pd.DataFrame:
     processor.add_currency_to_dividends()
     processor.create_exchange_rate_d_minus_1_column(courses_paths)
     processor.add_tax_collected_amount()
-    processor.calculate_tax_in_pln_for_detected_pln(statement_currency)
+
+    # Calculate tax in PLN based on detected statement currency
+    if statement_currency == "USD":
+        processor.calculate_tax_in_pln_for_detected_usd(
+            courses_paths, statement_currency)
+    else:
+        processor.calculate_tax_in_pln_for_detected_pln(statement_currency)
+
     processor.reorder_columns()
     processor.log_table_with_tax_summary()
 

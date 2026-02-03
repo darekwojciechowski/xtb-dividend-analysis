@@ -262,18 +262,101 @@ class TaxCalculator:
         Calculate tax amount in PLN to pay in Poland for USD statement currency.
         Adds 'Tax Amount PLN' column to the DataFrame.
 
-        This is a placeholder for future implementation.
+        For USD statements, Net Dividend and Tax Collected Amount are already in USD.
+
+        Polish tax logic (Belka tax = 19%):
+        - If Tax Collected >= 19%: Tax Amount PLN = "-" (tax already paid at source)
+        - If Tax Collected < 19%: Tax Amount PLN = (Gross Dividend * 19% - Tax Collected Amount) * Exchange Rate D-1
+        - Gross Dividend = Net Dividend / (1 - Tax Collected %)
 
         Args:
             statement_currency (str): The currency of the statement from cell F6 (e.g., 'USD').
 
         Returns:
             pd.DataFrame: DataFrame with added 'Tax Amount PLN' column.
+
+        Raises:
+            ValueError: If required columns are missing or if any row has missing data.
         """
-        # TODO: Implement USD statement tax calculation logic
+        # Validate required columns exist
+        required_columns = [
+            "Net Dividend",
+            "Tax Collected",
+            "Tax Collected Amount",
+            "Exchange Rate D-1",
+        ]
+        self._validate_required_columns(required_columns)
+
+        # Add Tax Amount PLN column if it doesn't exist
+        if "Tax Amount PLN" not in self.df.columns:
+            self.df["Tax Amount PLN"] = 0.0
+
+        def calculate_tax_pln(row):
+            """Calculate tax amount in PLN for a single row."""
+            # Get required values
+            net_dividend_str = str(row.get("Net Dividend", ""))
+            tax_percentage = row.get("Tax Collected", None)
+            tax_collected_amount_str = str(row.get("Tax Collected Amount", ""))
+            exchange_rate_str = str(row.get("Exchange Rate D-1", ""))
+
+            # Validate that none of the critical values are missing
+            if pd.isna(tax_percentage):
+                ticker = row.get("Ticker", "Unknown")
+                date = row.get("Date", "Unknown")
+                raise ValueError(
+                    f"Missing 'Tax Collected' value for ticker '{ticker}' on date '{date}'. "
+                    f"All rows must have valid tax percentage values."
+                )
+
+            # Convert tax percentage to float
+            try:
+                tax_percentage = float(tax_percentage)
+            except (ValueError, TypeError):
+                ticker = row.get("Ticker", "Unknown")
+                date = row.get("Date", "Unknown")
+                raise ValueError(
+                    f"Invalid 'Tax Collected' value for ticker '{ticker}' on date '{date}': {tax_percentage}"
+                )
+
+            # First condition: If tax already paid at source is >= 19%, no additional tax in Poland
+            if tax_percentage >= self.POLISH_TAX_RATE:
+                return "-"
+
+            # Second condition: Calculate tax to pay in Poland
+            ticker = row.get("Ticker", "Unknown")
+            date = str(row.get("Date", "Unknown"))
+
+            # Parse values using helper methods
+            net_dividend, _ = self._parse_value_with_currency(
+                net_dividend_str, "Net Dividend", ticker, date
+            )
+            tax_collected_amount = self._parse_tax_collected_amount(
+                tax_collected_amount_str, ticker, date
+            )
+            exchange_rate = self._parse_exchange_rate(exchange_rate_str, ticker, date)
+
+            # Calculate tax amount to pay in PLN
+            # For USD statement: values are already in USD, calculate Gross Dividend first
+            # Formula: (Gross Dividend * 19% - Tax Collected Amount) * Exchange Rate D-1
+            # Gross Dividend = Net Dividend / (1 - tax_percentage)
+            gross_dividend = net_dividend / (1 - tax_percentage)
+            tax_to_collect_in_currency = (
+                gross_dividend * self.POLISH_TAX_RATE
+            ) - tax_collected_amount
+            tax_amount_pln = tax_to_collect_in_currency * exchange_rate
+
+            return round(tax_amount_pln, 2)
+
+        # Apply calculation to all rows
+        self.df["Tax Amount PLN"] = self.df.apply(calculate_tax_pln, axis=1)
+
+        # Replace 0 with "-" for better readability
+        self.df["Tax Amount PLN"] = self.df["Tax Amount PLN"].replace(0.0, "-")
+
         logger.info(
-            f"USD statement tax calculation not yet implemented for {statement_currency} statement."
+            f"Step 11 - Calculated tax amounts in PLN based on Polish tax rules (19% Belka tax) for {statement_currency} statement."
         )
+
         return self.df
 
     @staticmethod

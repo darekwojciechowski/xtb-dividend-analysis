@@ -300,22 +300,18 @@ class DataFrameProcessor:
                     group.loc[:, "Tax Collected"] = round(tax_percentage, 2)
                     return group
 
-            # If no tax percentage found, check if this ticker has 0% default rate
+            # If no tax percentage found, use default rate for ticker
             default_rate = self._get_default_tax_rate(ticker)
+            group.loc[:, "Tax Collected"] = round(default_rate, 2)
+
             if default_rate == 0.0:
-                # This is expected for certain stocks (ASB.PL, UK, FR, etc.)
-                group.loc[:, "Tax Collected"] = 0.0
                 logger.info(
                     f"Using 0% tax rate for {ticker} (no withholding tax at source).")
-                return group
-
-            # If no tax percentage found and default is not 0%, raise error
-            comments_list = group["Comment"].tolist()
-            raise ValueError(
-                f"Unable to extract tax percentage from Comment column for ticker '{ticker}' on date '{date}'. "
-                f"Comment values in group: {comments_list}. "
-                f"Expected at least one row with format: 'USD WHT 15%' or similar with percentage."
-            )
+            else:
+                logger.warning(
+                    f"No WHT information in Comment for {ticker} on {date}. "
+                    f"Using default rate {default_rate*100:.0f}% (common for small dividend amounts).")
+            return group
 
         # Apply function to each group without including grouping columns in the operation
         results = []
@@ -333,20 +329,17 @@ class DataFrameProcessor:
                     break
 
             if not tax_found:
-                # If no tax percentage found, check if this ticker has 0% default rate
+                # If no tax percentage found, use default rate for ticker
                 default_rate = self._get_default_tax_rate(ticker)
+                group_copy["Tax Collected"] = round(default_rate, 2)
+
                 if default_rate == 0.0:
-                    # This is expected for certain stocks (ASB.PL, UK, FR, etc.)
-                    group_copy["Tax Collected"] = 0.0
                     logger.info(
                         f"Using 0% tax rate for {ticker} (no withholding tax at source).")
                 else:
-                    # If no tax percentage found and default is not 0%, raise error
-                    comments_list = group_copy["Comment"].tolist()
-                    raise ValueError(
-                        f"Unable to extract tax percentage from Comment column for ticker '{ticker}' on date '{date}'. "
-                        f"Comment values in group: {comments_list}. "
-                        f"Expected at least one row with format: 'USD WHT 15%' or similar with percentage."
+                    logger.warning(
+                        f"No WHT information in Comment for {ticker} on {date}. "
+                        f"Using default rate {default_rate*100:.0f}% (common for small dividend amounts)."
                     )
 
             results.append(group_copy)
@@ -1042,8 +1035,12 @@ class DataFrameProcessor:
             if pd.isna(tax_percentage) or tax_percentage == 0:
                 return "-"
 
-            # Calculate tax amount
-            tax_amount = dividend_amount * tax_percentage
+            # Calculate gross dividend and tax amount
+            # Net Dividend = Gross Dividend * (1 - tax_percentage)
+            # Therefore: Gross Dividend = Net Dividend / (1 - tax_percentage)
+            # Tax Amount = Gross Dividend * tax_percentage
+            gross_dividend = dividend_amount / (1 - tax_percentage)
+            tax_amount = gross_dividend * tax_percentage
 
             # Format with currency
             return f"{tax_amount:.2f} {currency}"
