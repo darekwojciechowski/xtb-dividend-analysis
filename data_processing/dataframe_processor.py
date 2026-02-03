@@ -109,7 +109,7 @@ class DataFrameProcessor:
             self.get_column_name("Type", "Typ"): "Type",
         }
         self.rename_columns(column_mapping)
-        logger.info("Normalized column names to English standard.")
+        logger.info("Step 2 - Normalized column names to English standard.")
 
     def convert_dates(self, date_col: str | None = None) -> None:
         """
@@ -278,24 +278,33 @@ class DataFrameProcessor:
             ValueError: If tax percentage cannot be extracted from any Comment in the group
                        and default rate is not 0%.
         """
-        def find_tax_for_group(group):
+        # Group by Date and Ticker, then extract tax percentage for each group
+        grouped = self.df.groupby(["Date", "Ticker"], group_keys=False)
+
+        def find_tax_for_group(group_data):
             """Find tax percentage for a group of rows with same Date and Ticker."""
-            ticker = group["Ticker"].iloc[0]
-            date = group["Date"].iloc[0]
+            # Get ticker and date from the group's name (index)
+            ticker = group_data.name[1] if hasattr(
+                group_data, 'name') else group_data["Ticker"].iloc[0]
+            date = group_data.name[0] if hasattr(
+                group_data, 'name') else group_data["Date"].iloc[0]
+
+            group = group_data if isinstance(
+                group_data, pd.DataFrame) else self.df.loc[group_data.index]
 
             # Try to extract tax percentage from each row in the group
             for comment in group["Comment"]:
                 tax_percentage = self._extract_tax_rate_from_comment(comment)
                 if tax_percentage is not None:
                     # Found a valid tax percentage, apply to all rows in group
-                    group["Tax Collected"] = round(tax_percentage, 2)
+                    group.loc[:, "Tax Collected"] = round(tax_percentage, 2)
                     return group
 
             # If no tax percentage found, check if this ticker has 0% default rate
             default_rate = self._get_default_tax_rate(ticker)
             if default_rate == 0.0:
                 # This is expected for certain stocks (ASB.PL, UK, FR, etc.)
-                group["Tax Collected"] = 0.0
+                group.loc[:, "Tax Collected"] = 0.0
                 logger.info(
                     f"Using 0% tax rate for {ticker} (no withholding tax at source).")
                 return group
@@ -308,9 +317,41 @@ class DataFrameProcessor:
                 f"Expected at least one row with format: 'USD WHT 15%' or similar with percentage."
             )
 
-        # Group by Date and Ticker, then extract tax percentage for each group
-        self.df = self.df.groupby(
-            ["Date", "Ticker"], group_keys=False).apply(find_tax_for_group)
+        # Apply function to each group without including grouping columns in the operation
+        results = []
+        for (date, ticker), group in grouped:
+            group_copy = group.copy()
+
+            # Try to extract tax percentage from each row in the group
+            tax_found = False
+            for comment in group_copy["Comment"]:
+                tax_percentage = self._extract_tax_rate_from_comment(comment)
+                if tax_percentage is not None:
+                    # Found a valid tax percentage, apply to all rows in group
+                    group_copy["Tax Collected"] = round(tax_percentage, 2)
+                    tax_found = True
+                    break
+
+            if not tax_found:
+                # If no tax percentage found, check if this ticker has 0% default rate
+                default_rate = self._get_default_tax_rate(ticker)
+                if default_rate == 0.0:
+                    # This is expected for certain stocks (ASB.PL, UK, FR, etc.)
+                    group_copy["Tax Collected"] = 0.0
+                    logger.info(
+                        f"Using 0% tax rate for {ticker} (no withholding tax at source).")
+                else:
+                    # If no tax percentage found and default is not 0%, raise error
+                    comments_list = group_copy["Comment"].tolist()
+                    raise ValueError(
+                        f"Unable to extract tax percentage from Comment column for ticker '{ticker}' on date '{date}'. "
+                        f"Comment values in group: {comments_list}. "
+                        f"Expected at least one row with format: 'USD WHT 15%' or similar with percentage."
+                    )
+
+            results.append(group_copy)
+
+        self.df = pd.concat(results, ignore_index=False)
         logger.info(
             "Extracted tax percentages from Comment column for each Date+Ticker group.")
 
@@ -865,7 +906,7 @@ class DataFrameProcessor:
             format_tax_percentage)
 
         logger.info(
-            "Step 8 - Created 'Tax Collected %' display column with percentage formatting."
+            "Step 7 - Created 'Tax Collected %' display column with percentage formatting."
         )
 
         return self.df
@@ -897,10 +938,13 @@ class DataFrameProcessor:
 
         return previous_day
 
-    def create_date_d_minus_1_column(self) -> pd.DataFrame:
+    def create_date_d_minus_1_column(self, step_number: str = "8") -> pd.DataFrame:
         """
         Creates 'Date D-1' column showing the previous business day from the dividend date.
         If D-1 falls on a weekend, uses the last weekday (typically Friday).
+
+        Args:
+            step_number (str): The step number to display in logs (default: "8").
 
         Returns:
             pd.DataFrame: DataFrame with added 'Date D-1' column.
@@ -908,7 +952,7 @@ class DataFrameProcessor:
         self.df["Date D-1"] = self.df["Date"].apply(self._get_previous_business_day)
 
         logger.info(
-            "Step 8a - Created 'Date D-1' column with previous business day dates."
+            f"Step {step_number} - Created 'Date D-1' column with previous business day dates."
         )
 
         return self.df
@@ -963,7 +1007,7 @@ class DataFrameProcessor:
         self.df["Exchange Rate D-1"] = self.df.apply(get_exchange_rate_for_row, axis=1)
 
         logger.info(
-            "Step 8b - Created 'Exchange Rate D-1' column with exchange rates for D-1 dates."
+            "Step 9 - Created 'Exchange Rate D-1' column with exchange rates for D-1 dates."
         )
 
         return self.df
@@ -1008,7 +1052,7 @@ class DataFrameProcessor:
         self.df["Tax Collected Amount"] = self.df.apply(calculate_tax_amount, axis=1)
 
         logger.info(
-            "Step 9 - Created 'Tax Collected Amount' column with actual tax amounts in respective currencies."
+            "Step 10 - Created 'Tax Collected Amount' column with actual tax amounts in respective currencies."
         )
 
         return self.df
@@ -1040,7 +1084,7 @@ class DataFrameProcessor:
         self.df = self.df[existing_columns]
 
         logger.info(
-            f"Step 10 - Reordered columns to: {', '.join(existing_columns)}"
+            f"Step 12 - Reordered columns to: {', '.join(existing_columns)}"
         )
 
         return self.df
@@ -1051,7 +1095,7 @@ class DataFrameProcessor:
 
         :return: The processed DataFrame.
         """
-        logger.info("Step 11 - Returning the processed DataFrame.")  # Log here
+        logger.info("Step 13 - Returning the processed DataFrame.")  # Log here
         return self.df
 
     def log_table_with_tax_summary(self) -> None:

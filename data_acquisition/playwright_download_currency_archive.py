@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+from pathlib import Path
 
 from loguru import logger
 from playwright.sync_api import sync_playwright
@@ -52,12 +53,12 @@ def find_and_download_latest_files() -> None:
 
                 # Wait for the download to complete
                 download = download_info.value
-                # Dynamically set the download path to the 'data' directory within the current project
-                script_dir = os.path.dirname(os.path.abspath(__file__))
-                data_dir = os.path.join(script_dir, "data")
-                os.makedirs(data_dir, exist_ok=True)
-                download_path = os.path.join(data_dir, download.suggested_filename)
-                download.save_as(download_path)
+                # Save to project root 'data' directory
+                project_root = Path(__file__).parent.parent
+                data_dir = project_root / "data"
+                data_dir.mkdir(exist_ok=True)
+                download_path = data_dir / download.suggested_filename
+                download.save_as(str(download_path))
                 logger.info(f"File downloaded to: {download_path}")
 
                 # Add the year to the set of downloaded years

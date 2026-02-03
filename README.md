@@ -1,7 +1,6 @@
 # 💼 Financial Data Processing Pipeline
 
-![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI/CD-2088FF?style=flat-square&logo=github-actions&logoColor=white)
-![Build Status](https://img.shields.io/github/actions/workflow/status/darekwojciechowski/xtb-dividend-analysis/ci.yml?branch=main&style=flat-square&logo=github&label=Build)
+![CI/CD](https://img.shields.io/github/actions/workflow/status/darekwojciechowski/xtb-dividend-analysis/ci.yml?branch=main&style=flat-square&logo=github-actions&logoColor=white&label=CI/CD)
 ![Python Version](https://img.shields.io/badge/Python-3.12+-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Playwright](https://img.shields.io/pypi/v/playwright?label=Playwright&style=flat-square&logo=playwright&logoColor=white&color=2EAD33)
 ![Pandas](https://img.shields.io/pypi/v/pandas?label=Pandas&style=flat-square&logo=pandas&logoColor=white&color=150458)

@@ -250,7 +250,7 @@ class TaxCalculator:
         self.df["Tax Amount PLN"] = self.df["Tax Amount PLN"].replace(0.0, "-")
 
         logger.info(
-            f"Step 7 - Calculated tax amounts in PLN based on Polish tax rules (19% Belka tax) for {statement_currency} statement."
+            f"Step 11 - Calculated tax amounts in PLN based on Polish tax rules (19% Belka tax) for {statement_currency} statement."
         )
 
         return self.df

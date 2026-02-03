@@ -1,6 +1,8 @@
-# main.py
-# XTB Dividend Analysis Pipeline
-# Main entry point for processing XTB broker statements and calculating dividend data
+"""XTB Dividend Analysis Pipeline.
+
+Main entry point for processing XTB broker statements and calculating dividend data
+with tax calculations according to Polish tax regulations (Belka tax 19%).
+"""
 
 from __future__ import annotations
 
@@ -21,16 +23,30 @@ DEFAULT_OUTPUT_FILE = "for_google_spreadsheet.csv"
 
 
 def process_data(file_path: str, courses_paths: list[str]) -> pd.DataFrame:
+    """Process XTB broker statement data through complete transformation pipeline.
+
+    Executes full data processing workflow including:
+    - Data extraction and currency detection
+    - Column normalization and filtering
+    - Dividend calculations with exchange rates
+    - Tax calculations according to Polish regulations
+    - Data export preparation
+
+    Args:
+        file_path: Path to the XTB broker statement XLSX file.
+        courses_paths: List of paths to NBP exchange rate CSV files.
+
+    Returns:
+        Processed DataFrame with calculated dividends and tax amounts.
+
+    Raises:
+        FileNotFoundError: If input file or exchange rate files are missing.
+        ValueError: If data format is invalid or required columns are missing.
     """
-    Process the data using DataFrameProcessor and return the processed DataFrame.
-    """
-    # Load data from XLSX file and extract currency
     df, currency = import_and_process_data(file_path)
 
-    # Initialize the DataFrameProcessor with the DataFrame
     processor = DataFrameProcessor(df)
 
-    # Detect statement currency from cell F6
     statement_currency = processor.detect_statement_currency(currency)
 
     # Perform data processing steps
@@ -43,42 +59,37 @@ def process_data(file_path: str, courses_paths: list[str]) -> pd.DataFrame:
     processor.group_by_dividends()
     processor.add_empty_column()
     processor.move_negative_values()
-    processor.create_date_d_minus_1_column()  # Add Date D-1 column BEFORE calculate_dividend
+    processor.create_date_d_minus_1_column("4a")
     processor.calculate_dividend(courses_paths, statement_currency)
-    processor.extract_tax_percentage_from_comment()  # Extract tax % BEFORE merging
+    processor.extract_tax_percentage_from_comment()
     processor.merge_rows_and_reorder()
-    processor.replace_tax_with_percentage()  # Validate tax percentages AFTER merging
-    processor.add_tax_percentage_display()  # Add display-friendly percentage column
-    processor.create_date_d_minus_1_column()  # Recreate Date D-1 after merge
+    processor.replace_tax_with_percentage()
+    processor.add_tax_percentage_display()
+    processor.create_date_d_minus_1_column("8")
     processor.add_currency_to_dividends()
-    processor.create_exchange_rate_d_minus_1_column(
-        courses_paths)  # Add Exchange Rate D-1 column
-    processor.add_tax_collected_amount()  # Add tax collected amount with currency
-    # Calculate tax amount in PLN using helper columns
+    processor.create_exchange_rate_d_minus_1_column(courses_paths)
+    processor.add_tax_collected_amount()
     processor.calculate_tax_in_pln_for_detected_pln(statement_currency)
-    processor.reorder_columns()  # Reorder columns to desired sequence
-    processor.log_table_with_tax_summary()  # Log table with tax summary
+    processor.reorder_columns()
+    processor.log_table_with_tax_summary()
 
     return processor.get_processed_df()
 
 
 def main() -> None:
+    """Orchestrate the complete dividend analysis workflow.
+
+    Sets up logging, validates file paths, processes XTB broker statement data,
+    and exports results to CSV format suitable for Google Sheets import.
     """
-    Main function to orchestrate the workflow.
-    """
-    # Set up logging
     setup_logging(log_level="INFO")
 
-    # Use default input file path
     file_path = DEFAULT_INPUT_FILE
 
-    # Get file paths and validate them
     file_path, courses_paths = get_file_paths(str(file_path))
 
-    # Process data
     df_processed = process_data(file_path, courses_paths)
 
-    # Export data to a CSV file for Google Spreadsheet
     exporter = GoogleSpreadsheetExporter(df_processed)
     exporter.export_to_google(DEFAULT_OUTPUT_FILE)
 

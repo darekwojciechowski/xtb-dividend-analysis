@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import openpyxl
 import pandas as pd
 from loguru import logger
 
 
-def import_and_process_data(file_path: str, sheet_name: str = "CASH OPERATION HISTORY") -> tuple[pd.DataFrame | None, str | None]:
+def import_and_process_data(file_path: Path, sheet_name: str = "CASH OPERATION HISTORY") -> tuple[pd.DataFrame | None, str | None]:
     """
     Import and process data from XTB broker statement.
 
@@ -43,7 +45,7 @@ def import_and_process_data(file_path: str, sheet_name: str = "CASH OPERATION HI
             ~data.apply(lambda row: row.astype(str).str.contains("Total").any(), axis=1)
         ]
 
-        logger.info(f"Detected currency from cell F6: {currency}")
+        logger.info(f"Detected currency for this XTB spreadsheet: {currency}")
 
         return data, currency
 

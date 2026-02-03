@@ -47,7 +47,17 @@ poetry run pytest
 ```
 
 
-## Step 5: Run Your Project
+## Step 5: Download Currency Exchange Rates (First Time Setup)
+
+Before running the main project, download the required NBP currency exchange rate files:
+
+```bash
+poetry run python data_acquisition/playwright_download_currency_archive.py
+```
+
+This downloads the last 3 years of exchange rate data from NBP to the `data/` directory. You only need to run this once, or periodically to update the rates.
+
+## Step 6: Run Your Project
 
 Process your transaction data:
 
@@ -55,7 +65,7 @@ Process your transaction data:
 poetry run python main.py
 ```
 
-## Step 6: Run Tests
+## Step 7: Run Tests
 
 Execute the test suite:
 
