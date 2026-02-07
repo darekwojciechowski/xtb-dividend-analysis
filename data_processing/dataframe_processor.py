@@ -12,15 +12,130 @@ from visualization.ticker_colors import get_random_color
 from .date_converter import DateConverter
 from .extractor import MultiConditionExtractor
 from .tax_calculator import TaxCalculator
-from .tax_calculator import TaxCalculator
+
+
+# Currency constants
+class Currency:
+    """Currency codes used in the application.
+
+    Defines standard ISO 4217 currency codes for all supported currencies
+    in the XTB dividend analysis system.
+
+    Attributes:
+        USD: United States Dollar
+        PLN: Polish Złoty (base currency)
+        EUR: Euro (Eurozone countries)
+        DKK: Danish Krone
+        GBP: British Pound Sterling
+    """
+    USD = "USD"
+    PLN = "PLN"
+    EUR = "EUR"
+    DKK = "DKK"
+    GBP = "GBP"
+
+
+# Ticker suffix constants
+class TickerSuffix:
+    """Stock exchange suffixes for ticker symbols.
+
+    Defines ticker suffixes for different stock exchanges to determine
+    currency, tax rates, and other country-specific parameters.
+
+    Attributes:
+        US: United States stocks (e.g., AAPL.US)
+        PL: Polish stocks (e.g., XTB.PL)
+        UK: United Kingdom stocks (e.g., BP.UK)
+        DK: Danish stocks (e.g., NOVOB.DK)
+        FR: French stocks (e.g., MC.FR)
+        DE: German stocks (e.g., SAP.DE)
+        IE: Irish stocks (e.g., RYANAIR.IE)
+        NL: Dutch stocks (e.g., ASML.NL)
+        ES: Spanish stocks (e.g., TEF.ES)
+        IT: Italian stocks (e.g., ENI.IT)
+        BE: Belgian stocks (e.g., AB.BE)
+        AT: Austrian stocks (e.g., OMV.AT)
+        FI: Finnish stocks (e.g., NOKIA.FI)
+        PT: Portuguese stocks (e.g., EDP.PT)
+        EUROZONE: List of all Eurozone country suffixes for EUR currency determination
+    """
+    US = ".US"
+    PL = ".PL"
+    UK = ".UK"
+    DK = ".DK"
+    FR = ".FR"
+    DE = ".DE"
+    IE = ".IE"
+    NL = ".NL"
+    ES = ".ES"
+    IT = ".IT"
+    BE = ".BE"
+    AT = ".AT"
+    FI = ".FI"
+    PT = ".PT"
+
+    EUROZONE = [FR, DE, IE, NL, ES, IT, BE, AT, FI, PT]
+
+
+# DataFrame column names
+class ColumnName:
+    """Standard column names used throughout processing.
+
+    Centralized definition of all DataFrame column names to ensure consistency
+    across the application and eliminate magic strings.
+
+    Attributes:
+        DATE: Date of dividend payment
+        TICKER: Stock ticker symbol with exchange suffix
+        SHARES: Number of shares
+        NET_DIVIDEND: Net dividend amount after source tax
+        TAX_COLLECTED: Tax percentage collected at source (numeric)
+        TAX_COLLECTED_RAW: Raw tax amount from USD statement (negative value)
+        TAX_COLLECTED_PCT: Tax percentage formatted for display (e.g., "15%")
+        TAX_AMOUNT_PLN: Tax amount to pay/reclaim in PLN
+        DATE_D_MINUS_1: Business day before dividend date (for exchange rates)
+        EXCHANGE_RATE_D_MINUS_1: Exchange rate on D-1 date
+        TAX_COLLECTED_AMOUNT: Actual tax amount with currency (e.g., "0.30 USD")
+        COMMENT: Original comment from broker statement
+        TYPE: Transaction type (Dividend, Withholding Tax, etc.)
+        AMOUNT: Original amount column from broker statement
+    """
+    DATE = "Date"
+    TICKER = "Ticker"
+    SHARES = "Shares"
+    NET_DIVIDEND = "Net Dividend"
+    TAX_COLLECTED = "Tax Collected"
+    TAX_COLLECTED_RAW = "Tax Collected Raw"
+    TAX_COLLECTED_PCT = "Tax Collected %"
+    TAX_AMOUNT_PLN = "Tax Amount PLN"
+    DATE_D_MINUS_1 = "Date D-1"
+    EXCHANGE_RATE_D_MINUS_1 = "Exchange Rate D-1"
+    TAX_COLLECTED_AMOUNT = "Tax Collected Amount"
+    COMMENT = "Comment"
+    TYPE = "Type"
+    AMOUNT = "Amount"
 
 
 class DataFrameProcessor:
+    """Processes XTB broker statement data for dividend analysis and tax calculation.
+
+    This class handles the complete pipeline for processing dividend data from XTB broker
+    statements, including currency conversions, tax calculations, and data transformation.
+    Supports both PLN and USD statement currencies with multilingual column names.
+
+    Attributes:
+        df: pandas DataFrame containing the processed dividend data.
+    """
+
     def __init__(self, df: pd.DataFrame | None = None):
         """
         Initializes the DataFrameProcessor with a DataFrame.
 
-        :param df: The DataFrame to be processed.
+        Args:
+            df: The DataFrame to be processed.
+
+        Raises:
+            ValueError: If df is None or invalid.
         """
         if df is None:
             raise ValueError(
@@ -69,7 +184,11 @@ class DataFrameProcessor:
         """
         Drops specified columns from the DataFrame.
 
-        :param columns: A list of column names to be dropped.
+        Args:
+            columns: A list of column names to be dropped.
+
+        Raises:
+            ValueError: If DataFrame is empty or columns are missing.
         """
         if self.df is None or self.df.empty:
             raise ValueError("Error: The DataFrame is empty or has not been loaded.")
@@ -84,7 +203,11 @@ class DataFrameProcessor:
         """
         Renames columns in the DataFrame based on a dictionary mapping.
 
-        :param columns_dict: A dictionary where keys are current column names and values are new column names.
+        Args:
+            columns_dict: A dictionary where keys are current column names and values are new column names.
+
+        Raises:
+            KeyError: If any source column is missing in the DataFrame.
         """
         missing_columns = [
             col for col in columns_dict.keys() if col not in self.df.columns
@@ -204,8 +327,9 @@ class DataFrameProcessor:
         """
         Adds an empty column to the DataFrame if it does not already exist.
 
-        :param col_name: The name of the column to be added. Defaults to 'Tax Collected'.
-        :param position: The position to insert the column. Defaults to 4.
+        Args:
+            col_name: The name of the column to be added. Defaults to 'Tax Collected'.
+            position: The position to insert the column. Defaults to 4.
         """
         if col_name not in self.df.columns:
             self.df.insert(position, col_name, pd.NA)
@@ -291,39 +415,7 @@ class DataFrameProcessor:
         # Group by Date and Ticker, then extract tax percentage for each group
         grouped = self.df.groupby(["Date", "Ticker"], group_keys=False)
 
-        def find_tax_for_group(group_data):
-            """Find tax percentage for a group of rows with same Date and Ticker."""
-            # Get ticker and date from the group's name (index)
-            ticker = group_data.name[1] if hasattr(
-                group_data, 'name') else group_data["Ticker"].iloc[0]
-            date = group_data.name[0] if hasattr(
-                group_data, 'name') else group_data["Date"].iloc[0]
-
-            group = group_data if isinstance(
-                group_data, pd.DataFrame) else self.df.loc[group_data.index]
-
-            # Try to extract tax percentage from each row in the group
-            for comment in group["Comment"]:
-                tax_percentage = self._extract_tax_rate_from_comment(comment)
-                if tax_percentage is not None:
-                    # Found a valid tax percentage, apply to all rows in group
-                    group.loc[:, "Tax Collected"] = round(tax_percentage, 2)
-                    return group
-
-            # If no tax percentage found, use default rate for ticker
-            default_rate = self._get_default_tax_rate(ticker)
-            group.loc[:, "Tax Collected"] = round(default_rate, 2)
-
-            if default_rate == 0.0:
-                logger.info(
-                    f"Using 0% tax rate for {ticker} (no withholding tax at source).")
-            else:
-                logger.warning(
-                    f"No WHT information in Comment for {ticker} on {date}. "
-                    f"Using default rate {default_rate*100:.0f}% (common for small dividend amounts).")
-            return group
-
-        # Apply function to each group without including grouping columns in the operation
+        # Process each group to extract tax percentage
         results = []
         for (date, ticker), group in grouped:
             group_copy = group.copy()
@@ -366,7 +458,12 @@ class DataFrameProcessor:
         removes the specified columns ('Type', 'Comment' by default),
         moves 'Shares' column to the end, and rounds numeric values to 2 decimal places.
 
-        :param drop_columns: A list of columns to drop after merging. Defaults to ['Type', 'Comment'].
+        Args:
+            drop_columns: A list of columns to drop after merging. Defaults to ['Type', 'Comment'].
+
+        Note:
+            This method should be called after extract_tax_percentage_from_comment() to preserve
+            tax percentage values during aggregation.
         """
         # Build aggregation dictionary dynamically based on available columns
         agg_dict = {
@@ -459,23 +556,24 @@ class DataFrameProcessor:
         if extracted_currency:
             return extracted_currency
 
-        # If no currency in comment, infer from ticker
-        if ".US" in ticker:
-            return "USD"
-        elif ".PL" in ticker:
-            # Special case for ASB.PL which uses USD
-            if "ASB.PL" in ticker:
-                return "USD"
-            return "PLN"
-        elif ".DK" in ticker:
-            return "DKK"
-        elif ".UK" in ticker:
-            return "GBP"
-        elif any(suffix in ticker for suffix in [".FR", ".DE", ".IE", ".NL", ".ES", ".IT", ".BE", ".AT", ".FI", ".PT"]):
-            return "EUR"
+        # Special case: ASB.PL is a US company listed in Poland
+        if "ASB.PL" in ticker:
+            return Currency.USD
+
+        # If no currency in comment, infer from ticker suffix
+        if TickerSuffix.US in ticker:
+            return Currency.USD
+        elif TickerSuffix.PL in ticker:
+            return Currency.PLN
+        elif TickerSuffix.DK in ticker:
+            return Currency.DKK
+        elif TickerSuffix.UK in ticker:
+            return Currency.GBP
+        elif any(suffix in ticker for suffix in TickerSuffix.EUROZONE):
+            return Currency.EUR
 
         # Default to USD if can't determine
-        return "USD"
+        return Currency.USD
 
     def _extract_tax_rate_from_comment(self, comment: str) -> float | None:
         """
@@ -519,15 +617,16 @@ class DataFrameProcessor:
         # Define the withholding tax rates at source
         # Note: US default is 15% with W8BEN form. Without W8BEN, the rate is 30%.
         tax_rates = {
-            "US": 0.15,  # 15% withholding tax for US stocks (with W8BEN form)
-            "PL": 0.19,  # 19% withholding tax for PL stocks (Belka tax)
-            "DK": 0.15,  # 15% withholding tax for DK stocks (Denmark)
+            # 15% withholding tax for US stocks (with W8BEN form)
+            TickerSuffix.US: 0.15,
+            TickerSuffix.PL: 0.19,  # 19% withholding tax for PL stocks (Belka tax)
+            TickerSuffix.DK: 0.15,  # 15% withholding tax for DK stocks (Denmark)
             # 0% withholding tax for UK stocks (no UK withholding tax for non-residents)
-            "UK": 0.0,
+            TickerSuffix.UK: 0.0,
             # 15% withholding tax for IE stocks (Ireland, reduced rate for Polish residents)
-            "IE": 0.15,
+            TickerSuffix.IE: 0.15,
             # 0% withholding tax for FR stocks (France, under Poland-France tax treaty)
-            "FR": 0.0,
+            TickerSuffix.FR: 0.0,
         }
 
         for suffix, rate in tax_rates.items():
@@ -551,17 +650,17 @@ class DataFrameProcessor:
                    Returns 1.0 for PLN. Returns 0.0 if rate not found.
         """
         # PLN is the base currency, so exchange rate is always 1.0
-        if currency == "PLN":
+        if currency == Currency.PLN:
             return 1.0
 
         target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
 
         # Map currency to column name in NBP data
         currency_column_map = {
-            "USD": "1USD",
-            "EUR": "1EUR",
-            "GBP": "1GBP",
-            "DKK": "1DKK",
+            Currency.USD: "1USD",
+            Currency.EUR: "1EUR",
+            Currency.GBP: "1GBP",
+            Currency.DKK: "1DKK",
         }
 
         column_name = currency_column_map.get(currency)
@@ -627,22 +726,25 @@ class DataFrameProcessor:
         """
 
         def append_currency(row):
-            ticker = row["Ticker"]
-            dividend = row["Net Dividend"]
+            ticker = row[ColumnName.TICKER]
+            dividend = row[ColumnName.NET_DIVIDEND]
 
-            if ".US" in ticker:
-                return f"{dividend} USD"
-            elif "ASB.PL" in ticker:
-                # Exception for ASB.PL (uses USD)
-                return f"{dividend} USD"
-            elif ".PL" in ticker:
-                return f"{dividend} PLN"
-            elif ".DK" in ticker:
-                return f"{dividend} DKK"
-            elif ".UK" in ticker:
-                return f"{dividend} GBP"
-            elif any(suffix in ticker for suffix in [".FR", ".DE", ".IE", ".NL", ".ES", ".IT", ".BE", ".AT", ".FI", ".PT"]):
-                return f"{dividend} EUR"
+            # Special case: ASB.PL uses USD
+            if "ASB.PL" in ticker:
+                return f"{dividend} {Currency.USD}"
+
+            # Determine currency based on ticker suffix
+            if TickerSuffix.US in ticker:
+                return f"{dividend} {Currency.USD}"
+            elif TickerSuffix.PL in ticker:
+                return f"{dividend} {Currency.PLN}"
+            elif TickerSuffix.DK in ticker:
+                return f"{dividend} {Currency.DKK}"
+            elif TickerSuffix.UK in ticker:
+                return f"{dividend} {Currency.GBP}"
+            elif any(suffix in ticker for suffix in TickerSuffix.EUROZONE):
+                return f"{dividend} {Currency.EUR}"
+
             # No change if the condition doesn't match
             return dividend
 
@@ -811,14 +913,24 @@ class DataFrameProcessor:
 
     def replace_tax_with_percentage(self, tax_col: str = "Tax Collected", amount_col: str = "Net Dividend") -> pd.DataFrame:
         """
-        This method is deprecated. Tax percentage extraction is now done by
-        extract_tax_percentage_from_comment() before merging.
+        Validates Tax Collected column and warns about high US tax rates.
 
-        This method now just validates that Tax Collected column exists and contains valid values.
+        This method validates that the Tax Collected column exists and contains valid values.
+        It also checks for US dividends with 30% tax rate and suggests filing W8BEN form.
 
         Args:
-            tax_col (str): The name of the column containing tax percentages.
-            amount_col (str): The name of the column containing net dividend amounts.
+            tax_col: The name of the column containing tax percentages. Defaults to 'Tax Collected'.
+            amount_col: The name of the column containing net dividend amounts. Defaults to 'Net Dividend'.
+
+        Returns:
+            DataFrame with validated tax data.
+
+        Raises:
+            ValueError: If Tax Collected column is not found.
+
+        Note:
+            Tax percentage extraction is now handled by extract_tax_percentage_from_comment()
+            which should be called before merge_rows_and_reorder().
         """
         # Validate that Tax Collected column exists and has values
         if tax_col not in self.df.columns:
@@ -1115,20 +1227,59 @@ class DataFrameProcessor:
 
     def get_processed_df(self) -> pd.DataFrame:
         """
-        Returns the processed DataFrame.
+        Returns the processed DataFrame with all transformations applied.
 
-        :return: The processed DataFrame.
+        Returns:
+            The fully processed DataFrame ready for export or analysis.
         """
         logger.info("Step 13 - Returning the processed DataFrame.")  # Log here
         return self.df
 
-    def log_table_with_tax_summary(self) -> None:
+    @staticmethod
+    def parse_dividend_to_pln(row) -> float:
         """
-        Log the processed DataFrame as a formatted table with tax summary.
-        Removes the numeric 'Tax Collected' column before display and adds
-        a summary footer showing total dividends received and total tax due in PLN.
+        Parse Net Dividend and convert to PLN using Exchange Rate D-1.
 
-        :return: None
+        Args:
+            row: DataFrame row containing 'Net Dividend' and 'Exchange Rate D-1' columns.
+
+        Returns:
+            float: Dividend amount converted to PLN.
+        """
+        try:
+            # Extract numeric value from "Net Dividend" (e.g., "5.05 USD" -> 5.05)
+            net_div_str = str(row["Net Dividend"])
+            net_div_value = float(net_div_str.split()[0])
+
+            # Get exchange rate (handle "-" for PLN)
+            exchange_rate_str = str(row["Exchange Rate D-1"])
+            if exchange_rate_str == "-":
+                exchange_rate = 1.0
+            else:
+                exchange_rate = float(exchange_rate_str.split()[0])
+
+            return net_div_value * exchange_rate
+        except (ValueError, IndexError, KeyError):
+            return 0.0
+
+    def log_table_with_tax_summary(self, statement_currency: str = "PLN") -> None:
+        """
+        Logs the processed DataFrame as a formatted table with comprehensive tax summary.
+
+        Displays a formatted table with all dividend data and calculates:
+        - Total dividends received (gross) in PLN
+        - Total tax due in PLN
+        - Net dividends after tax in PLN
+
+        Removes the numeric 'Tax Collected' column before display and adds
+        a summary footer with financial totals.
+
+        Args:
+            statement_currency: Currency of the statement ('USD' or 'PLN'). Defaults to 'PLN'.
+
+        Note:
+            All amounts are converted to PLN using exchange rates from Date D-1.
+            Uses parse_dividend_to_pln() for currency conversion.
         """
         from tabulate import tabulate
         from data_processing.tax_calculator import TaxCalculator
@@ -1139,25 +1290,7 @@ class DataFrameProcessor:
             df_display = df_display.drop(columns=["Tax Collected"])
 
         # Calculate total dividends in PLN
-        def parse_dividend_to_pln(row):
-            """Parse Net Dividend and convert to PLN using Exchange Rate D-1."""
-            try:
-                # Extract numeric value from "Net Dividend" (e.g., "5.05 USD" -> 5.05)
-                net_div_str = str(row["Net Dividend"])
-                net_div_value = float(net_div_str.split()[0])
-
-                # Get exchange rate (handle "-" for PLN)
-                exchange_rate_str = str(row["Exchange Rate D-1"])
-                if exchange_rate_str == "-":
-                    exchange_rate = 1.0
-                else:
-                    exchange_rate = float(exchange_rate_str.split()[0])
-
-                return net_div_value * exchange_rate
-            except (ValueError, IndexError, KeyError):
-                return 0.0
-
-        total_dividends_pln = df_display.apply(parse_dividend_to_pln, axis=1).sum()
+        total_dividends_pln = df_display.apply(self.parse_dividend_to_pln, axis=1).sum()
 
         # Calculate total tax to pay in PLN
         total_tax = TaxCalculator.calculate_total_tax_amount(df_display)
