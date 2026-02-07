@@ -2,6 +2,7 @@
 
 import pandas as pd
 import pytest
+from unittest.mock import patch
 
 from data_processing.dataframe_processor import DataFrameProcessor
 
@@ -224,8 +225,9 @@ class TestAggregationOperations:
         processor.df["Date D-1"] = processor.df["Date"]
         processor.df["Comment"] = ["Dividend 1.5"] * len(processor.df)
 
-        # Act
-        processor.calculate_dividend(self.dummy_paths, statement_currency="PLN")
+        # Act - Mock _get_exchange_rate to avoid ValueError when no exchange rate files exist
+        with patch.object(processor, '_get_exchange_rate', return_value=4.0):
+            processor.calculate_dividend(self.dummy_paths, statement_currency="PLN")
 
         # Assert
         assert isinstance(processor.df, pd.DataFrame)

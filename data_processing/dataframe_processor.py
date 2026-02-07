@@ -609,11 +609,12 @@ class DataFrameProcessor:
             while current_date.weekday() in [5, 6]:
                 current_date = current_date - timedelta(days=1)
 
-        logger.error(
+        error_msg = (
             f"No exchange rate data found for {currency} on date '{target_date_str}' or previous {max_attempts} business days. "
             f"Check if you have downloaded the file 'archiwum_tab_a_XXXX.csv' for the date '{target_date_str}'."
         )
-        return 0.0
+        logger.error(error_msg)
+        raise ValueError(error_msg)
 
     def add_currency_to_dividends(self) -> None:
         """
@@ -745,8 +746,7 @@ class DataFrameProcessor:
                     exchange_rate = self._get_exchange_rate(
                         courses_paths, target_date_str, currency
                     )
-                    if exchange_rate == 0:
-                        continue  # Skip if we couldn't get a valid exchange rate
+                    # No need to check for 0 as exception will be raised if not found
 
                 # Calculate shares based on total dividend and dividend per share
                 shares = calculate_shares(

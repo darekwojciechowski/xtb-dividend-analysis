@@ -16,324 +16,312 @@ from data_processing.tax_calculator import TaxCalculator
 class TestTaxCalculation:
     """Test suite for tax calculation logic."""
 
-    def test_calculate_tax_for_sbux_example(self) -> None:
-        """
-        Test tax calculation for SBUX example from 2025-01-06.
+    # Polish tax rate constant
+    POLISH_TAX_RATE = 0.19
 
-        Example calculation:
-        - Net Dividend: 1.71 USD
-        - Tax Collected Amount: 0.26 USD
-        - Tax Collected %: 15%
-        - Exchange Rate D-1: 4.1512 PLN
-
-        Expected calculation:
-        - Tax due in USD: 1.71 × 19% = 0.3249 USD
-        - Tax to pay in USD: 0.3249 - 0.26 = 0.0649 USD
-        - Tax in PLN: 0.0649 × 4.1512 = 0.269413 PLN
-        - Rounded: 0.27 PLN
+    @staticmethod
+    def create_test_dataframe(
+        date: str,
+        ticker: str,
+        shares: float,
+        net_dividend: float,
+        currency: str,
+        tax_collected_pct: float,
+        tax_collected_amount: float | str,
+        exchange_rate: float | str,
+    ) -> pd.DataFrame:
         """
-        # Arrange
-        df = pd.DataFrame({
-            "Date": ["2025-01-06"],
-            "Ticker": ["SBUX.US"],
-            "Shares": [3.0],
-            "Net Dividend": ["1.71 USD"],
-            "Tax Collected": [0.15],  # 15%
-            "Tax Collected Amount": ["0.26 USD"],
-            "Exchange Rate D-1": ["4.1512 PLN"],
+        Helper method to create test DataFrame with consistent structure.
+
+        Args:
+            date: Transaction date
+            ticker: Stock ticker symbol
+            shares: Number of shares
+            net_dividend: Net dividend amount
+            currency: Currency code (USD, PLN, DKK, etc.)
+            tax_collected_pct: Tax percentage collected at source (0.15 = 15%)
+            tax_collected_amount: Tax amount collected (or "-" for zero)
+            exchange_rate: Exchange rate to PLN (or "-" for PLN dividends)
+
+        Returns:
+            pd.DataFrame: Test data in expected format
+        """
+        tax_collected_str = "-" if tax_collected_amount == 0 or tax_collected_amount == "-" else f"{tax_collected_amount} {currency}"
+        exchange_rate_str = "-" if exchange_rate == "-" or exchange_rate == 1.0 else f"{exchange_rate} PLN"
+
+        return pd.DataFrame({
+            "Date": [date],
+            "Ticker": [ticker],
+            "Shares": [shares],
+            "Net Dividend": [f"{net_dividend} {currency}"],
+            "Tax Collected": [tax_collected_pct],
+            "Tax Collected Amount": [tax_collected_str],
+            "Exchange Rate D-1": [exchange_rate_str],
         })
 
+    @staticmethod
+    def calculate_expected_tax_pln_statement(
+        net_dividend: float,
+        tax_collected_amount: float,
+        exchange_rate: float,
+        tax_collected_pct: float
+    ) -> float | str:
+        """
+        Calculate expected tax for PLN statement using the same formula as TaxCalculator.
+
+        Formula: (net_dividend * 19% - tax_collected_amount) * exchange_rate
+
+        Returns:
+            float: Expected tax amount in PLN (rounded to 2 decimals)
+            str: "-" if no additional tax is due
+        """
+        if tax_collected_pct >= 0.19:
+            return "-"
+
+        tax_to_collect = (net_dividend * 0.19) - tax_collected_amount
+        tax_in_pln = tax_to_collect * exchange_rate
+        return round(tax_in_pln, 2)
+
+    @staticmethod
+    def calculate_expected_tax_usd_statement(
+        net_dividend: float,
+        tax_collected_amount: float,
+        exchange_rate: float,
+        tax_collected_pct: float
+    ) -> float | str:
+        """
+        Calculate expected tax for USD statement using the same formula as TaxCalculator.
+
+        Formula: ((net_dividend + tax_collected_amount) * 19% - tax_collected_amount) * exchange_rate
+
+        Returns:
+            float: Expected tax amount in PLN (rounded to 2 decimals)
+            str: "-" if no additional tax is due
+        """
+        if tax_collected_pct >= 0.19:
+            return "-"
+
+        gross_dividend = net_dividend + tax_collected_amount
+        tax_to_collect = (gross_dividend * 0.19) - tax_collected_amount
+        tax_in_pln = tax_to_collect * exchange_rate
+        return round(tax_in_pln, 2)
+
+    @pytest.mark.parametrize(
+        "net_dividend,tax_collected_amount,tax_collected_pct,exchange_rate,ticker,date",
+        [
+            # SBUX.US - 15% tax collected at source
+            (1.71, 0.26, 0.15, 4.1512, "SBUX.US", "2025-01-06"),
+            # Test with different values - 10% tax collected
+            (10.0, 1.0, 0.10, 4.0, "TEST1.US", "2025-01-15"),
+            # Test with 18% tax (just below 19%)
+            (10.0, 1.8, 0.18, 4.0, "TEST2.US", "2025-01-20"),
+        ],
+    )
+    def test_calculate_tax_for_pln_statement_with_tax_below_19_percent(
+        self, net_dividend, tax_collected_amount, tax_collected_pct, exchange_rate, ticker, date
+    ) -> None:
+        """Test tax calculation for PLN statement when tax collected is below 19%."""
+        # Arrange
+        df = self.create_test_dataframe(
+            date=date,
+            ticker=ticker,
+            shares=1.0,
+            net_dividend=net_dividend,
+            currency="USD",
+            tax_collected_pct=tax_collected_pct,
+            tax_collected_amount=tax_collected_amount,
+            exchange_rate=exchange_rate,
+        )
         calculator = TaxCalculator(df)
+
+        # Calculate expected result using the formula
+        expected_tax = self.calculate_expected_tax_pln_statement(
+            net_dividend, tax_collected_amount, exchange_rate, tax_collected_pct
+        )
 
         # Act
         result_df = calculator.calculate_tax_for_pln_statement("PLN")
 
-        # Assert
+        # Assert - verify calculator uses correct formula
         assert "Tax Amount PLN" in result_df.columns
-        assert result_df.loc[0, "Tax Amount PLN"] == 0.27
+        assert result_df.loc[0, "Tax Amount PLN"] == expected_tax
 
-    def test_calculate_tax_when_tax_collected_above_19_percent_then_no_additional_tax(self) -> None:
-        """
-        Test that when tax collected at source is >= 19%, no additional tax is due in Poland.
-
-        Example: MMM.US with 30% tax collected.
-        """
-        # Arrange
-        df = pd.DataFrame({
-            "Date": ["2025-02-21"],
-            "Ticker": ["MMM.US"],
-            "Shares": [2.0],
-            "Net Dividend": ["1.4 USD"],
-            "Tax Collected": [0.30],  # 30%
-            "Tax Collected Amount": ["0.42 USD"],
-            "Exchange Rate D-1": ["3.9974 PLN"],
-        })
-
+    @pytest.mark.parametrize(
+        "net_dividend,tax_collected_pct,currency,exchange_rate,ticker,date",
+        [
+            # MMM.US - 30% tax collected (above 19%)
+            (1.4, 0.30, "USD", 3.9974, "MMM.US", "2025-02-21"),
+            # NOVOB.DK - 27% tax collected (above 19%)
+            (26.25, 0.27, "DKK", 0.5702, "NOVOB.DK", "2025-08-19"),
+            # XTB.PL - 19% tax collected (exactly 19%)
+            (92.65, 0.19, "PLN", "-", "XTB.PL", "2025-06-25"),
+            # Edge case: 20% tax collected
+            (100.0, 0.20, "USD", 4.0, "TEST.US", "2025-01-01"),
+        ],
+    )
+    def test_calculate_tax_when_tax_collected_above_or_equal_19_percent(
+        self, net_dividend, tax_collected_pct, currency, exchange_rate, ticker, date
+    ) -> None:
+        """Test that when tax >= 19%, no additional tax is due in Poland."""
+        # Arrange - tax amount doesn't matter when percentage >= 19%
+        tax_collected_amount = net_dividend * tax_collected_pct
+        df = self.create_test_dataframe(
+            date=date,
+            ticker=ticker,
+            shares=1.0,
+            net_dividend=net_dividend,
+            currency=currency,
+            tax_collected_pct=tax_collected_pct,
+            tax_collected_amount=tax_collected_amount,
+            exchange_rate=exchange_rate,
+        )
         calculator = TaxCalculator(df)
 
         # Act
         result_df = calculator.calculate_tax_for_pln_statement("PLN")
 
-        # Assert
-        assert result_df.loc[0, "Tax Amount PLN"] == "-"
+        # Assert - verify that tax percentage check works correctly
+        assert result_df.loc[0, "Tax Amount PLN"] == "-", (
+            f"Expected no additional tax for {tax_collected_pct*100}% tax rate, "
+            f"but got {result_df.loc[0, 'Tax Amount PLN']}"
+        )
 
-    def test_calculate_tax_for_danish_dividend_with_27_percent_tax(self) -> None:
-        """
-        Test that when tax collected at source is 27%, no additional tax is due in Poland.
-
-        Example: NOVOB.DK with 27% tax collected from 2025-08-19.
-
-        Expected calculation:
-        - Net Dividend: 26.25 DKK
-        - Tax Collected Amount: 7.09 DKK
-        - Tax Collected %: 27%
-        - Exchange Rate D-1: 0.5702 PLN
-
-        Since 27% >= 19%, no additional tax is due in Poland.
-        Expected result: "-"
-        """
+    def test_calculate_tax_for_zero_tax_collected(self) -> None:
+        """Test that when no tax is collected at source, full 19% is due."""
         # Arrange
-        df = pd.DataFrame({
-            "Date": ["2025-08-19"],
-            "Ticker": ["NOVOB.DK"],
-            "Shares": [7.0],
-            "Net Dividend": ["26.25 DKK"],
-            "Tax Collected": [0.27],  # 27%
-            "Tax Collected Amount": ["7.09 DKK"],
-            "Exchange Rate D-1": ["0.5702 PLN"],
-        })
+        net_dividend = 25.5
+        tax_collected_amount = 0.0
+        tax_collected_pct = 0.0
+        exchange_rate = 3.7456
 
+        df = self.create_test_dataframe(
+            date="2025-05-29",
+            ticker="ASB.PL",
+            shares=85.0,
+            net_dividend=net_dividend,
+            currency="USD",
+            tax_collected_pct=tax_collected_pct,
+            tax_collected_amount="-",
+            exchange_rate=exchange_rate,
+        )
         calculator = TaxCalculator(df)
+
+        # Calculate expected: full 19% of net dividend converted to PLN
+        expected_tax = self.calculate_expected_tax_pln_statement(
+            net_dividend, tax_collected_amount, exchange_rate, tax_collected_pct
+        )
 
         # Act
         result_df = calculator.calculate_tax_for_pln_statement("PLN")
 
-        # Assert
-        assert result_df.loc[0, "Tax Amount PLN"] == "-"
+        # Assert - verify full 19% is calculated
+        assert result_df.loc[0, "Tax Amount PLN"] == expected_tax
+        # Additional verification: should be net_dividend * 0.19 * exchange_rate
+        assert result_df.loc[0, "Tax Amount PLN"] == round(
+            net_dividend * 0.19 * exchange_rate, 2)
 
-    def test_calculate_tax_for_pln_dividend_then_no_additional_tax(self) -> None:
-        """
-        Test that PLN dividends with 19% tax collected have no additional tax due.
-
-        Example: XTB.PL with 19% tax collected.
-        """
+    @pytest.mark.parametrize(
+        "net_dividend,tax_collected_amount,tax_collected_pct,exchange_rate,ticker,date",
+        [
+            # MAA.US example
+            (6.12, 0.92, 0.15, 3.5189, "MAA.US", "2026-01-30"),
+            # VICI.US example
+            (11.7, 1.76, 0.15, 3.6035, "VICI.US", "2026-01-08"),
+            # Test with different tax percentage
+            (10.0, 1.0, 0.10, 4.0, "TEST.US", "2026-01-01"),
+        ],
+    )
+    def test_calculate_tax_for_usd_statement(
+        self, net_dividend, tax_collected_amount, tax_collected_pct, exchange_rate, ticker, date
+    ) -> None:
+        """Test tax calculation for USD statement - uses gross dividend formula."""
         # Arrange
-        df = pd.DataFrame({
-            "Date": ["2025-06-25"],
-            "Ticker": ["XTB.PL"],
-            "Shares": [17.0],
-            "Net Dividend": ["92.65 PLN"],
-            "Tax Collected": [0.19],  # 19%
-            "Tax Collected Amount": ["17.60 PLN"],
-            "Exchange Rate D-1": ["-"],
-        })
-
+        df = self.create_test_dataframe(
+            date=date,
+            ticker=ticker,
+            shares=1.0,
+            net_dividend=net_dividend,
+            currency="USD",
+            tax_collected_pct=tax_collected_pct,
+            tax_collected_amount=tax_collected_amount,
+            exchange_rate=exchange_rate,
+        )
         calculator = TaxCalculator(df)
 
-        # Act
-        result_df = calculator.calculate_tax_for_pln_statement("PLN")
-
-        # Assert
-        assert result_df.loc[0, "Tax Amount PLN"] == "-"
-
-    def test_calculate_tax_for_zero_tax_collected_then_full_19_percent_due(self) -> None:
-        """
-        Test that when no tax is collected at source, full 19% is due in Poland.
-
-        Example: ASB.PL with 0% tax collected from 2025-05-29.
-
-        Expected calculation:
-        - Net Dividend: 25.5 USD
-        - Tax Collected Amount: 0 USD (no tax at source)
-        - Tax Collected %: 0%
-        - Exchange Rate D-1: 3.7456 PLN
-
-        Calculation:
-        - Tax due in USD: 25.5 × 19% = 4.845 USD
-        - Tax to pay in USD: 4.845 - 0 = 4.845 USD
-        - Tax in PLN: 4.845 × 3.7456 = 18.1476 PLN
-        - Rounded: 18.15 PLN
-        """
-        # Arrange
-        df = pd.DataFrame({
-            "Date": ["2025-05-29"],
-            "Ticker": ["ASB.PL"],
-            "Shares": [85.0],
-            "Net Dividend": ["25.5 USD"],
-            "Tax Collected": [0.0],  # 0%
-            "Tax Collected Amount": ["-"],
-            "Exchange Rate D-1": ["3.7456 PLN"],
-        })
-
-        calculator = TaxCalculator(df)
-
-        # Act
-        result_df = calculator.calculate_tax_for_pln_statement("PLN")
-
-        # Assert
-        assert result_df.loc[0, "Tax Amount PLN"] == 18.15
-
-    def test_calculate_tax_when_exactly_19_percent_then_no_additional_tax(self) -> None:
-        """
-        Test edge case: when tax collected is exactly 19%, no additional tax is due.
-
-        This is a critical boundary condition - at exactly 19%, the condition
-        tax_percentage >= POLISH_TAX_RATE should return "-".
-
-        Example calculation:
-        - Net Dividend: 10.0 USD
-        - Tax Collected Amount: 1.9 USD (exactly 19%)
-        - Tax Collected %: 19%
-        - Exchange Rate D-1: 4.0 PLN
-
-        Expected: No additional tax ("-") because 19% >= 19%
-        """
-        # Arrange
-        df = pd.DataFrame({
-            "Date": ["2025-01-15"],
-            "Ticker": ["TEST.US"],
-            "Shares": [10.0],
-            "Net Dividend": ["10.0 USD"],
-            "Tax Collected": [0.19],  # Exactly 19%
-            "Tax Collected Amount": ["1.9 USD"],
-            "Exchange Rate D-1": ["4.0 PLN"],
-        })
-
-        calculator = TaxCalculator(df)
-
-        # Act
-        result_df = calculator.calculate_tax_for_pln_statement("PLN")
-
-        # Assert
-        assert result_df.loc[0, "Tax Amount PLN"] == "-"
-
-    def test_calculate_tax_when_just_below_19_percent_then_small_additional_tax(self) -> None:
-        """
-        Test edge case: when tax collected is just below 19%, small additional tax is due.
-
-        Example calculation:
-        - Net Dividend: 10.0 USD
-        - Tax Collected Amount: 1.8 USD (18%)
-        - Tax Collected %: 18%
-        - Exchange Rate D-1: 4.0 PLN
-
-        Expected calculation:
-        - Tax due: 10.0 × 19% = 1.9 USD
-        - Tax to pay: 1.9 - 1.8 = 0.1 USD
-        - Tax in PLN: 0.1 × 4.0 = 0.4 PLN
-        """
-        # Arrange
-        df = pd.DataFrame({
-            "Date": ["2025-01-15"],
-            "Ticker": ["TEST.US"],
-            "Shares": [10.0],
-            "Net Dividend": ["10.0 USD"],
-            "Tax Collected": [0.18],  # Just below 19%
-            "Tax Collected Amount": ["1.8 USD"],
-            "Exchange Rate D-1": ["4.0 PLN"],
-        })
-
-        calculator = TaxCalculator(df)
-
-        # Act
-        result_df = calculator.calculate_tax_for_pln_statement("PLN")
-
-        # Assert
-        assert result_df.loc[0, "Tax Amount PLN"] == 0.4
-
-    def test_calculate_tax_for_usd_statement_maa_example(self) -> None:
-        """
-        Test tax calculation for USD statement using MAA.US example from 2026-01-30.
-
-        For USD statement, Tax Collected Amount is the actual amount from the file,
-        not calculated from percentage.
-
-        Example calculation:
-        - Net Dividend: 6.12 USD (from file)
-        - Tax Collected Amount: 0.92 USD (actual amount from file)
-        - Tax Collected %: 15%
-        - Exchange Rate D-1: 3.5189 PLN
-
-        Expected calculation for USD statement:
-        - Gross Dividend = Net + Tax Collected = 6.12 + 0.92 = 7.04 USD
-        - Tax due 19%: 7.04 × 0.19 = 1.3376 USD
-        - Tax to pay: 1.3376 - 0.92 = 0.4176 USD
-        - Tax in PLN: 0.4176 × 3.5189 = 1.469 PLN
-        - Rounded: 1.47 PLN
-        """
-        # Arrange
-        df = pd.DataFrame({
-            "Date": ["2026-01-30"],
-            "Ticker": ["MAA.US"],
-            "Shares": [4.0],
-            "Net Dividend": ["6.12 USD"],
-            "Tax Collected": [0.15],  # 15%
-            "Tax Collected Amount": ["0.92 USD"],
-            "Exchange Rate D-1": ["3.5189 PLN"],
-        })
-
-        calculator = TaxCalculator(df)
+        # Calculate expected result using USD statement formula
+        expected_tax = self.calculate_expected_tax_usd_statement(
+            net_dividend, tax_collected_amount, exchange_rate, tax_collected_pct
+        )
 
         # Act
         result_df = calculator.calculate_tax_for_usd_statement("USD")
 
-        # Assert
+        # Assert - verify calculator uses correct USD statement formula
         assert "Tax Amount PLN" in result_df.columns
-        assert result_df.loc[0, "Tax Amount PLN"] == 1.47
+        assert result_df.loc[0, "Tax Amount PLN"] == expected_tax
 
-    def test_calculate_tax_for_usd_statement_vici_example(self) -> None:
-        """
-        Test tax calculation for USD statement using VICI.US example from 2026-01-08.
-
-        For USD statement, Tax Collected Amount is the actual amount from the file,
-        not calculated from percentage.
-
-        Example calculation:
-        - Net Dividend: 11.7 USD (from file)
-        - Tax Collected Amount: 1.76 USD (actual amount from file)
-        - Tax Collected %: 15%
-        - Exchange Rate D-1: 3.6035 PLN
-
-        Expected calculation for USD statement:
-        - Gross Dividend = Net + Tax Collected = 11.7 + 1.76 = 13.46 USD
-        - Tax due 19%: 13.46 × 0.19 = 2.5574 USD
-        - Tax to pay: 2.5574 - 1.76 = 0.7974 USD
-        - Tax in PLN: 0.7974 × 3.6035 = 2.873 PLN
-        - Rounded: 2.87 PLN
-        """
-        # Arrange
-        df = pd.DataFrame({
-            "Date": ["2026-01-08"],
-            "Ticker": ["VICI.US"],
-            "Shares": [26.0],
-            "Net Dividend": ["11.7 USD"],
-            "Tax Collected": [0.15],  # 15%
-            "Tax Collected Amount": ["1.76 USD"],
-            "Exchange Rate D-1": ["3.6035 PLN"],
-        })
-
-        calculator = TaxCalculator(df)
-
-        # Act
-        result_df = calculator.calculate_tax_for_usd_statement("USD")
-
-        # Assert
-        assert "Tax Amount PLN" in result_df.columns
-        assert result_df.loc[0, "Tax Amount PLN"] == 2.87
+        # Additional verification: manually check the gross dividend formula
+        if tax_collected_pct < 0.19:
+            gross_dividend = net_dividend + tax_collected_amount
+            tax_due = gross_dividend * 0.19
+            tax_to_pay = tax_due - tax_collected_amount
+            expected_manual = round(tax_to_pay * exchange_rate, 2)
+            assert result_df.loc[0, "Tax Amount PLN"] == expected_manual
 
     def test_calculate_total_tax_amount(self) -> None:
         """Test calculation of total tax amount across multiple rows."""
         # Arrange
-        df = pd.DataFrame({
-            "Tax Amount PLN": [0.27, "-", 18.15, 0.43, "-"]
-        })
+        test_values = [0.27, "-", 18.15, 0.43, "-", 5.00]
+        df = pd.DataFrame({"Tax Amount PLN": test_values})
+
+        # Calculate expected total (sum only numeric values, skip "-")
+        expected_total = round(sum(v for v in test_values if v != "-"), 2)
 
         # Act
         total = TaxCalculator.calculate_total_tax_amount(df)
 
-        # Assert
-        # 0.27 + 18.15 + 0.43 = 18.85
-        assert total == 18.85
+        # Assert - verify summation logic
+        assert total == expected_total
+        assert total == 23.85  # Verification of manual calculation
+
+    def test_pln_vs_usd_statement_different_formulas(self) -> None:
+        """Verify that PLN and USD statements use different calculation formulas."""
+        # Arrange - same input data
+        net_dividend = 10.0
+        tax_collected_amount = 1.0
+        tax_collected_pct = 0.10
+        exchange_rate = 4.0
+
+        df_pln = self.create_test_dataframe(
+            date="2025-01-01",
+            ticker="TEST.US",
+            shares=1.0,
+            net_dividend=net_dividend,
+            currency="USD",
+            tax_collected_pct=tax_collected_pct,
+            tax_collected_amount=tax_collected_amount,
+            exchange_rate=exchange_rate,
+        )
+        df_usd = df_pln.copy()
+
+        # Act
+        result_pln = TaxCalculator(df_pln).calculate_tax_for_pln_statement("PLN")
+        result_usd = TaxCalculator(df_usd).calculate_tax_for_usd_statement("USD")
+
+        # Assert - results should be different because formulas are different
+        tax_pln = result_pln.loc[0, "Tax Amount PLN"]
+        tax_usd = result_usd.loc[0, "Tax Amount PLN"]
+
+        # PLN statement: (net * 0.19 - tax_collected) * rate = (10*0.19 - 1) * 4 = 3.6
+        expected_pln = round(
+            (net_dividend * 0.19 - tax_collected_amount) * exchange_rate, 2)
+        # USD statement: ((net + tax_collected) * 0.19 - tax_collected) * rate = (11*0.19 - 1) * 4 = 4.36
+        expected_usd = round(((net_dividend + tax_collected_amount)
+                             * 0.19 - tax_collected_amount) * exchange_rate, 2)
+
+        assert tax_pln == expected_pln
+        assert tax_usd == expected_usd
+        assert tax_pln != tax_usd, "PLN and USD statements should produce different results with same input"
 
 
 class TestValueParsing:

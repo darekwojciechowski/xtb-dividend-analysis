@@ -100,7 +100,3 @@ Simply take the exported CSV file from this project and use it as input in the S
 - **Visualization**: Leverages `matplotlib` and `seaborn` for creating financial-specific plots and interactive visualizations.
 
 - **Web Automation**: Uses `Playwright` for automated browser interactions to download currency exchange rate data.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.

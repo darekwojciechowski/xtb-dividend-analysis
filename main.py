@@ -95,7 +95,18 @@ def main() -> None:
 
     file_path, courses_paths = get_file_paths(str(file_path))
 
-    df_processed = process_data(file_path, courses_paths)
+    try:
+        df_processed = process_data(file_path, courses_paths)
+    except ValueError as e:
+        logger.error(f"Processing failed: {e}")
+        logger.warning(
+            "No exchange rate data found. Please ensure that the NBP currency archive files "
+            "(archiwum_tab_a_20XX.csv) are downloaded for the required dates."
+        )
+        logger.info(
+            "To download missing currency data, run: python data_acquisition/playwright_download_currency_archive.py"
+        )
+        return
 
     exporter = GoogleSpreadsheetExporter(df_processed)
     exporter.export_to_google(DEFAULT_OUTPUT_FILE)
