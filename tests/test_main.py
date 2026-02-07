@@ -1,161 +1,320 @@
-"""Integration tests for DataFrameProcessor workflows."""
+"""Integration tests for main.py workflow orchestration.
+
+This module contains integration tests that verify the correct behavior of the
+main.py entry point functions (process_data and main). Tests use mocking to
+isolate the orchestration logic from external dependencies like file I/O,
+DataFrameProcessor, and GoogleSpreadsheetExporter.
+
+Test Coverage:
+    - process_data() function with PLN and USD statement types
+    - main() function successful execution and error handling
+    - Error handling for missing exchange rates
+    - Proper logging behavior during errors
+"""
+
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
 
-from data_processing.dataframe_processor import DataFrameProcessor
+from main import DEFAULT_INPUT_FILE, DEFAULT_OUTPUT_FILE, main, process_data
 
 
 @pytest.fixture
-def processor(sample_dataframe: pd.DataFrame) -> DataFrameProcessor:
-    """
-    Provides a DataFrameProcessor instance initialized with the sample DataFrame.
-
-    Args:
-        sample_dataframe: Sample DataFrame fixture from conftest.py.
+def sample_processed_df() -> pd.DataFrame:
+    """Provides a sample processed DataFrame with dividend data.
 
     Returns:
-        DataFrameProcessor instance.
+        pd.DataFrame: DataFrame containing sample dividend data with columns:
+            Date, Ticker, Net Dividend, and Tax Amount PLN.
     """
-    return DataFrameProcessor(sample_dataframe)
+    return pd.DataFrame({
+        "Date": ["2025-01-01"],
+        "Ticker": ["AAPL.US"],
+        "Net Dividend": ["10.00 USD"],
+        "Tax Amount PLN": [5.0]
+    })
+
+
+@pytest.fixture
+def mock_courses_paths() -> list[str]:
+    """Provides sample currency exchange rate file paths for testing.
+
+    Returns:
+        list[str]: List containing path to mock NBP exchange rate archive file.
+    """
+    return ["data/archiwum_tab_a_2025.csv"]
 
 
 @pytest.mark.integration
-class TestWorkflowIntegration:
-    """Test suite for integrated workflow operations."""
+class TestProcessDataFunction:
+    """Test suite for process_data() function.
 
-    def setup_method(self) -> None:
-        """Setup test fixtures before each test method."""
-        self.tax_test_amounts = [100.0, 200.0]
-        self.tax_test_collected = [10.0, 20.0]
+    Verifies that the process_data function correctly orchestrates the dividend
+    processing pipeline for different statement currencies (PLN, USD) and ensures
+    all DataFrameProcessor methods are called in the correct order.
+    """
 
-    def teardown_method(self) -> None:
-        """Cleanup after each test method."""
-        pass
+    @patch("main.import_and_process_data")
+    @patch("main.DataFrameProcessor")
+    def test_process_data_when_pln_statement_then_processes_correctly(
+        self, mock_processor_class, mock_import, sample_processed_df, mock_courses_paths
+    ):
+        """Tests that PLN statement is processed with correct tax calculation method.
 
-    def test_workflow_when_methods_combined_then_executes_successfully(
-        self, processor: DataFrameProcessor
-    ) -> None:
-        """Tests that multiple workflow methods execute sequentially without errors."""
-        # Arrange - processor from fixture
+        Args:
+            mock_processor_class: Mock of DataFrameProcessor class.
+            mock_import: Mock of import_and_process_data function.
+            sample_processed_df: Fixture providing sample DataFrame.
+            mock_courses_paths: Fixture providing exchange rate file paths.
+
+        Verifies:
+            - import_and_process_data is called with correct file path
+            - PLN-specific tax calculation method is used
+            - USD tax calculation method is NOT called
+            - Result is a pandas DataFrame
+        """
+        # Arrange
+        mock_import.return_value = (sample_processed_df.copy(), "PLN")
+        mock_processor_instance = MagicMock()
+        mock_processor_instance.detect_statement_currency.return_value = "PLN"
+        mock_processor_instance.get_processed_df.return_value = sample_processed_df
+        mock_processor_class.return_value = mock_processor_instance
 
         # Act
-        processor.apply_date_converter()
-        processor.filter_dividends()
-        processor.group_by_dividends()
+        result = process_data("test_file.xlsx", mock_courses_paths)
 
         # Assert
-        assert isinstance(processor.df, pd.DataFrame)
+        mock_import.assert_called_once_with("test_file.xlsx")
+        mock_processor_instance.calculate_tax_in_pln_for_detected_pln.assert_called_once()
+        mock_processor_instance.calculate_tax_in_pln_for_detected_usd.assert_not_called()
+        assert isinstance(result, pd.DataFrame)
 
-    def test_workflow_when_calculating_tax_percentage_then_computes_correctly(
-        self, processor: DataFrameProcessor
-    ) -> None:
-        """Tests that tax percentage validation workflow works correctly."""
+    @patch("main.import_and_process_data")
+    @patch("main.DataFrameProcessor")
+    def test_process_data_when_usd_statement_then_uses_usd_tax_calculation(
+        self, mock_processor_class, mock_import, sample_processed_df, mock_courses_paths
+    ):
+        """Tests that USD statement uses USD-specific tax calculation method.
+
+        Args:
+            mock_processor_class: Mock of DataFrameProcessor class.
+            mock_import: Mock of import_and_process_data function.
+            sample_processed_df: Fixture providing sample DataFrame.
+            mock_courses_paths: Fixture providing exchange rate file paths.
+
+        Verifies:
+            - USD-specific tax calculation is called with correct parameters
+            - PLN tax calculation method is NOT called for USD statements
+        """
         # Arrange
-        processor.df["Net Dividend"] = self.tax_test_amounts
-        # Tax percentages (2 values for 2 rows)
-        processor.df["Tax Collected"] = [0.15, 0.19]
+        mock_import.return_value = (sample_processed_df.copy(), "USD")
+        mock_processor_instance = MagicMock()
+        mock_processor_instance.detect_statement_currency.return_value = "USD"
+        mock_processor_instance.get_processed_df.return_value = sample_processed_df
+        mock_processor_class.return_value = mock_processor_instance
 
-        # Act - This function now validates Tax Collected column
-        processor.replace_tax_with_percentage()
+        # Act
+        result = process_data("test_file.xlsx", mock_courses_paths)
 
-        # Assert - Check that Tax Collected column still has valid values
-        assert "Tax Collected" in processor.df.columns
-        assert not processor.df["Tax Collected"].isnull().any()
-        assert all(processor.df["Tax Collected"] > 0)
-
-
-@pytest.mark.integration
-class TestDataQualityHandling:
-    """Test suite for handling data quality issues."""
-
-    def setup_method(self) -> None:
-        """Setup test fixtures before each test method."""
-        self.nan_test_data = pd.DataFrame(
-            {
-                "Date": ["2024-01-01", None],
-                "Ticker": ["AAPL", None],
-                "Amount": [10.0, None],
-                "Type": ["Cash", None],
-                "Comment": ["Dividend", None],
-            }
+        # Assert
+        mock_processor_instance.calculate_tax_in_pln_for_detected_usd.assert_called_once_with(
+            mock_courses_paths, "USD"
         )
+        mock_processor_instance.calculate_tax_in_pln_for_detected_pln.assert_not_called()
 
-    def teardown_method(self) -> None:
-        """Cleanup after each test method."""
-        pass
+    @patch("main.import_and_process_data")
+    @patch("main.DataFrameProcessor")
+    def test_process_data_when_called_then_executes_full_pipeline(
+        self, mock_processor_class, mock_import, sample_processed_df, mock_courses_paths
+    ):
+        """Tests that all required processing steps are executed in order.
 
-    def test_filter_when_missing_values_then_removes_invalid_rows(self) -> None:
-        """Tests that missing values are handled gracefully during filtering."""
+        Args:
+            mock_processor_class: Mock of DataFrameProcessor class.
+            mock_import: Mock of import_and_process_data function.
+            sample_processed_df: Fixture providing sample DataFrame.
+            mock_courses_paths: Fixture providing exchange rate file paths.
+
+        Verifies:
+            All key pipeline steps are called exactly once:
+            - normalize_column_names, filter_dividends, group_by_dividends
+            - calculate_dividend, extract_tax_percentage_from_comment
+            - reorder_columns, log_table_with_tax_summary
+        """
         # Arrange
-        processor = DataFrameProcessor(self.nan_test_data)
+        mock_import.return_value = (sample_processed_df.copy(), "PLN")
+        mock_processor_instance = MagicMock()
+        mock_processor_instance.detect_statement_currency.return_value = "PLN"
+        mock_processor_instance.get_processed_df.return_value = sample_processed_df
+        mock_processor_class.return_value = mock_processor_instance
 
         # Act
-        processor.filter_dividends()
+        process_data("test_file.xlsx", mock_courses_paths)
 
-        # Assert
-        assert processor.df["Type"].isnull().sum() == 0
+        # Assert - verify key pipeline steps were called
+        mock_processor_instance.normalize_column_names.assert_called_once()
+        mock_processor_instance.filter_dividends.assert_called_once()
+        mock_processor_instance.group_by_dividends.assert_called_once()
+        mock_processor_instance.calculate_dividend.assert_called_once()
+        mock_processor_instance.extract_tax_percentage_from_comment.assert_called_once()
+        mock_processor_instance.reorder_columns.assert_called_once()
+        mock_processor_instance.log_table_with_tax_summary.assert_called_once()
 
 
 @pytest.mark.integration
-@pytest.mark.performance
-class TestLargeDatasetProcessing:
-    """Test suite for processing large datasets."""
+class TestMainFunction:
+    """Test suite for main() orchestration function.
 
-    @classmethod
-    def setup_class(cls) -> None:
-        """Setup class-level fixtures before all tests."""
-        cls.large_dataset_size = 10000
-        cls.date_start = "2024-01-01"
-        cls.frequency = "D"
+    Tests the top-level main() function that orchestrates the complete workflow:
+    logging setup, file path retrieval, data processing, and export to Google
+    Spreadsheet format. Includes both successful execution and error scenarios.
+    """
 
-    @classmethod
-    def teardown_class(cls) -> None:
-        """Cleanup class-level fixtures after all tests."""
-        pass
+    @patch("main.GoogleSpreadsheetExporter")
+    @patch("main.process_data")
+    @patch("main.get_file_paths")
+    @patch("main.setup_logging")
+    def test_main_when_successful_then_exports_results(
+        self, mock_logging, mock_get_paths, mock_process, mock_exporter_class, sample_processed_df
+    ):
+        """Tests that main() successfully processes and exports data.
 
-    def test_group_when_large_dataframe_then_processes_efficiently(self) -> None:
-        """Tests that large DataFrames are processed efficiently."""
+        Args:
+            mock_logging: Mock of setup_logging function.
+            mock_get_paths: Mock of get_file_paths function.
+            mock_process: Mock of process_data function.
+            mock_exporter_class: Mock of GoogleSpreadsheetExporter class.
+            sample_processed_df: Fixture providing sample DataFrame.
+
+        Verifies:
+            - Logging is configured with INFO level
+            - File paths are retrieved
+            - Data processing is executed
+            - Export to Google Spreadsheet format is performed
+        """
         # Arrange
-        large_df = pd.DataFrame(
-            {
-                "Date": pd.date_range(
-                    start=self.date_start, periods=self.large_dataset_size, freq=self.frequency
-                ),
-                "Ticker": ["AAPL"] * self.large_dataset_size,
-                "Amount": [10.0] * self.large_dataset_size,
-                "Type": ["Cash"] * self.large_dataset_size,
-                "Comment": ["Dividend"] * self.large_dataset_size,
-            }
-        )
-        processor = DataFrameProcessor(large_df)
+        mock_get_paths.return_value = ("input.xlsx", ["rates.csv"])
+        mock_process.return_value = sample_processed_df
+        mock_exporter_instance = MagicMock()
+        mock_exporter_class.return_value = mock_exporter_instance
 
         # Act
-        processor.group_by_dividends()
+        main()
 
         # Assert
-        assert len(processor.df) > 0
+        mock_logging.assert_called_once_with(log_level="INFO")
+        mock_get_paths.assert_called_once()
+        mock_process.assert_called_once_with("input.xlsx", ["rates.csv"])
+        mock_exporter_class.assert_called_once_with(sample_processed_df)
+        mock_exporter_instance.export_to_google.assert_called_once_with(
+            DEFAULT_OUTPUT_FILE)
+
+    @patch("main.logger")
+    @patch("main.process_data")
+    @patch("main.get_file_paths")
+    @patch("main.setup_logging")
+    def test_main_when_value_error_then_logs_error_and_exits_gracefully(
+        self, mock_logging, mock_get_paths, mock_process, mock_logger
+    ):
+        """Tests that main() handles ValueError gracefully with proper logging.
+
+        Args:
+            mock_logging: Mock of setup_logging function.
+            mock_get_paths: Mock of get_file_paths function.
+            mock_process: Mock of process_data function that raises ValueError.
+            mock_logger: Mock of logger instance.
+
+        Verifies:
+            - Error is logged when processing fails
+            - Warning and info messages are logged
+            - Application exits gracefully without crashing
+        """
+        # Arrange
+        mock_get_paths.return_value = ("input.xlsx", ["rates.csv"])
+        mock_process.side_effect = ValueError("Exchange rate not found")
+
+        # Act
+        main()
+
+        # Assert
+        mock_logger.error.assert_called()
+        mock_logger.warning.assert_called()
+        mock_logger.info.assert_called()
+
+    @patch("main.GoogleSpreadsheetExporter")
+    @patch("main.process_data")
+    @patch("main.get_file_paths")
+    @patch("main.setup_logging")
+    def test_main_when_called_then_uses_default_input_file(
+        self, mock_logging, mock_get_paths, mock_process, mock_exporter_class, sample_processed_df
+    ):
+        """Tests that main() uses DEFAULT_INPUT_FILE constant.
+
+        Args:
+            mock_logging: Mock of setup_logging function.
+            mock_get_paths: Mock of get_file_paths function.
+            mock_process: Mock of process_data function.
+            mock_exporter_class: Mock of GoogleSpreadsheetExporter class.
+            sample_processed_df: Fixture providing sample DataFrame.
+
+        Verifies:
+            - get_file_paths is called with DEFAULT_INPUT_FILE constant value
+        """
+        # Arrange
+        mock_get_paths.return_value = ("test.xlsx", ["rates.csv"])
+        mock_process.return_value = sample_processed_df
+
+        # Act
+        main()
+
+        # Assert
+        # Verify get_file_paths was called with string version of DEFAULT_INPUT_FILE
+        called_path = mock_get_paths.call_args[0][0]
+        assert str(DEFAULT_INPUT_FILE) == called_path
 
 
 @pytest.mark.integration
 @pytest.mark.edge_case
-class TestEdgeCaseWorkflows:
-    """Test suite for edge case workflow scenarios."""
+class TestMainErrorHandling:
+    """Test suite for error handling in main workflow.
 
-    def setup_method(self) -> None:
-        """Setup test fixtures before each test method."""
-        self.empty_df = pd.DataFrame()
+    Focuses on edge cases and error scenarios, particularly missing exchange
+    rate data and the quality of error messages provided to users.
+    """
 
-    def teardown_method(self) -> None:
-        """Cleanup after each test method."""
-        pass
+    @patch("main.logger")
+    @patch("main.process_data")
+    @patch("main.get_file_paths")
+    @patch("main.setup_logging")
+    def test_main_when_missing_exchange_rates_then_provides_helpful_message(
+        self, mock_logging, mock_get_paths, mock_process, mock_logger
+    ):
+        """Tests that missing exchange rate error provides actionable guidance.
 
-    def test_workflow_when_empty_dataframe_then_handles_without_error(self) -> None:
-        """Tests that empty DataFrame is handled gracefully in workflows."""
+        Args:
+            mock_logging: Mock of setup_logging function.
+            mock_get_paths: Mock of get_file_paths function.
+            mock_process: Mock of process_data function that raises ValueError.
+            mock_logger: Mock of logger instance.
+
+        Verifies:
+            - Error message contains "Processing failed"
+            - Warning mentions "exchange rate"
+            - Info message references "playwright_download_currency_archive" script
+        """
         # Arrange
-        empty_processor = DataFrameProcessor(self.empty_df)
+        mock_get_paths.return_value = ("input.xlsx", [])
+        mock_process.side_effect = ValueError("No exchange rate data found")
 
-        # Act - no operations performed on empty DataFrame
+        # Act
+        main()
 
         # Assert
-        assert empty_processor.df.empty
+        error_calls = [call[0][0] for call in mock_logger.error.call_args_list]
+        warning_calls = [call[0][0] for call in mock_logger.warning.call_args_list]
+        info_calls = [call[0][0] for call in mock_logger.info.call_args_list]
+
+        assert any("Processing failed" in msg for msg in error_calls)
+        assert any("exchange rate" in msg.lower() for msg in warning_calls)
+        assert any("playwright_download_currency_archive" in msg for msg in info_calls)
