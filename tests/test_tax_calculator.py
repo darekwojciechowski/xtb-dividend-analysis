@@ -115,6 +115,12 @@ class TestTaxCalculation:
             (10.0, 1.0, 0.10, 4.0, "TEST1.US", "2025-01-15"),
             # Test with 18% tax (just below 19%)
             (10.0, 1.8, 0.18, 4.0, "TEST2.US", "2025-01-20"),
+            # PLD.US - 15% tax collected at source
+            (5.05, 0.76, 0.15, 3.6411, "PLD.US", "2025-09-30"),
+            # VICI.US - 15% tax collected at source
+            (9.52, 1.42, 0.15, 3.8707, "VICI.US", "2025-04-03"),
+            # MAA.US - 15% tax collected at source
+            (6.06, 0.91, 0.15, 3.6520, "MAA.US", "2025-10-31"),
         ],
     )
     def test_calculate_tax_for_pln_statement_with_tax_below_19_percent(

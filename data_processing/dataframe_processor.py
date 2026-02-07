@@ -1126,7 +1126,7 @@ class DataFrameProcessor:
         """
         Log the processed DataFrame as a formatted table with tax summary.
         Removes the numeric 'Tax Collected' column before display and adds
-        a summary footer showing the total tax due in PLN.
+        a summary footer showing total dividends received and total tax due in PLN.
 
         :return: None
         """
@@ -1138,8 +1138,32 @@ class DataFrameProcessor:
         if "Tax Collected" in df_display.columns:
             df_display = df_display.drop(columns=["Tax Collected"])
 
+        # Calculate total dividends in PLN
+        def parse_dividend_to_pln(row):
+            """Parse Net Dividend and convert to PLN using Exchange Rate D-1."""
+            try:
+                # Extract numeric value from "Net Dividend" (e.g., "5.05 USD" -> 5.05)
+                net_div_str = str(row["Net Dividend"])
+                net_div_value = float(net_div_str.split()[0])
+
+                # Get exchange rate (handle "-" for PLN)
+                exchange_rate_str = str(row["Exchange Rate D-1"])
+                if exchange_rate_str == "-":
+                    exchange_rate = 1.0
+                else:
+                    exchange_rate = float(exchange_rate_str.split()[0])
+
+                return net_div_value * exchange_rate
+            except (ValueError, IndexError, KeyError):
+                return 0.0
+
+        total_dividends_pln = df_display.apply(parse_dividend_to_pln, axis=1).sum()
+
         # Calculate total tax to pay in PLN
         total_tax = TaxCalculator.calculate_total_tax_amount(df_display)
+
+        # Calculate net dividends after tax
+        net_after_tax = total_dividends_pln - total_tax
 
         # Create table with data
         table = tabulate(
@@ -1156,17 +1180,22 @@ class DataFrameProcessor:
         # Create separator line
         separator = "+" + "-" * (table_width - 2) + "+"
 
-        # Create summary text
-        summary_text = f"Total tax due in PLN: {total_tax:.2f} PLN"
+        # Create summary texts
+        dividends_text = f"Total dividends received (gross): {total_dividends_pln:.2f} PLN"
+        tax_text = f"Total tax due in PLN: {total_tax:.2f} PLN"
+        net_text = f"Net dividends after tax: {net_after_tax:.2f} PLN"
 
-        # Center the summary text
-        padding = (table_width - len(summary_text) - 2) // 2
-        centered_summary = "|" + " " * padding + summary_text + " " * (
-            table_width - len(summary_text) - padding - 2
-        ) + "|"
+        # Center the summary texts
+        def center_text(text, width):
+            padding = (width - len(text) - 2) // 2
+            return "|" + " " * padding + text + " " * (width - len(text) - padding - 2) + "|"
+
+        dividends_line = center_text(dividends_text, table_width)
+        tax_line = center_text(tax_text, table_width)
+        net_line = center_text(net_text, table_width)
 
         # Combine table with summary
-        table_with_summary = f"{table}\n{separator}\n{centered_summary}\n{separator}"
+        table_with_summary = f"{table}\n{separator}\n{dividends_line}\n{separator}\n{tax_line}\n{separator}\n{net_line}\n{separator}"
 
         # Log processed data with summary
         logger.info("\n" + table_with_summary)
