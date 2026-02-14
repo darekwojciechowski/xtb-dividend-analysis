@@ -49,6 +49,7 @@ addopts = [
     "--cov=data_acquisition",
     "--cov=visualization",
     "--cov=config",
+    "--cov=scripts",
     "--cov-report=term-missing",
     "--cov-report=html",
     "--cov-report=xml",
@@ -57,6 +58,7 @@ addopts = [
 markers = [
     "unit: Unit tests for individual functions",
     "integration: Integration tests for multiple components",
+    "security: Security and CI/CD script tests",
     "performance: Performance and stress tests",
     "edge_case: Edge case and boundary tests"
 ]

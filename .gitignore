@@ -1,11 +1,21 @@
-# Ignore all for_google_spreadsheet.csv files except in assets/
-for_google_spreadsheet.csv
+# Ignore all .csv files except specific ones
+*.csv
 !assets/for_google_spreadsheet.csv
+!data/archiwum_tab_a_2025.csv
+
+# Ignore all .xlsx files except demo files
+*.xlsx
+!data/demo_XTB_broker_statement_currency_PLN.xlsx
+!data/demo_XTB_broker_statement_currency_USD.xlsx
 
 # Private or sensitive files
 *.pdf
 account*
 .DS_Store
+.github/agents/
+.github/README.md
+.qodo
+.vscode/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -168,5 +178,4 @@ cython_debug/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
-.qodo
 

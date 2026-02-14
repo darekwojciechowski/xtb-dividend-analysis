@@ -58,7 +58,7 @@ To run the script, execute the following command:
 python playwright_download_currency_archive.py
 ```
 
-This script will download files for the last 3 years, such as `archiwum_tab_a_<YYYY>.csv` (e.g., `archiwum_tab_a_2025.csv`, `archiwum_tab_a_2024.csv`, `archiwum_tab_a_2023.csv`). These files are necessary for the data processing pipeline.
+This script will download files for the last 3 years, such as `archiwum_tab_a_<YYYY>.csv` (e.g., `archiwum_tab_a_2026.csv`, `archiwum_tab_a_2025.csv`, `archiwum_tab_a_2024.csv`). These files are necessary for the data processing pipeline.
 
 ### 2. ⚙️ Data Processing
 

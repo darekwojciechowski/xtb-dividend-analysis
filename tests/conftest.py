@@ -3,6 +3,32 @@ Shared pytest configuration and fixtures for all test modules.
 
 This module provides common test fixtures and configuration for the entire test suite,
 following pytest best practices and 2026 standards.
+
+Test Structure:
+    tests/
+    ├── conftest.py              # Shared fixtures (this file)
+    ├── test_unit/               # Unit tests for business logic
+    │   ├── test_dataframe_processor.py
+    │   ├── test_date_converter.py
+    │   ├── test_exporter.py
+    │   ├── test_tax_calculator.py
+    │   └── test_main.py
+    └── test_security/           # Tests for security/CI scripts
+        ├── test_bandit_to_sarif.py
+        └── test_security_summary.py
+
+Usage:
+    # Run all tests
+    pytest
+    
+    # Run only unit tests
+    pytest tests/test_unit/
+    
+    # Run only security tests
+    pytest tests/test_security/ -m security
+    
+    # Run with coverage
+    pytest --cov=data_processing --cov=scripts
 """
 
 from __future__ import annotations
@@ -187,6 +213,7 @@ def pytest_configure(config: pytest.Config) -> None:
     markers = [
         ("unit", "Unit tests for individual functions and methods"),
         ("integration", "Integration tests for multiple components working together"),
+        ("security", "Security and CI/CD script tests"),
         ("performance", "Performance benchmarks and stress tests"),
         ("edge_case", "Edge cases and boundary condition tests"),
     ]
