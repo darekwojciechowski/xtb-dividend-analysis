@@ -7,6 +7,8 @@ from pathlib import Path
 from loguru import logger
 from playwright.sync_api import sync_playwright
 
+from config.settings import settings
+
 
 def find_and_download_latest_files() -> None:
     logger.info("Starting the Playwright script.")
@@ -14,10 +16,8 @@ def find_and_download_latest_files() -> None:
         browser = p.chromium.launch(headless=False)
         page = browser.new_page()
 
-        # Navigate to the desired page
-        # Replace with the actual URL
-        page.goto(
-            'https://nbp.pl/statystyka-i-sprawozdawczosc/kursy/archiwum-tabela-a-csv-xls/')
+        # Navigate to NBP currency archive page
+        page.goto(settings.nbp_archive_url)
 
         # Initialize a list to store file elements and their names
         file_elements = []

@@ -12,14 +12,11 @@ import pandas as pd
 from loguru import logger
 
 from config.logging_config import setup_logging
+from config.settings import settings
 from data_processing.dataframe_processor import DataFrameProcessor
 from data_processing.exporter import GoogleSpreadsheetExporter
 from data_processing.file_paths import get_file_paths
 from data_processing.import_data_xlsx import import_and_process_data
-
-# Configuration constants
-DEFAULT_INPUT_FILE = Path("data") / "demo_XTB_broker_statement_currency_PLN.xlsx"
-DEFAULT_OUTPUT_FILE = "for_google_spreadsheet.csv"
 
 
 def process_data(file_path: str, courses_paths: list[str]) -> pd.DataFrame:
@@ -89,9 +86,9 @@ def main() -> None:
     Sets up logging, validates file paths, processes XTB broker statement data,
     and exports results to CSV format suitable for Google Sheets import.
     """
-    setup_logging(log_level="INFO")
+    setup_logging(log_level=settings.log_level)
 
-    file_path = DEFAULT_INPUT_FILE
+    file_path = settings.get_input_file_path()
 
     file_path, courses_paths = get_file_paths(str(file_path))
 
@@ -109,7 +106,7 @@ def main() -> None:
         return
 
     exporter = GoogleSpreadsheetExporter(df_processed)
-    exporter.export_to_google(DEFAULT_OUTPUT_FILE)
+    exporter.export_to_google(settings.default_output_file)
 
 
 if __name__ == "__main__":

@@ -15,21 +15,22 @@ from __future__ import annotations
 import pandas as pd
 from loguru import logger
 
+from config.settings import settings
+
 
 class TaxCalculator:
     """Calculate tax amounts in PLN to pay in Poland according to Belka tax (19%)."""
 
-    # Polish Belka tax rate (19% flat tax on capital gains)
-    POLISH_TAX_RATE = 0.19
-
-    def __init__(self, df: pd.DataFrame):
+    def __init__(self, df: pd.DataFrame, polish_tax_rate: float | None = None):
         """
         Initialize TaxCalculator with a DataFrame.
 
         Args:
             df (pd.DataFrame): DataFrame containing dividend data with required columns.
+            polish_tax_rate (float | None): Polish Belka tax rate. If None, uses value from settings.
         """
         self.df = df
+        self.polish_tax_rate = polish_tax_rate if polish_tax_rate is not None else settings.polish_tax_rate
 
     def _validate_required_columns(self, required_columns: list[str]) -> None:
         """
@@ -218,7 +219,7 @@ class TaxCalculator:
                 )
 
             # First condition: If tax already paid at source is >= 19%, no additional tax in Poland
-            if tax_percentage >= self.POLISH_TAX_RATE:
+            if tax_percentage >= self.polish_tax_rate:
                 return "-"
 
             # Second condition: Calculate tax to pay in Poland
@@ -237,7 +238,7 @@ class TaxCalculator:
             # Calculate tax amount to pay in PLN
             # Formula: (Net Dividend * 19% - Tax Collected Amount) * Exchange Rate D-1
             tax_to_collect_in_currency = (
-                net_dividend * self.POLISH_TAX_RATE
+                net_dividend * self.polish_tax_rate
             ) - tax_collected_amount
             tax_amount_pln = tax_to_collect_in_currency * exchange_rate
 
@@ -319,7 +320,7 @@ class TaxCalculator:
                 )
 
             # First condition: If tax already paid at source is >= 19%, no additional tax in Poland
-            if tax_percentage >= self.POLISH_TAX_RATE:
+            if tax_percentage >= self.polish_tax_rate:
                 return "-"
 
             # Second condition: Calculate tax to pay in Poland
@@ -341,7 +342,7 @@ class TaxCalculator:
             # Gross Dividend = Net Dividend + Tax Collected Amount (actual values from file)
             gross_dividend = net_dividend + tax_collected_amount
             tax_to_collect_in_currency = (
-                gross_dividend * self.POLISH_TAX_RATE
+                gross_dividend * self.polish_tax_rate
             ) - tax_collected_amount
             tax_amount_pln = tax_to_collect_in_currency * exchange_rate
 

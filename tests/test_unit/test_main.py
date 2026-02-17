@@ -17,7 +17,8 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from main import DEFAULT_INPUT_FILE, DEFAULT_OUTPUT_FILE, main, process_data
+from config.settings import settings
+from main import main, process_data
 
 
 @pytest.fixture
@@ -203,12 +204,12 @@ class TestMainFunction:
         main()
 
         # Assert
-        mock_logging.assert_called_once_with(log_level="INFO")
+        mock_logging.assert_called_once_with(log_level=settings.log_level)
         mock_get_paths.assert_called_once()
         mock_process.assert_called_once_with("input.xlsx", ["rates.csv"])
         mock_exporter_class.assert_called_once_with(sample_processed_df)
         mock_exporter_instance.export_to_google.assert_called_once_with(
-            DEFAULT_OUTPUT_FILE)
+            settings.default_output_file)
 
     @patch("main.logger")
     @patch("main.process_data")
@@ -249,7 +250,7 @@ class TestMainFunction:
     def test_main_when_called_then_uses_default_input_file(
         self, mock_logging, mock_get_paths, mock_process, mock_exporter_class, sample_processed_df
     ):
-        """Tests that main() uses DEFAULT_INPUT_FILE constant.
+        """Tests that main() uses settings.default_input_file.
 
         Args:
             mock_logging: Mock of setup_logging function.
@@ -259,7 +260,7 @@ class TestMainFunction:
             sample_processed_df: Fixture providing sample DataFrame.
 
         Verifies:
-            - get_file_paths is called with DEFAULT_INPUT_FILE constant value
+            - get_file_paths is called with settings.default_input_file value
         """
         # Arrange
         mock_get_paths.return_value = ("test.xlsx", ["rates.csv"])
@@ -269,9 +270,9 @@ class TestMainFunction:
         main()
 
         # Assert
-        # Verify get_file_paths was called with string version of DEFAULT_INPUT_FILE
+        # Verify get_file_paths was called with string version of settings.default_input_file
         called_path = mock_get_paths.call_args[0][0]
-        assert str(DEFAULT_INPUT_FILE) == called_path
+        assert str(settings.get_input_file_path()) == called_path
 
 
 @pytest.mark.integration
