@@ -242,13 +242,14 @@ class TaxCalculator:
             ) - tax_collected_amount
             tax_amount_pln = tax_to_collect_in_currency * exchange_rate
 
-            return round(tax_amount_pln, 2)
+            # Format with PLN currency suffix
+            rounded_tax = round(tax_amount_pln, 2)
+            if rounded_tax == 0.0:
+                return "-"
+            return f"{rounded_tax} PLN"
 
         # Apply calculation to all rows
         self.df["Tax Amount PLN"] = self.df.apply(calculate_tax_pln, axis=1)
-
-        # Replace 0 with "-" for better readability
-        self.df["Tax Amount PLN"] = self.df["Tax Amount PLN"].replace(0.0, "-")
 
         logger.info(
             f"Step 11 - Calculated tax amounts in PLN based on Polish tax rules (19% Belka tax) for {statement_currency} statement."
@@ -346,13 +347,14 @@ class TaxCalculator:
             ) - tax_collected_amount
             tax_amount_pln = tax_to_collect_in_currency * exchange_rate
 
-            return round(tax_amount_pln, 2)
+            # Format with PLN currency suffix
+            rounded_tax = round(tax_amount_pln, 2)
+            if rounded_tax == 0.0:
+                return "-"
+            return f"{rounded_tax} PLN"
 
         # Apply calculation to all rows
         self.df["Tax Amount PLN"] = self.df.apply(calculate_tax_pln, axis=1)
-
-        # Replace 0 with "-" for better readability
-        self.df["Tax Amount PLN"] = self.df["Tax Amount PLN"].replace(0.0, "-")
 
         logger.info(
             f"Step 11 - Calculated tax amounts in PLN based on Polish tax rules (19% Belka tax) for {statement_currency} statement."
@@ -376,10 +378,15 @@ class TaxCalculator:
 
         total = 0.0
         for value in df["Tax Amount PLN"]:
-            # Skip "-" values and convert numeric values
+            # Skip "-" values and parse numeric values with " PLN" suffix
             if value != "-" and value != 0:
                 try:
-                    total += float(value)
+                    # Handle format: "18.15 PLN" or numeric values
+                    if isinstance(value, str) and " PLN" in value:
+                        numeric_value = float(value.replace(" PLN", "").strip())
+                        total += numeric_value
+                    else:
+                        total += float(value)
                 except (ValueError, TypeError):
                     pass
 

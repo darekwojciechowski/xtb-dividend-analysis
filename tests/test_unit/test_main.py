@@ -33,7 +33,7 @@ def sample_processed_df() -> pd.DataFrame:
         "Date": ["2025-01-01"],
         "Ticker": ["AAPL.US"],
         "Net Dividend": ["10.00 USD"],
-        "Tax Amount PLN": [5.0]
+        "Tax Amount PLN": ["5.0 PLN"]
     })
 
 

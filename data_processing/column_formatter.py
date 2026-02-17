@@ -11,6 +11,7 @@ from datetime import datetime
 import pandas as pd
 from loguru import logger
 
+from config.settings import settings
 from visualization.ticker_colors import get_random_color
 
 from .currency_converter import CurrencyConverter
@@ -124,6 +125,10 @@ class ColumnFormatter:
     def create_exchange_rate_d_minus_1_column(self, courses_paths: list[str]) -> pd.DataFrame:
         """Create 'Exchange Rate D-1' column showing exchange rate for currency on D-1 date.
 
+        Exchange rate is only shown when Tax Collected < 19% (polish_tax_rate).
+        When foreign tax collected is >= 19%, Exchange Rate D-1 shows "-" since
+        Polish tax obligations are already satisfied.
+
         Args:
             courses_paths: List of paths to exchange rate CSV files.
 
@@ -133,7 +138,17 @@ class ColumnFormatter:
         converter = CurrencyConverter(self.df)
 
         def get_exchange_rate_for_row(row):
-            """Extract currency from Net Dividend and get exchange rate for D-1 date."""
+            """Extract currency from Net Dividend and get exchange rate for D-1 date.
+
+            Returns "-" if Tax Collected >= polish_tax_rate (19%), otherwise returns
+            the exchange rate for the D-1 date.
+            """
+            # Check if foreign tax already satisfies Polish tax obligation
+            tax_percentage = row.get("Tax Collected", None)
+            if tax_percentage is not None and not pd.isna(tax_percentage):
+                if tax_percentage >= settings.polish_tax_rate:
+                    return "-"
+
             net_dividend_str = str(row.get("Net Dividend", ""))
             date_d_minus_1 = row.get("Date D-1")
 

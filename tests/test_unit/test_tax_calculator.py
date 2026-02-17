@@ -65,22 +65,24 @@ class TestTaxCalculation:
         tax_collected_amount: float,
         exchange_rate: float,
         tax_collected_pct: float
-    ) -> float | str:
+    ) -> str:
         """
         Calculate expected tax for PLN statement using the same formula as TaxCalculator.
 
         Formula: (net_dividend * 19% - tax_collected_amount) * exchange_rate
 
         Returns:
-            float: Expected tax amount in PLN (rounded to 2 decimals)
-            str: "-" if no additional tax is due
+            str: Expected tax amount formatted as "X.XX PLN" or "-" if no additional tax is due
         """
         if tax_collected_pct >= 0.19:
             return "-"
 
         tax_to_collect = (net_dividend * 0.19) - tax_collected_amount
         tax_in_pln = tax_to_collect * exchange_rate
-        return round(tax_in_pln, 2)
+        rounded_tax = round(tax_in_pln, 2)
+        if rounded_tax == 0.0:
+            return "-"
+        return f"{rounded_tax} PLN"
 
     @staticmethod
     def calculate_expected_tax_usd_statement(
@@ -88,15 +90,14 @@ class TestTaxCalculation:
         tax_collected_amount: float,
         exchange_rate: float,
         tax_collected_pct: float
-    ) -> float | str:
+    ) -> str:
         """
         Calculate expected tax for USD statement using the same formula as TaxCalculator.
 
         Formula: ((net_dividend + tax_collected_amount) * 19% - tax_collected_amount) * exchange_rate
 
         Returns:
-            float: Expected tax amount in PLN (rounded to 2 decimals)
-            str: "-" if no additional tax is due
+            str: Expected tax amount formatted as "X.XX PLN" or "-" if no additional tax is due
         """
         if tax_collected_pct >= 0.19:
             return "-"
@@ -104,7 +105,10 @@ class TestTaxCalculation:
         gross_dividend = net_dividend + tax_collected_amount
         tax_to_collect = (gross_dividend * 0.19) - tax_collected_amount
         tax_in_pln = tax_to_collect * exchange_rate
-        return round(tax_in_pln, 2)
+        rounded_tax = round(tax_in_pln, 2)
+        if rounded_tax == 0.0:
+            return "-"
+        return f"{rounded_tax} PLN"
 
     @pytest.mark.parametrize(
         "net_dividend,tax_collected_amount,tax_collected_pct,exchange_rate,ticker,date",
@@ -222,9 +226,9 @@ class TestTaxCalculation:
 
         # Assert - verify full 19% is calculated
         assert result_df.loc[0, "Tax Amount PLN"] == expected_tax
-        # Additional verification: should be net_dividend * 0.19 * exchange_rate
-        assert result_df.loc[0, "Tax Amount PLN"] == round(
-            net_dividend * 0.19 * exchange_rate, 2)
+        # Additional verification: should be net_dividend * 0.19 * exchange_rate formatted with PLN
+        expected_formatted = f"{round(net_dividend * 0.19 * exchange_rate, 2)} PLN"
+        assert result_df.loc[0, "Tax Amount PLN"] == expected_formatted
 
     @pytest.mark.parametrize(
         "net_dividend,tax_collected_amount,tax_collected_pct,exchange_rate,ticker,date",
@@ -271,17 +275,18 @@ class TestTaxCalculation:
             gross_dividend = net_dividend + tax_collected_amount
             tax_due = gross_dividend * 0.19
             tax_to_pay = tax_due - tax_collected_amount
-            expected_manual = round(tax_to_pay * exchange_rate, 2)
+            expected_manual = f"{round(tax_to_pay * exchange_rate, 2)} PLN"
             assert result_df.loc[0, "Tax Amount PLN"] == expected_manual
 
     def test_calculate_total_tax_amount(self) -> None:
         """Test calculation of total tax amount across multiple rows."""
         # Arrange
-        test_values = [0.27, "-", 18.15, 0.43, "-", 5.00]
+        test_values = ["0.27 PLN", "-", "18.15 PLN", "0.43 PLN", "-", "5.00 PLN"]
         df = pd.DataFrame({"Tax Amount PLN": test_values})
 
         # Calculate expected total (sum only numeric values, skip "-")
-        expected_total = round(sum(v for v in test_values if v != "-"), 2)
+        numeric_values = [0.27, 18.15, 0.43, 5.00]
+        expected_total = round(sum(numeric_values), 2)
 
         # Act
         total = TaxCalculator.calculate_total_tax_amount(df)
@@ -319,11 +324,9 @@ class TestTaxCalculation:
         tax_usd = result_usd.loc[0, "Tax Amount PLN"]
 
         # PLN statement: (net * 0.19 - tax_collected) * rate = (10*0.19 - 1) * 4 = 3.6
-        expected_pln = round(
-            (net_dividend * 0.19 - tax_collected_amount) * exchange_rate, 2)
+        expected_pln = f"{round((net_dividend * 0.19 - tax_collected_amount) * exchange_rate, 2)} PLN"
         # USD statement: ((net + tax_collected) * 0.19 - tax_collected) * rate = (11*0.19 - 1) * 4 = 4.36
-        expected_usd = round(((net_dividend + tax_collected_amount)
-                             * 0.19 - tax_collected_amount) * exchange_rate, 2)
+        expected_usd = f"{round(((net_dividend + tax_collected_amount) * 0.19 - tax_collected_amount) * exchange_rate, 2)} PLN"
 
         assert tax_pln == expected_pln
         assert tax_usd == expected_usd
