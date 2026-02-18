@@ -216,6 +216,7 @@ def pytest_configure(config: pytest.Config) -> None:
         ("security", "Security and CI/CD script tests"),
         ("performance", "Performance benchmarks and stress tests"),
         ("edge_case", "Edge cases and boundary condition tests"),
+        ("property_based", "Property-based tests using Hypothesis"),
     ]
 
     for marker_name, marker_description in markers:

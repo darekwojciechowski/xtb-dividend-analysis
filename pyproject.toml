@@ -28,6 +28,7 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.2"
 pytest-cov = "^7.0.0"
+hypothesis = "^6.0.0"
 flake8 = "^7.0.0"
 black = "^24.0.0"
 isort = "^5.13.0"
@@ -61,7 +62,8 @@ markers = [
     "integration: Integration tests for multiple components",
     "security: Security and CI/CD script tests",
     "performance: Performance and stress tests",
-    "edge_case: Edge case and boundary tests"
+    "edge_case: Edge case and boundary tests",
+    "property_based: Property-based tests using Hypothesis"
 ]
 
 [tool.coverage.run]
