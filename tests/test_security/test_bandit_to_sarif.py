@@ -6,22 +6,23 @@ and ensuring proper conversion of security scan results to SARIF 2.1.0 format.
 """
 
 from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+import pytest
+
+# Add scripts directory to path before importing
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
+
 from bandit_to_sarif import (
     _map_severity,
     _create_sarif_structure,
     _convert_result,
     convert_bandit_to_sarif,
 )
-
-import json
-from pathlib import Path
-from typing import TYPE_CHECKING
-
-import pytest
-
-# Import functions from the script being tested
-import sys
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
 
 
 if TYPE_CHECKING:

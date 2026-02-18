@@ -6,13 +6,9 @@ and ensuring proper generation of security scan summaries for CI/CD pipelines.
 """
 
 from __future__ import annotations
-from security_summary import (
-    _format_severity_stats,
-    _format_common_issues,
-    generate_security_summary,
-)
 
 import json
+import sys
 from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -20,9 +16,14 @@ from unittest.mock import patch
 
 import pytest
 
-# Import functions from the script being tested
-import sys
+# Add scripts directory to path before importing
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
+
+from security_summary import (
+    _format_severity_stats,
+    _format_common_issues,
+    generate_security_summary,
+)
 
 
 if TYPE_CHECKING:
