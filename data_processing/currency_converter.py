@@ -99,10 +99,14 @@ class CurrencyConverter:
         match = re.search(r"([\d.]+)", comment)
         if match:
             num_str = match.group(1)
-            # Avoid matching a single '.' which is not a valid number
-            if num_str == ".":
+            # Avoid matching a single '.' or multiple dots which are not valid numbers
+            if num_str == "." or num_str.replace(".", "") == "":
                 return None, None
-            return float(num_str), None
+            try:
+                return float(num_str), None
+            except ValueError:
+                # If conversion fails, return None for this invalid input
+                return None, None
 
         return None, None
 

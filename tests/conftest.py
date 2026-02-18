@@ -13,6 +13,11 @@ Test Structure:
     │   ├── test_exporter.py
     │   ├── test_tax_calculator.py
     │   └── test_main.py
+    ├── test_integration/        # Integration tests (multiple components)
+    │   ├── conftest.py          # Integration-specific fixtures
+    │   ├── test_data_pipeline.py
+    │   ├── test_data_import_processing.py
+    │   └── ... (see tests/test_integration/README.md)
     └── test_security/           # Tests for security/CI scripts
         ├── test_bandit_to_sarif.py
         └── test_security_summary.py
