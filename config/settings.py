@@ -11,7 +11,6 @@ Required settings will fail fast at startup if missing, ensuring proper configur
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -31,11 +30,6 @@ class Settings(BaseSettings):
 
         # Tax Configuration
         polish_tax_rate: Polish Belka tax rate (19% capital gains tax)
-
-        # Application Settings
-        environment: Current environment (LOCAL, STAGING, PRODUCTION)
-        debug: Enable debug mode with verbose logging
-        log_level: Logging level (DEBUG, INFO, WARNING, ERROR)
     """
 
     # File Paths Configuration
@@ -71,25 +65,6 @@ class Settings(BaseSettings):
         description="Polish Belka tax rate (19% flat tax on capital gains)"
     )
 
-    # Application Environment
-    environment: Literal["LOCAL", "STAGING", "PRODUCTION"] = Field(
-        default="LOCAL",
-        alias="ENVIRONMENT",
-        description="Application environment"
-    )
-
-    debug: bool = Field(
-        default=False,
-        alias="DEBUG",
-        description="Enable debug mode"
-    )
-
-    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(
-        default="INFO",
-        alias="LOG_LEVEL",
-        description="Logging level"
-    )
-
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -112,16 +87,6 @@ class Settings(BaseSettings):
         # Skip validation in non-production environments for flexibility
         return v
 
-    @property
-    def is_production(self) -> bool:
-        """Check if running in production environment."""
-        return self.environment == "PRODUCTION"
-
-    @property
-    def is_local(self) -> bool:
-        """Check if running in local development environment."""
-        return self.environment == "LOCAL"
-
     def get_input_file_path(self) -> Path:
         """Get the default input file as a Path object."""
         return Path(self.default_input_file)
@@ -137,7 +102,7 @@ try:
     settings = Settings()
 except Exception as e:
     import sys
-    print(f"❌ Configuration Error: {e}")
+    print(f"Configuration Error: {e}")
     print("\nPlease check your environment variables or .env file.")
     print("See .env.example for required configuration format.")
     sys.exit(1)

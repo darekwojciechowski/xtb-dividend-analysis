@@ -204,7 +204,7 @@ class TestMainFunction:
         main()
 
         # Assert
-        mock_logging.assert_called_once_with(log_level=settings.log_level)
+        mock_logging.assert_called_once_with()
         mock_get_paths.assert_called_once()
         mock_process.assert_called_once_with("input.xlsx", ["rates.csv"])
         mock_exporter_class.assert_called_once_with(sample_processed_df)

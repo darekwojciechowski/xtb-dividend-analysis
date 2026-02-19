@@ -86,7 +86,7 @@ def main() -> None:
     Sets up logging, validates file paths, processes XTB broker statement data,
     and exports results to CSV format suitable for Google Sheets import.
     """
-    setup_logging(log_level=settings.log_level)
+    setup_logging()
 
     file_path = settings.get_input_file_path()
 
