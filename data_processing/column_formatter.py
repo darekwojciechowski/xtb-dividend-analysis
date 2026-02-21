@@ -14,6 +14,7 @@ from loguru import logger
 from config.settings import settings
 from visualization.ticker_colors import get_random_color
 
+from .constants import ColumnName
 from .currency_converter import CurrencyConverter
 from .date_converter import DateConverter
 from .extractor import MultiConditionExtractor
@@ -105,6 +106,10 @@ class ColumnFormatter:
         """Create 'Date D-1' column showing the previous business day from the dividend date.
 
         If D-1 falls on a weekend, uses the last weekday (typically Friday).
+        When Tax Collected >= polish_tax_rate, 'Date D-1' shows "-" since
+        Polish tax obligations are already satisfied and no exchange-rate lookup is needed.
+        The mask is applied only when the 'Tax Collected' column is already present
+        (i.e. at step "8"); the early call at step "4a" is unaffected.
 
         Args:
             step_number: The step number to display in logs (default: "8").
@@ -115,6 +120,17 @@ class ColumnFormatter:
         self.df["Date D-1"] = self.df["Date"].apply(
             CurrencyConverter.get_previous_business_day
         )
+
+        # Mask rows where foreign WHT already satisfies Polish tax obligation.
+        # 'Tax Collected' only exists after tax extraction (step "8" onwards).
+        tax_col = ColumnName.TAX_COLLECTED.value
+        if tax_col in self.df.columns:
+            mask = self.df[tax_col].notna() & (
+                self.df[tax_col] >= settings.polish_tax_rate)
+            if mask.any():
+                # Cast to object so a string sentinel "-" can coexist with Timestamps.
+                self.df["Date D-1"] = self.df["Date D-1"].astype(object)
+                self.df.loc[mask, "Date D-1"] = "-"
 
         logger.info(
             f"Step {step_number} - Created 'Date D-1' column with previous business day dates."

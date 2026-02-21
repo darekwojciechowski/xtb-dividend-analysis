@@ -65,7 +65,7 @@ class GoogleSpreadsheetExporter:
             self.df = self.df.drop(columns=["Tax Collected"])
 
         # Replace NaN values with 0
-        self.df.fillna(0, inplace=True)
+        self.df = self.df.fillna(0)
 
         # Round numeric columns to two decimal places
         numeric_cols = self.df.select_dtypes(include=["number"]).columns

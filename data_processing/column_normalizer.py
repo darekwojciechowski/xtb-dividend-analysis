@@ -9,6 +9,8 @@ from __future__ import annotations
 import pandas as pd
 from loguru import logger
 
+from .constants import ColumnName
+
 
 class ColumnNormalizer:
     """Handles column name normalization and multilingual column management.
@@ -56,11 +58,11 @@ class ColumnNormalizer:
             DataFrame with normalized column names.
         """
         column_mapping = {
-            self.get_column_name("Time", "Czas"): "Date",
-            self.get_column_name("Symbol", "Ticker"): "Ticker",
-            self.get_column_name("Comment", "Komentarz"): "Comment",
-            self.get_column_name("Amount", "Kwota"): "Amount",
-            self.get_column_name("Type", "Typ"): "Type",
+            self.get_column_name("Time", "Czas"): ColumnName.DATE.value,
+            self.get_column_name("Symbol", "Ticker"): ColumnName.TICKER.value,
+            self.get_column_name("Comment", "Komentarz"): ColumnName.COMMENT.value,
+            self.get_column_name("Amount", "Kwota"): ColumnName.AMOUNT.value,
+            self.get_column_name("Type", "Typ"): ColumnName.TYPE.value,
         }
 
         missing_columns = [
@@ -71,7 +73,7 @@ class ColumnNormalizer:
                 f"The following columns are missing in the DataFrame: {', '.join(missing_columns)}"
             )
 
-        self.df.rename(columns=column_mapping, inplace=True)
+        self.df = self.df.rename(columns=column_mapping)
         logger.info("Step 2 - Normalized column names to English standard.")
 
         return self.df
@@ -95,5 +97,5 @@ class ColumnNormalizer:
         if missing_columns:
             raise ValueError(f"Error: Missing columns: {', '.join(missing_columns)}")
 
-        self.df.drop(columns=columns, inplace=True)
+        self.df = self.df.drop(columns=columns)
         return self.df
