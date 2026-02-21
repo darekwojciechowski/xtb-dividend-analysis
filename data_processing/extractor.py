@@ -1,22 +1,36 @@
+"""Comment extraction using keyword-based condition matching.
+
+This module provides keyword-based extraction of structured conditions
+from free-text comment strings found in XTB broker statements.
+"""
+
 from __future__ import annotations
 
 import re
 
 
 class MultiConditionExtractor:
-    def __init__(self, input_string: str):
-        """
-        Initializes the MultiConditionExtractor with an input string.
+    """Extracts structured conditions from free-text comment strings.
 
-        :param input_string: The string from which to extract conditions based on keywords.
+    Matches predefined keywords in the input string and maps them to
+    canonical condition labels used elsewhere in the pipeline.
+    """
+
+    def __init__(self, input_string: str):
+        """Initialize MultiConditionExtractor with a comment string.
+
+        Args:
+            input_string: The string from which to extract conditions
+                based on keywords.
         """
         self.input_string = input_string
 
     def extract_condition(self) -> str:
-        """
-        Extracts a condition from the input string based on predefined keywords.
+        """Extract a condition from the input string based on predefined keywords.
 
-        :return: A string representing the extracted condition based on keywords, or the original input string if no match is found.
+        Returns:
+            The canonical condition label matching a keyword, or the
+            original input string if no keyword is found.
         """
         # Define a mapping of keywords to their corresponding conditions
         keyword_map: dict[str, str] = {

@@ -1,13 +1,13 @@
-"""
-Tax Calculator Module
+"""Belka tax (19%) calculation for foreign dividend income.
 
-This module contains all logic related to calculating tax amounts (Tax Amount PLN)
-for dividend income according to Polish Belka tax rules (19% flat tax).
+This module calculates the Polish ``Tax Amount PLN`` owed on dividend
+income, accounting for withholding tax already deducted at source.
 
-The TaxCalculator class handles:
-- Validation of required columns in DataFrame
-- Parsing of formatted values (amounts with currency)
-- Calculation of tax to pay in Poland based on tax already collected at source
+The ``TaxCalculator`` class handles:
+
+- Validation of required DataFrame columns before calculation
+- Parsing of formatted amount-with-currency strings
+- Per-row tax calculation for both PLN and USD statement variants
 """
 
 from __future__ import annotations
@@ -22,22 +22,21 @@ class TaxCalculator:
     """Calculate tax amounts in PLN to pay in Poland according to Belka tax (19%)."""
 
     def __init__(self, df: pd.DataFrame, polish_tax_rate: float | None = None):
-        """
-        Initialize TaxCalculator with a DataFrame.
+        """Initialize TaxCalculator with a DataFrame.
 
         Args:
-            df (pd.DataFrame): DataFrame containing dividend data with required columns.
-            polish_tax_rate (float | None): Polish Belka tax rate. If None, uses value from settings.
+            df: DataFrame containing dividend data with required columns.
+            polish_tax_rate: Polish Belka tax rate. If ``None``, reads the
+                rate from ``settings.polish_tax_rate``.
         """
         self.df = df
         self.polish_tax_rate = polish_tax_rate if polish_tax_rate is not None else settings.polish_tax_rate
 
     def _validate_required_columns(self, required_columns: list[str]) -> None:
-        """
-        Validate that required columns exist in DataFrame for tax calculations.
+        """Validate that required columns exist in the DataFrame.
 
         Args:
-            required_columns (list[str]): List of column names that must exist.
+            required_columns: Column names that must all be present.
 
         Raises:
             ValueError: If any required column is missing.
@@ -54,20 +53,20 @@ class TaxCalculator:
     def _parse_value_with_currency(
         self, value_str: str, column_name: str, ticker: str, date: str
     ) -> tuple[float, str]:
-        """
-        Parse numeric value and currency from formatted string.
+        """Parse a numeric value and currency from a formatted string.
 
         Args:
-            value_str (str): String in format "6.84 USD" or "28.22 PLN"
-            column_name (str): Name of the column being parsed (for error messages)
-            ticker (str): Ticker symbol (for error messages)
-            date (str): Date value (for error messages)
+            value_str: String in the format ``"6.84 USD"`` or ``"28.22 PLN"``.
+            column_name: Column name being parsed, used in error messages.
+            ticker: Ticker symbol, used in error messages.
+            date: Date value, used in error messages.
 
         Returns:
-            tuple[float, str]: (numeric_value, currency_code)
+            A tuple ``(numeric_value, currency_code)``.
 
         Raises:
-            ValueError: If format is invalid or value cannot be parsed.
+            ValueError: If the format is invalid or the value cannot be
+                parsed.
         """
         if pd.isna(value_str) or value_str == "" or value_str == "nan":
             raise ValueError(
@@ -93,19 +92,20 @@ class TaxCalculator:
     def _parse_tax_collected_amount(
         self, value_str: str, ticker: str, date: str
     ) -> float:
-        """
-        Parse Tax Collected Amount which can be a value with currency or '-' for zero.
+        """Parse the Tax Collected Amount, accepting ``"-"`` as zero.
 
         Args:
-            value_str (str): String in format "1.03 USD" or "-"
-            ticker (str): Ticker symbol (for error messages)
-            date (str): Date value (for error messages)
+            value_str: String in the format ``"1.03 USD"`` or ``"-"``.
+            ticker: Ticker symbol, used in error messages.
+            date: Date value, used in error messages.
 
         Returns:
-            float: Tax collected amount (0.0 if value is "-")
+            Tax collected amount as a float, or ``0.0`` when the value
+            is ``"-"``.
 
         Raises:
-            ValueError: If format is invalid or value cannot be parsed.
+            ValueError: If the format is invalid or the value cannot be
+                parsed.
         """
         if value_str == "-" or pd.isna(value_str) or value_str == "nan":
             return 0.0
@@ -125,19 +125,20 @@ class TaxCalculator:
             )
 
     def _parse_exchange_rate(self, value_str: str, ticker: str, date: str) -> float:
-        """
-        Parse Exchange Rate D-1 which can be a value with PLN or '-' for 1.0.
+        """Parse the Exchange Rate D-1, accepting ``"-"`` as ``1.0`` (PLN).
 
         Args:
-            value_str (str): String in format "4.1512 PLN" or "-"
-            ticker (str): Ticker symbol (for error messages)
-            date (str): Date value (for error messages)
+            value_str: String in the format ``"4.1512 PLN"`` or ``"-"``.
+            ticker: Ticker symbol, used in error messages.
+            date: Date value, used in error messages.
 
         Returns:
-            float: Exchange rate (1.0 if value is "-" indicating PLN)
+            Exchange rate as a float, or ``1.0`` when the value is
+            ``"-"`` (indicating PLN base currency).
 
         Raises:
-            ValueError: If format is invalid or value cannot be parsed.
+            ValueError: If the format is invalid or the value cannot be
+                parsed.
         """
         if value_str == "-" or pd.isna(value_str) or value_str == "nan":
             return 1.0
@@ -157,26 +158,28 @@ class TaxCalculator:
             )
 
     def calculate_tax_for_pln_statement(self, statement_currency: str) -> pd.DataFrame:
-        """
-        Calculate tax amount in PLN to pay in Poland for PLN statement currency.
-        Adds 'Tax Amount PLN' column to the DataFrame.
+        """Calculate Belka tax in PLN for a PLN-denominated statement.
 
-        Polish tax logic (Belka tax = 19%):
-        - If Tax Collected >= 19%: Tax Amount PLN = "-" (tax already paid at source)
-        - If Tax Collected < 19%: Tax Amount PLN = (Net Dividend * 19% - Tax Collected Amount) * Exchange Rate D-1
+        Adds a ``Tax Amount PLN`` column using the following logic:
 
-        This function uses the helper columns:
-        - Tax Collected Amount: actual tax paid at source with currency
-        - Exchange Rate D-1: exchange rate for currency on D-1 date
+        - If ``Tax Collected >= 19%``: sets ``Tax Amount PLN`` to ``"-"``
+          (tax already fully paid at source).
+        - Otherwise: ``Tax Amount PLN =
+          (Net Dividend * 19% - Tax Collected Amount) * Exchange Rate D-1``.
+
+        Requires the helper columns ``Tax Collected Amount`` and
+        ``Exchange Rate D-1`` to exist before calling.
 
         Args:
-            statement_currency (str): The currency of the statement from cell F6 (e.g., 'PLN').
+            statement_currency: Currency code from cell F6 (for example,
+                ``"PLN"``).
 
         Returns:
-            pd.DataFrame: DataFrame with added 'Tax Amount PLN' column.
+            DataFrame with the ``Tax Amount PLN`` column added.
 
         Raises:
-            ValueError: If required columns are missing or if any row has missing data.
+            ValueError: If required columns are missing or any row has
+                missing data.
         """
         # Validate required columns exist
         required_columns = [
@@ -260,25 +263,27 @@ class TaxCalculator:
     def calculate_tax_for_usd_statement(
         self, statement_currency: str
     ) -> pd.DataFrame:
-        """
-        Calculate tax amount in PLN to pay in Poland for USD statement currency.
-        Adds 'Tax Amount PLN' column to the DataFrame.
+        """Calculate Belka tax in PLN for a USD-denominated statement.
 
-        For USD statements, Net Dividend and Tax Collected Amount are already in USD.
+        Adds a ``Tax Amount PLN`` column. Because the USD statement
+        already contains gross amounts, the formula differs from the PLN
+        variant:
 
-        Polish tax logic (Belka tax = 19%):
-        - If Tax Collected >= 19%: Tax Amount PLN = "-" (tax already paid at source)
-        - If Tax Collected < 19%: Tax Amount PLN = (Gross Dividend * 19% - Tax Collected Amount) * Exchange Rate D-1
-        - Gross Dividend = Net Dividend / (1 - Tax Collected %)
+        - If ``Tax Collected >= 19%``: sets ``Tax Amount PLN`` to ``"-"``.
+        - Otherwise: ``Tax Amount PLN =
+          (Gross Dividend * 19% - Tax Collected Amount) * Exchange Rate D-1``
+          where ``Gross Dividend = Net Dividend + Tax Collected Amount``.
 
         Args:
-            statement_currency (str): The currency of the statement from cell F6 (e.g., 'USD').
+            statement_currency: Currency code from cell F6 (for example,
+                ``"USD"``).
 
         Returns:
-            pd.DataFrame: DataFrame with added 'Tax Amount PLN' column.
+            DataFrame with the ``Tax Amount PLN`` column added.
 
         Raises:
-            ValueError: If required columns are missing or if any row has missing data.
+            ValueError: If required columns are missing or any row has
+                missing data.
         """
         # Validate required columns exist
         required_columns = [
@@ -364,14 +369,13 @@ class TaxCalculator:
 
     @staticmethod
     def calculate_total_tax_amount(df: pd.DataFrame) -> float:
-        """
-        Calculate the total tax amount in PLN from the 'Tax Amount PLN' column.
+        """Sum all ``Tax Amount PLN`` values, ignoring ``"-"`` markers.
 
         Args:
-            df (pd.DataFrame): DataFrame containing 'Tax Amount PLN' column.
+            df: DataFrame containing a ``Tax Amount PLN`` column.
 
         Returns:
-            float: Total tax amount rounded to 2 decimal places.
+            Total tax amount in PLN rounded to two decimal places.
         """
         if "Tax Amount PLN" not in df.columns:
             return 0.0

@@ -45,7 +45,11 @@ class TickerSuffix(str, Enum):
 
     @classmethod
     def eurozone_suffixes(cls) -> list[TickerSuffix]:
-        """Return list of all Eurozone country suffixes for EUR currency determination."""
+        """Return all Eurozone country ticker suffixes used for EUR currency determination.
+
+        Returns:
+            List of ``TickerSuffix`` values representing Eurozone countries.
+        """
         return [cls.FR, cls.DE, cls.IE, cls.NL, cls.ES, cls.IT, cls.BE, cls.AT, cls.FI, cls.PT]
 
 

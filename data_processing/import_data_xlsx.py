@@ -1,4 +1,8 @@
-# import_data_xlsx.py
+"""XTB broker statement XLSX importer.
+
+This module reads an XTB ``CASH OPERATION HISTORY`` sheet from an
+``.xlsx`` file and detects the account currency from cell F6.
+"""
 
 from __future__ import annotations
 
@@ -9,17 +13,23 @@ import pandas as pd
 from loguru import logger
 
 
-def import_and_process_data(file_path: Path, sheet_name: str = "CASH OPERATION HISTORY") -> tuple[pd.DataFrame | None, str | None]:
-    """
-    Import and process data from XTB broker statement.
+def import_and_process_data(
+    file_path: Path,
+    sheet_name: str = "CASH OPERATION HISTORY",
+) -> tuple[pd.DataFrame | None, str | None]:
+    """Import and process data from an XTB broker statement.
+
+    Reads cell F6 for the account currency, locates the header row by
+    searching for ``ID``, then loads the transaction table below it.
 
     Args:
-        file_path: Path to the XLSX file
-        sheet_name: Name of the sheet to read
+        file_path: Path to the XLSX file.
+        sheet_name: Name of the sheet to read.
 
     Returns:
-        tuple: (DataFrame with transaction data, currency code from cell F6)
-               Returns (None, None) if an error occurs
+        A tuple ``(df, currency)`` where ``df`` is a DataFrame of
+        transaction rows and ``currency`` is the currency code from
+        cell F6. Returns ``(None, None)`` if an error occurs.
     """
     try:
         # First, extract currency from cell F6 using openpyxl

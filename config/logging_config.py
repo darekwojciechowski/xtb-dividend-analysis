@@ -1,3 +1,9 @@
+"""Loguru logging configuration for XTB Dividend Analysis.
+
+Call ``setup_logging()`` once at application startup to configure
+console and file handlers with consistent formatting.
+"""
+
 from __future__ import annotations
 
 import sys
@@ -7,8 +13,20 @@ from loguru import logger
 
 
 def setup_logging(log_level: str = "INFO", log_file: str = "app.log"):
-    """
-    Set up logging configuration for the application using loguru.
+    """Configure loguru handlers for console and file output.
+
+    Removes the default loguru handler and adds a colorized stderr
+    handler and a plain-text rotating file handler under ``logs/``.
+    The file is overwritten on each run (``mode="w"``).
+
+    Args:
+        log_level: Minimum log level to emit (for example, ``"DEBUG"``
+            or ``"INFO"``).
+        log_file: Filename for the log file inside the ``logs/``
+            directory.
+
+    Returns:
+        The configured ``loguru.logger`` instance.
     """
     # Remove default handler
     logger.remove()

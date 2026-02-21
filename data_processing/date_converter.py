@@ -1,3 +1,9 @@
+"""Date string conversion utilities for XTB statement processing.
+
+This module provides date parsing and normalization for the date formats
+found in both Polish and English XTB broker statement exports.
+"""
+
 from __future__ import annotations
 
 import pandas as pd
@@ -5,20 +11,29 @@ from loguru import logger
 
 
 class DateConverter:
-    def __init__(self, date_string: str):
-        """
-        Initializes the DateConverter with a date string.
+    """Converts date strings from XTB statements to Python date objects.
 
-        :param date_string: The date string to be converted.
+    Handles the ``dd.mm.YYYY HH:MM:SS`` format used in XTB exports and
+    returns ``None`` safely when the input is missing or unparseable.
+    """
+
+    def __init__(self, date_string: str):
+        """Initialize DateConverter with a date string.
+
+        Args:
+            date_string: The date string to convert.
         """
         self.date_string = date_string
         self.date_only: pd.Timestamp | None = None
 
     def convert_to_date(self, format: str = "%d.%m.%Y %H:%M:%S") -> None:
-        """
-        Converts the date string to a date object based on the provided format.
+        """Convert the date string to a date object using the provided format.
 
-        :param format: The format in which the date_string is provided.
+        Sets ``self.date_only`` to ``None`` when the input is empty or
+        the conversion fails.
+
+        Args:
+            format: strptime format string for the input date.
         """
         if not self.date_string:  # Check for None or empty string
             self.date_only = None
@@ -30,9 +45,9 @@ class DateConverter:
             self.date_only = None
 
     def get_date(self) -> pd.Timestamp | None:
-        """
-        Returns the converted date object.
+        """Return the converted date object.
 
-        :return: The converted date object or None if conversion failed.
+        Returns:
+            The converted date object, or ``None`` if conversion failed.
         """
         return self.date_only

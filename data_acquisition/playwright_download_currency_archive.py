@@ -1,3 +1,10 @@
+"""Playwright-based downloader for NBP currency exchange rate archives.
+
+Downloads the three most recent annual NBP Table A CSV files
+(``archiwum_tab_a_*.csv``) from the NBP website and saves them to the
+``data/`` directory in the project root.
+"""
+
 from __future__ import annotations
 
 import os
@@ -11,6 +18,13 @@ from config.settings import settings
 
 
 def find_and_download_latest_files() -> None:
+    """Download the three most recent NBP currency archive CSV files.
+
+    Opens a Chromium browser, navigates to the NBP archive page defined
+    in ``settings.nbp_archive_url``, identifies download buttons by
+    extracting four-digit year numbers from their labels, and downloads
+    the files for the three most recent years to the ``data/`` directory.
+    """
     logger.info("Starting the Playwright script.")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False)

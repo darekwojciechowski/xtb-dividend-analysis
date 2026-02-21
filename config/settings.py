@@ -1,11 +1,7 @@
-"""Application Settings using pydantic-settings.
+"""Type-safe application settings backed by pydantic-settings.
 
-This module provides type-safe configuration management for the XTB Dividend Analysis application.
-All environment-specific values are externalized to environment variables with sensible defaults
-for local development.
-
-Configuration is loaded from environment variables and .env file (if present).
-Required settings will fail fast at startup if missing, ensuring proper configuration.
+All environment-specific values are read from environment variables or
+a ``.env`` file. Required settings fail fast at startup if misconfigured.
 """
 
 from __future__ import annotations
@@ -17,19 +13,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Application settings with type-safe environment variable configuration.
+    """Application settings loaded from environment variables or a ``.env`` file.
 
     Attributes:
-        # File Paths
-        default_input_file: Default XTB broker statement file to process
-        default_output_file: Default output CSV filename for Google Sheets
-        data_directory: Directory containing input data files
-
-        # URLs
-        nbp_archive_url: NBP (National Bank of Poland) currency archive URL
-
-        # Tax Configuration
-        polish_tax_rate: Polish Belka tax rate (19% capital gains tax)
+        default_input_file: Default XTB broker statement XLSX path to process.
+        default_output_file: Default output CSV filename for Google Sheets.
+        data_directory: Directory containing input data files.
+        nbp_archive_url: NBP currency archive URL for downloading exchange rates.
+        polish_tax_rate: Polish Belka flat capital-gains tax rate (``0.19``).
     """
 
     # File Paths Configuration
@@ -75,7 +66,17 @@ class Settings(BaseSettings):
     @field_validator("polish_tax_rate")
     @classmethod
     def validate_tax_rate(cls, v: float) -> float:
-        """Validate that tax rate is between 0 and 1."""
+        """Validate that the tax rate is a fraction between 0 and 1.
+
+        Args:
+            v: Tax rate value to validate.
+
+        Returns:
+            The validated tax rate unchanged.
+
+        Raises:
+            ValueError: If ``v`` is outside the range ``[0, 1]``.
+        """
         if not 0 <= v <= 1:
             raise ValueError(f"Tax rate must be between 0 and 1, got {v}")
         return v
@@ -83,16 +84,32 @@ class Settings(BaseSettings):
     @field_validator("default_input_file", "data_directory")
     @classmethod
     def validate_paths_exist(cls, v: str, info) -> str:
-        """Validate that critical paths exist (only for production)."""
+        """Pass-through validator for path fields; reserved for future checks.
+
+        Args:
+            v: Path string value to validate.
+            info: Pydantic field validation info.
+
+        Returns:
+            The path string unchanged.
+        """
         # Skip validation in non-production environments for flexibility
         return v
 
     def get_input_file_path(self) -> Path:
-        """Get the default input file as a Path object."""
+        """Return the default input file as a ``Path`` object.
+
+        Returns:
+            ``Path`` instance for ``default_input_file``.
+        """
         return Path(self.default_input_file)
 
     def get_data_directory_path(self) -> Path:
-        """Get the data directory as a Path object."""
+        """Return the data directory as a ``Path`` object.
+
+        Returns:
+            ``Path`` instance for ``data_directory``.
+        """
         return Path(self.data_directory)
 
 

@@ -6,12 +6,23 @@ from loguru import logger
 
 
 def get_file_paths(file_path: str) -> tuple[str, list[str]]:
-    """
-    Define file paths and validate their existence.
+    """Resolve and validate the XLSX input path and all NBP archive CSV paths.
+
+    Searches the ``data/`` directory for files matching
+    ``archiwum_tab_a_*.csv`` and validates that the main input file and
+    each archive file exist on disk.
+
     Args:
-        file_path: Path to the main file.
+        file_path: Path to the XTB XLSX broker statement.
+
     Returns:
-        tuple: file_path (str), courses_paths (list[str])
+        A tuple ``(file_path, courses_paths)`` where ``file_path`` is
+        the validated XLSX path and ``courses_paths`` is a list of
+        matched NBP archive CSV paths.
+
+    Raises:
+        FileNotFoundError: If the XLSX file or any NBP archive CSV does
+            not exist.
     """
     # Dynamically find all files starting with "archiwum_tab_a_" in the data folder
     data_folder = Path("data")

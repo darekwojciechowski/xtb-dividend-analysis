@@ -1,3 +1,9 @@
+"""Google Sheets CSV export for dividend analysis results.
+
+This module serializes the processed dividend DataFrame to a
+tab-separated CSV file ready to paste into Google Sheets.
+"""
+
 from __future__ import annotations
 
 import re
@@ -7,30 +13,45 @@ import pandas as pd
 
 
 class GoogleSpreadsheetExporter:
-    def __init__(self, df: pd.DataFrame):
-        """
-        Initializes the GoogleSpreadsheetExporter with a DataFrame.
+    """Exports the processed dividend DataFrame to a Google Sheets-compatible CSV.
 
-        :param df: The DataFrame to be processed and exported.
+    Strips ANSI color codes, drops intermediate calculation columns, and
+    writes a tab-separated file to the ``output/`` directory.
+    """
+
+    def __init__(self, df: pd.DataFrame):
+        """Initialize GoogleSpreadsheetExporter with a DataFrame.
+
+        Args:
+            df: The DataFrame to process and export.
         """
         self.df = df
 
     def remove_ansi(self, text: str) -> str:
-        """
-        Removes ANSI escape sequences from a string.
+        """Remove ANSI escape sequences from a string.
 
-        :param text: The string containing ANSI escape sequences.
-        :return: The string with ANSI sequences removed.
+        Args:
+            text: The string potentially containing ANSI escape sequences.
+
+        Returns:
+            The string with all ANSI sequences removed.
         """
         ansi_escape = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
         return ansi_escape.sub("", text)
 
     def export_to_google(self, filename: str = "for_google_spreadsheet.csv") -> None:
-        """
-        Processes the DataFrame and exports it to a CSV file formatted for Google Sheets.
-        The file is saved in the 'output' directory.
+        """Export the DataFrame to a tab-separated CSV file for Google Sheets.
 
-        :param filename: The name of the file to which the DataFrame will be exported.
+        Saves the file to the ``output/`` directory, creating it if needed.
+        Removes ANSI sequences from ``Ticker``, drops the numeric
+        ``Tax Collected`` column when the display column is present, fills
+        ``NaN`` with ``0``, and rounds numeric columns to two decimal places.
+
+        Args:
+            filename: Name of the output file.
+
+        Raises:
+            ValueError: If the DataFrame does not contain a ``Ticker`` column.
         """
         # Validate that the DataFrame has a 'Ticker' column
         if "Ticker" not in self.df.columns:

@@ -1,7 +1,8 @@
 """XTB Dividend Analysis Pipeline.
 
-Main entry point for processing XTB broker statements and calculating dividend data
-with tax calculations according to Polish tax regulations (Belka tax 19%).
+Main entry point for processing XTB broker statements and calculating
+dividend data with tax calculations per Polish tax regulations (Belka
+tax 19%).
 """
 
 from __future__ import annotations
