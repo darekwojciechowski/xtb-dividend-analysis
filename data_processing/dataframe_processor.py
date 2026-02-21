@@ -8,7 +8,6 @@ Refactored to follow SOLID principles with proper separation of concerns.
 
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 from loguru import logger
 
@@ -116,7 +115,7 @@ class DataFrameProcessor:
 
     def normalize_column_names(self) -> None:
         """Normalize column names to English standard names based on detected language.
-        
+
         Maps Polish or English column names to standardized English names.
         """
         normalizer = ColumnNormalizer(self.df)
@@ -136,7 +135,7 @@ class DataFrameProcessor:
 
     def apply_colorize_ticker(self) -> None:
         """Apply random color formatting to the 'Ticker' column.
-        
+
         Creates a new 'Colored Ticker' column without modifying the original 'Ticker' column.
         """
         formatter = ColumnFormatter(self.df)
@@ -191,19 +190,10 @@ class DataFrameProcessor:
 
     def merge_and_sum(self) -> None:
         """Merge rows with the same 'Date' and 'Ticker', summing amounts.
-        
+
         DEPRECATED: Use merge_rows_and_reorder() instead.
         """
-        self.prepare_columns()
-        self.convert_columns_to_numeric()
-        self.df.fillna(0, inplace=True)
-
-        self.df = self.df.groupby(["Date", "Ticker"], as_index=False).agg(
-            {"Net Dividend": "sum", "Tax Collected": "sum"}
-        )
-
-        self.df["Net Dividend"] = self.df["Net Dividend"].replace(0, np.nan)
-        self.df["Tax Collected"] = self.df["Tax Collected"].replace(0, np.nan)
+        self.merge_rows_and_reorder()
 
     def extract_tax_percentage_from_comment(self, statement_currency: str = "PLN") -> None:
         """Extract tax percentage from Comment column and store in 'Tax Collected' column.
@@ -225,6 +215,51 @@ class DataFrameProcessor:
         aggregator = DataAggregator(self.df)
         self.df = aggregator.merge_rows_and_reorder(drop_columns)
 
+    # ------------------------------------------------------------------
+    # Lazy specialist cache helpers
+    # ------------------------------------------------------------------
+
+    def _get_currency_converter(self) -> CurrencyConverter:
+        """Return a CurrencyConverter bound to the current DataFrame.
+
+        The instance is reused as long as ``self.df`` has not been replaced
+        by a new object, avoiding repeated instantiation inside per-row loops.
+
+        Returns:
+            Cached ``CurrencyConverter`` for the current ``self.df``.
+        """
+        current_df = self.df
+        if (
+            getattr(self, "_cached_currency_converter", None) is None
+            or getattr(self, "_cached_currency_converter_df", None) is not current_df
+        ):
+            self._cached_currency_converter: CurrencyConverter = CurrencyConverter(
+                current_df)
+            self._cached_currency_converter_df = current_df
+        return self._cached_currency_converter
+
+    def _get_tax_extractor(self) -> TaxExtractor:
+        """Return a TaxExtractor bound to the current DataFrame.
+
+        The instance is reused as long as ``self.df`` has not been replaced
+        by a new object, avoiding repeated instantiation inside per-row loops.
+
+        Returns:
+            Cached ``TaxExtractor`` for the current ``self.df``.
+        """
+        current_df = self.df
+        if (
+            getattr(self, "_cached_tax_extractor", None) is None
+            or getattr(self, "_cached_tax_extractor_df", None) is not current_df
+        ):
+            self._cached_tax_extractor: TaxExtractor = TaxExtractor(current_df)
+            self._cached_tax_extractor_df = current_df
+        return self._cached_tax_extractor
+
+    # ------------------------------------------------------------------
+    # Private forwarding delegates (use cached specialists)
+    # ------------------------------------------------------------------
+
     def _extract_dividend_from_comment(self, comment: str) -> tuple[float | None, str | None]:
         """Extract dividend per share and currency from the comment string.
 
@@ -234,8 +269,7 @@ class DataFrameProcessor:
         Returns:
             Tuple of (dividend_per_share, currency) or (None, None) if not found.
         """
-        converter = CurrencyConverter(self.df)
-        return converter.extract_dividend_from_comment(comment)
+        return self._get_currency_converter().extract_dividend_from_comment(comment)
 
     def _determine_currency(self, ticker: str, extracted_currency: str | None) -> str:
         """Determine the currency based on ticker and extracted currency.
@@ -247,8 +281,7 @@ class DataFrameProcessor:
         Returns:
             Determined currency ('USD', 'PLN', 'EUR', 'DKK', 'GBP')
         """
-        converter = CurrencyConverter(self.df)
-        return converter.determine_currency(ticker, extracted_currency)
+        return self._get_currency_converter().determine_currency(ticker, extracted_currency)
 
     def _extract_tax_rate_from_comment(self, comment: str) -> float | None:
         """Extract tax rate from comment string (e.g., 'WHT 27%' or '19%').
@@ -259,8 +292,7 @@ class DataFrameProcessor:
         Returns:
             Tax rate as decimal (e.g., 0.27 for 27%) or None if not found.
         """
-        tax_extractor = TaxExtractor(self.df)
-        return tax_extractor.extract_tax_rate_from_comment(comment)
+        return self._get_tax_extractor().extract_tax_rate_from_comment(comment)
 
     def _get_default_tax_rate(self, ticker: str) -> float:
         """Get default withholding tax rate based on ticker suffix.
@@ -271,8 +303,7 @@ class DataFrameProcessor:
         Returns:
             Default tax rate as decimal.
         """
-        tax_extractor = TaxExtractor(self.df)
-        return tax_extractor.get_default_tax_rate(ticker)
+        return self._get_tax_extractor().get_default_tax_rate(ticker)
 
     def _get_exchange_rate(self, courses_paths: list[str], target_date_str: str, currency: str) -> float:
         """Retrieve the exchange rate for a specific currency on a specific date.
@@ -285,8 +316,7 @@ class DataFrameProcessor:
         Returns:
             The exchange rate for the specified currency on the specified date.
         """
-        converter = CurrencyConverter(self.df)
-        return converter.get_exchange_rate(courses_paths, target_date_str, currency)
+        return self._get_currency_converter().get_exchange_rate(courses_paths, target_date_str, currency)
 
     def add_currency_to_dividends(self) -> None:
         """Append currency symbols to the 'Net Dividend' column based on the ticker."""
@@ -294,143 +324,60 @@ class DataFrameProcessor:
         self.df = converter.add_currency_to_dividends()
 
     def calculate_dividend(
-        self, courses_paths: list[str], statement_currency: str, comment_col: str | None = None, amount_col: str | None = None, date_col: str | None = None
+        self,
+        courses_paths: list[str],
+        statement_currency: str,
+        comment_col: str | None = None,
+        amount_col: str | None = None,
+        date_col: str | None = None,
     ) -> pd.DataFrame:
         """Modify the Net Dividend column and calculate shares based on dividend per share.
+
+        Delegates all business logic to ``CurrencyConverter.calculate_dividend``.
 
         Args:
             courses_paths: A list of CSV file paths for retrieving exchange rates.
             statement_currency: The currency of the statement from cell F6 (e.g., 'PLN', 'USD').
-            comment_col: The name of the column containing the comments to extract numbers from.
-            amount_col: The name of the column (Net Dividend) to update with the extracted values.
-            date_col: The name of the column containing the date for retrieving the exchange rate.
-            
+            comment_col: Column containing per-share dividend comments. Resolved from
+                the DataFrame language if not provided.
+            amount_col: Column to update with total dividend amounts. Defaults to
+                ``ColumnName.NET_DIVIDEND``.
+            date_col: Unused; kept for backward compatibility.
+
         Returns:
             Processed DataFrame with calculated shares and dividends.
         """
-        # Use get_column_name to handle multilingual column names
         comment_col = comment_col or self.get_column_name("Comment", "Komentarz")
-        amount_col = amount_col or "Net Dividend"
-        date_col = date_col or self.get_column_name("Date", "Data")
-
+        amount_col = amount_col or ColumnName.NET_DIVIDEND.value
         converter = CurrencyConverter(self.df)
-        
-        def calculate_shares(total_dividend, dividend_per_share, exchange_rate):
-            """Calculate the number of shares based on the total dividend value."""
-            if dividend_per_share * exchange_rate == 0:
-                print("Warning: Division by zero encountered in shares calculation.")
-                return 0.0
-
-            shares = total_dividend / (dividend_per_share * exchange_rate)
-            return round(shares, 2)
-
-        # Add Shares column if it doesn't exist
-        if "Shares" not in self.df.columns:
-            self.df["Shares"] = np.nan
-
-        # Add Currency column if it doesn't exist
-        if "Currency" not in self.df.columns:
-            self.df["Currency"] = None
-
-        for index, row in self.df.iterrows():
-            if (
-                pd.isna(row[date_col])
-                or pd.isna(row[amount_col])
-                or pd.isna(row[comment_col])
-            ):
-                continue
-
-            # Use Date D-1 for exchange rate lookup - it must be available
-            if "Date D-1" not in self.df.columns:
-                raise ValueError(
-                    "Column 'Date D-1' is required but not found in DataFrame. "
-                    "Please run create_date_d_minus_1_column() before calling this method."
-                )
-
-            if pd.isna(row.get("Date D-1")):
-                raise ValueError(
-                    f"Date D-1 value is missing for row {index}. "
-                    f"All rows must have valid 'Date D-1' values."
-                )
-
-            target_date = row["Date D-1"]
-            if isinstance(target_date, pd.Timestamp):
-                target_date_str = target_date.strftime("%Y-%m-%d")
-            else:
-                target_date_str = target_date.strftime("%Y-%m-%d")
-
-            total_dividend = float(row[amount_col])
-            ticker = row["Ticker"]
-
-            extracted_value, extracted_currency = converter.extract_dividend_from_comment(
-                row[comment_col])
-
-            if extracted_value is not None and extracted_value > 0:
-                # Store the dividend per share
-                dividend_per_share = extracted_value
-
-                # Determine currency based on ticker and extracted info
-                currency = converter.determine_currency(ticker, extracted_currency)
-                self.df.at[index, "Currency"] = currency
-
-                # Apply exchange rate based on statement currency and dividend currency
-                exchange_rate = 1.0  # Default exchange rate
-
-                # Only apply exchange rate conversion for Polish statements (PLN) with USD dividends
-                if statement_currency == "PLN" and currency == "USD":
-                    exchange_rate = converter.get_exchange_rate(
-                        courses_paths, target_date_str, currency
-                    )
-
-                # Calculate shares based on total dividend and dividend per share
-                shares = calculate_shares(
-                    total_dividend, dividend_per_share, exchange_rate
-                )
-
-                # Round shares to the nearest integer
-                self.df.at[index, "Shares"] = round(shares)
-
-                # Keep the dividend per share value in the amount column
-                self.df.at[index, amount_col] = dividend_per_share
-
-        # Calculate the total dividend amount after processing
-        self.df[amount_col] = self.df.apply(
-            lambda row: (
-                row["Shares"] * row[amount_col]
-                if not pd.isna(row["Shares"])
-                else row[amount_col]
-            ),
-            axis=1,
+        self.df = converter.calculate_dividend(
+            courses_paths, statement_currency, comment_col, amount_col
         )
-        logger.info(
-            "Step 5 - Calculated dividends and updated shares using exchange rates."
-        )
-
         return self.df
 
     def replace_tax_values(
-        self, ticker_col: str | None = None, amount_col: str | None = None, tax_col: str = "Tax Collected"
+        self, ticker_col: str | None = None, amount_col: str | None = None, tax_col: str = ColumnName.TAX_COLLECTED.value
     ) -> pd.DataFrame:
         """Update the 'Tax Collected' column based on the 'Net Dividend' column and ticker type.
-        
+
         DEPRECATED: Tax extraction is now handled by extract_tax_percentage_from_comment().
 
         Args:
             ticker_col: The name of the column containing the ticker information.
             amount_col: The name of the column (Net Dividend) to base the calculation on.
             tax_col: The name of the column to update with the tax values.
-            
+
         Returns:
             DataFrame with tax values updated.
         """
         ticker_col = ticker_col or self.get_column_name("Ticker", "Symbol")
-        amount_col = amount_col or "Net Dividend"
+        amount_col = amount_col or ColumnName.NET_DIVIDEND.value
 
         tax_extractor = TaxExtractor(self.df)
-        
+
         def calculate_tax(row):
             """Calculate tax for a single row."""
-            comment = row.get("Comment", "")
+            comment = row.get(ColumnName.COMMENT.value, "")
 
             # First, try to extract the tax rate from the comment
             tax_rate = tax_extractor.extract_tax_rate_from_comment(comment)
@@ -453,7 +400,7 @@ class DataFrameProcessor:
         Args:
             tax_col: The name of the column containing tax percentages.
             amount_col: The name of the column containing net dividend amounts.
-            
+
         Returns:
             DataFrame with validated tax data.
         """
@@ -584,11 +531,11 @@ class DataFrameProcessor:
         """
         try:
             # Extract numeric value from "Net Dividend" (e.g., "5.05 USD" -> 5.05)
-            net_div_str = str(row["Net Dividend"])
+            net_div_str = str(row[ColumnName.NET_DIVIDEND.value])
             net_div_value = float(net_div_str.split()[0])
 
             # Get exchange rate (handle "-" for PLN)
-            exchange_rate_str = str(row["Exchange Rate D-1"])
+            exchange_rate_str = str(row[ColumnName.EXCHANGE_RATE_D_MINUS_1.value])
             if exchange_rate_str == "-":
                 exchange_rate = 1.0
             else:
@@ -608,8 +555,8 @@ class DataFrameProcessor:
 
         # Prepare DataFrame for display (remove numeric Tax Collected column)
         df_display = self.df.copy()
-        if "Tax Collected" in df_display.columns:
-            df_display = df_display.drop(columns=["Tax Collected"])
+        if ColumnName.TAX_COLLECTED.value in df_display.columns:
+            df_display = df_display.drop(columns=[ColumnName.TAX_COLLECTED.value])
 
         # Calculate total dividends in PLN
         total_dividends_pln = df_display.apply(self.parse_dividend_to_pln, axis=1).sum()

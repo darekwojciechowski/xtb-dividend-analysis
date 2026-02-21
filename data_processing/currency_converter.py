@@ -9,10 +9,11 @@ from __future__ import annotations
 import re
 from datetime import datetime, timedelta
 
+import numpy as np
 import pandas as pd
 from loguru import logger
 
-from .constants import Currency, TickerSuffix
+from .constants import ColumnName, Currency, TickerSuffix
 
 
 class CurrencyConverter:
@@ -192,6 +193,107 @@ class CurrencyConverter:
         )
         logger.error(error_msg)
         raise ValueError(error_msg)
+
+    def calculate_dividend(
+        self,
+        courses_paths: list[str],
+        statement_currency: str,
+        comment_col: str,
+        amount_col: str,
+    ) -> pd.DataFrame:
+        """Calculate shares and net dividends per row using per-share dividend and exchange rates.
+
+        Populates the ``Shares`` and ``Currency`` columns and updates ``amount_col``
+        with the total dividend (shares × dividend_per_share).
+
+        Args:
+            courses_paths: List of NBP CSV file paths for exchange-rate lookups.
+            statement_currency: Currency of the XTB statement from cell F6 (e.g., 'PLN', 'USD').
+            comment_col: Column name containing comment strings with dividend-per-share data.
+            amount_col: Column name holding the total dividend amount to be updated.
+
+        Returns:
+            DataFrame with populated ``Shares``, ``Currency``, and updated amount column.
+
+        Raises:
+            ValueError: If ``Date D-1`` column is missing or contains NaN values.
+        """
+        date_d1_col = ColumnName.DATE_D_MINUS_1.value
+        shares_col = ColumnName.SHARES.value
+        currency_col = ColumnName.CURRENCY.value
+        ticker_col = ColumnName.TICKER.value
+
+        if date_d1_col not in self.df.columns:
+            raise ValueError(
+                f"Column '{date_d1_col}' is required but not found in DataFrame. "
+                "Please run create_date_d_minus_1_column() before calling this method."
+            )
+
+        if shares_col not in self.df.columns:
+            self.df[shares_col] = np.nan
+
+        if currency_col not in self.df.columns:
+            self.df[currency_col] = None
+
+        for index, row in self.df.iterrows():
+            if (
+                pd.isna(row.get(ColumnName.DATE.value))
+                or pd.isna(row.get(amount_col))
+                or pd.isna(row.get(comment_col))
+            ):
+                continue
+
+            if pd.isna(row.get(date_d1_col)):
+                raise ValueError(
+                    f"'{date_d1_col}' value is missing for row {index}. "
+                    "All rows must have valid 'Date D-1' values."
+                )
+
+            target_date = row[date_d1_col]
+            target_date_str = target_date.strftime("%Y-%m-%d")
+
+            total_dividend = float(row[amount_col])
+            ticker = row[ticker_col]
+
+            extracted_value, extracted_currency = self.extract_dividend_from_comment(
+                row[comment_col]
+            )
+
+            if extracted_value is not None and extracted_value > 0:
+                dividend_per_share = extracted_value
+
+                currency = self.determine_currency(ticker, extracted_currency)
+                self.df.at[index, currency_col] = currency
+
+                exchange_rate = 1.0
+                if statement_currency == Currency.PLN.value and currency == Currency.USD.value:
+                    exchange_rate = self.get_exchange_rate(
+                        courses_paths, target_date_str, currency
+                    )
+
+                if dividend_per_share * exchange_rate == 0:
+                    logger.warning(
+                        "Division by zero encountered in shares calculation for "
+                        f"ticker '{ticker}' on {target_date_str}."
+                    )
+                    shares = 0.0
+                else:
+                    shares = total_dividend / (dividend_per_share * exchange_rate)
+
+                self.df.at[index, shares_col] = round(shares)
+                self.df.at[index, amount_col] = dividend_per_share
+
+        self.df[amount_col] = self.df.apply(
+            lambda r: (
+                r[shares_col] * r[amount_col]
+                if not pd.isna(r[shares_col])
+                else r[amount_col]
+            ),
+            axis=1,
+        )
+        logger.info(
+            "Step 5 - Calculated dividends and updated shares using exchange rates.")
+        return self.df
 
     def add_currency_to_dividends(self) -> pd.DataFrame:
         """Append currency symbols to the 'Net Dividend' column based on the ticker.

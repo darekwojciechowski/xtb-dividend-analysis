@@ -9,6 +9,8 @@ from __future__ import annotations
 import pandas as pd
 from loguru import logger
 
+from .constants import ColumnName
+
 
 class DividendFilter:
     """Filters and groups dividend-related transactions from XTB statements.
@@ -34,7 +36,7 @@ class DividendFilter:
         Returns:
             Filtered DataFrame with only dividend data.
         """
-        type_col = "Type"
+        type_col = ColumnName.TYPE.value
 
         self.df = self.df[self.df[type_col].notna()]
         self.df = self.df[
@@ -62,11 +64,17 @@ class DividendFilter:
             Grouped DataFrame with aggregated amounts.
         """
         self.df = (
-            self.df.groupby(["Date", "Ticker", "Type", "Comment"])
-            .agg({"Amount": "sum"})
+            self.df.groupby([
+                ColumnName.DATE.value,
+                ColumnName.TICKER.value,
+                ColumnName.TYPE.value,
+                ColumnName.COMMENT.value,
+            ])
+            .agg({ColumnName.AMOUNT.value: "sum"})
             .reset_index()
         )
-        self.df.rename(columns={"Amount": "Net Dividend"}, inplace=True)
+        self.df.rename(
+            columns={ColumnName.AMOUNT.value: ColumnName.NET_DIVIDEND.value}, inplace=True)
         logger.info(
             "Step 4 - Grouped data by date, ticker, and type; aggregated amounts."
         )
