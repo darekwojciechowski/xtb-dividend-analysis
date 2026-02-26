@@ -16,7 +16,26 @@ from data_processing.import_data_xlsx import import_and_process_data
 
 
 @pytest.fixture(scope="module")
-def pln_statement() -> tuple[pd.DataFrame, str]:
+def pln_statement_path() -> Path:
+    """Return path to the PLN demo XTB statement XLSX.
+
+    Single source of truth for the PLN demo file path used by all
+    integration tests that need to drive the full pipeline.
+
+    Scope: module — path is constant across all tests in the module.
+
+    Returns:
+        Absolute ``Path`` to ``data/demo_XTB_broker_statement_currency_PLN.xlsx``.
+    """
+    return (
+        Path(__file__).parent.parent.parent
+        / "data"
+        / "demo_XTB_broker_statement_currency_PLN.xlsx"
+    )
+
+
+@pytest.fixture(scope="module")
+def pln_statement(pln_statement_path: Path) -> tuple[pd.DataFrame, str]:
     """Return imported PLN statement DataFrame and detected currency.
 
     Reads ``demo_XTB_broker_statement_currency_PLN.xlsx`` once per module
@@ -26,13 +45,11 @@ def pln_statement() -> tuple[pd.DataFrame, str]:
 
     Returns:
         Tuple of ``(df, currency_code)`` from ``import_and_process_data()``.
+
+    Args:
+        pln_statement_path: Module-scoped fixture providing the XLSX path.
     """
-    _pln_path = (
-        Path(__file__).parent.parent.parent
-        / "data"
-        / "demo_XTB_broker_statement_currency_PLN.xlsx"
-    )
-    df, currency = import_and_process_data(_pln_path)
+    df, currency = import_and_process_data(pln_statement_path)
     assert df is not None, "Failed to import PLN demo statement"
     return df, currency
 
@@ -46,13 +63,8 @@ def nbp_courses() -> list[str]:
     Returns:
         List of string paths to the 2025 NBP archive CSV.
     """
-    return [
-        str(
-            Path(__file__).parent.parent.parent
-            / "data"
-            / "archiwum_tab_a_2025.csv"
-        )
-    ]
+    data_dir = Path(__file__).parent.parent.parent / "data"
+    return [str(data_dir / "archiwum_tab_a_2025.csv")]
 
 
 @pytest.fixture(scope="module")
@@ -116,3 +128,28 @@ def sample_exchange_rates_path() -> Path:
         "exchange_rates" /
         "nbp_rates_sample.csv"
     )
+
+
+@pytest.fixture(scope="module")
+def processed_pln_result(
+    pln_statement_path: Path,
+    nbp_courses: list[str],
+) -> pd.DataFrame:
+    """Run the full pipeline once per module and share the result.
+
+    Prevents each integration test from calling ``process_data()`` independently
+    with identical inputs, which would waste CI time on repeated openpyxl and
+    NBP CSV reads.
+
+    Scope: module — computed once, shared read-only across all tests.
+
+    Args:
+        pln_statement_path: Module-scoped fixture providing the XLSX path.
+        nbp_courses: Module-scoped fixture providing NBP CSV paths for 2024–2026.
+
+    Returns:
+        Processed DataFrame from ``process_data()``.
+    """
+    from main import process_data
+
+    return process_data(str(pln_statement_path), nbp_courses)
