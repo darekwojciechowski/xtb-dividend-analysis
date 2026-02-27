@@ -48,15 +48,6 @@ from loguru import logger
 if TYPE_CHECKING:
     from collections.abc import Generator
 
-__all__ = [
-    "sample_dataframe",
-    "sample_dataframe_with_ansi",
-    "empty_dataframe",
-    "dataframe_with_missing_values",
-    "large_dataframe",
-    "temp_output_dir",
-]
-
 
 @pytest.fixture(scope="session")
 def sample_dataframe() -> pd.DataFrame:
@@ -124,6 +115,8 @@ def dataframe_with_missing_values() -> pd.DataFrame:
     Provides a DataFrame with NaN values for testing data validation.
 
     Scope: session - Data is immutable and can be reused across all tests.
+    A defensive copy is returned so that any test code that receives this
+    fixture cannot mutate the shared session-level object.
 
     Returns:
         pd.DataFrame containing None/NaN values.
@@ -136,7 +129,7 @@ def dataframe_with_missing_values() -> pd.DataFrame:
             "Type": ["Cash", None],
             "Comment": ["Dividend", None],
         }
-    )
+    ).copy()
 
 
 @pytest.fixture(scope="session")
@@ -204,25 +197,6 @@ def configure_test_logging() -> Generator[None, None, None]:
     logger.remove()
 
 
-# Test markers configuration
-def pytest_configure(config: pytest.Config) -> None:
-    """
-    Configure custom pytest markers for test categorization.
-
-    Registers custom markers to enable filtering tests by category.
-    Run tests by marker: pytest -m unit, pytest -m integration, etc.
-
-    Args:
-        config: pytest configuration object.
-    """
-    markers = [
-        ("unit", "Unit tests for individual functions and methods"),
-        ("integration", "Integration tests for multiple components working together"),
-        ("security", "Security and CI/CD script tests"),
-        ("performance", "Performance benchmarks and stress tests"),
-        ("edge_case", "Edge cases and boundary condition tests"),
-        ("property_based", "Property-based tests using Hypothesis"),
-    ]
-
-    for marker_name, marker_description in markers:
-        config.addinivalue_line("markers", f"{marker_name}: {marker_description}")
+# Marker definitions live exclusively in pyproject.toml [tool.pytest.ini_options].
+# Duplicating them here with addinivalue_line caused warnings under --strict-markers
+# (pytest 9+). The pytest_configure hook has been removed.

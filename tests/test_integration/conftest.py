@@ -13,6 +13,7 @@ import pytest
 
 from data_processing.currency_converter import CurrencyConverter
 from data_processing.import_data_xlsx import import_and_process_data
+from main import process_data
 
 
 @pytest.fixture(scope="module")
@@ -50,7 +51,11 @@ def pln_statement(pln_statement_path: Path) -> tuple[pd.DataFrame, str]:
         pln_statement_path: Module-scoped fixture providing the XLSX path.
     """
     df, currency = import_and_process_data(pln_statement_path)
-    assert df is not None, "Failed to import PLN demo statement"
+    if df is None:
+        pytest.fail(
+            f"Failed to import PLN demo statement from {pln_statement_path}. "
+            "Check that the file exists and is a valid XTB XLSX export."
+        )
     return df, currency
 
 
@@ -64,7 +69,11 @@ def nbp_courses() -> list[str]:
         List of string paths to the 2025 NBP archive CSV.
     """
     data_dir = Path(__file__).parent.parent.parent / "data"
-    return [str(data_dir / "archiwum_tab_a_2025.csv")]
+    # Include all available annual CSVs so that dividend dates spanning
+    # multiple calendar years (e.g. a D-1 falling in late December 2024)
+    # can be resolved without a ValueError from the converter.
+    years = ["2024", "2025", "2026"]
+    return [str(data_dir / f"archiwum_tab_a_{y}.csv") for y in years if (data_dir / f"archiwum_tab_a_{y}.csv").exists()]
 
 
 @pytest.fixture(scope="module")
@@ -87,13 +96,20 @@ def sample_xtb_statement_path() -> Path:
 
     Returns:
         Path to sample XTB statement in fixtures directory.
+
+    Raises:
+        pytest.skip.Exception: When the fixture file has not yet been added
+            to ``tests/test_integration/fixtures/sample_xtb_statements/``.
     """
-    return (
-        Path(__file__).parent /
-        "fixtures" /
-        "sample_xtb_statements" /
-        "xtb_statement_sample.xlsx"
+    path = (
+        Path(__file__).parent
+        / "fixtures"
+        / "sample_xtb_statements"
+        / "xtb_statement_sample.xlsx"
     )
+    if not path.exists():
+        pytest.skip(f"Fixture file not found: {path} — add it to enable these tests.")
+    return path
 
 
 @pytest.fixture(scope="function")
@@ -121,13 +137,20 @@ def sample_exchange_rates_path() -> Path:
 
     Returns:
         Path to sample exchange rates CSV in fixtures directory.
+
+    Raises:
+        pytest.skip.Exception: When the fixture file has not yet been added
+            to ``tests/test_integration/fixtures/exchange_rates/``.
     """
-    return (
-        Path(__file__).parent /
-        "fixtures" /
-        "exchange_rates" /
-        "nbp_rates_sample.csv"
+    path = (
+        Path(__file__).parent
+        / "fixtures"
+        / "exchange_rates"
+        / "nbp_rates_sample.csv"
     )
+    if not path.exists():
+        pytest.skip(f"Fixture file not found: {path} — add it to enable these tests.")
+    return path
 
 
 @pytest.fixture(scope="module")
@@ -150,6 +173,4 @@ def processed_pln_result(
     Returns:
         Processed DataFrame from ``process_data()``.
     """
-    from main import process_data
-
     return process_data(str(pln_statement_path), nbp_courses)

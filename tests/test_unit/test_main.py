@@ -47,7 +47,7 @@ def mock_courses_paths() -> list[str]:
     return ["data/archiwum_tab_a_2025.csv"]
 
 
-@pytest.mark.integration
+@pytest.mark.unit
 class TestProcessDataFunction:
     """Test suite for process_data() function.
 

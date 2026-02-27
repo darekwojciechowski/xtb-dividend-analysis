@@ -7,6 +7,8 @@ This module contains tests for tax calculation logic including:
 - Handling of different tax scenarios
 """
 
+from __future__ import annotations
+
 import pandas as pd
 import pytest
 

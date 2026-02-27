@@ -12,28 +12,25 @@ def processor(sample_dataframe: pd.DataFrame) -> DataFrameProcessor:
     """
     Provides a DataFrameProcessor instance initialized with the sample DataFrame.
 
+    A copy of the session-scoped fixture is used so that mutations inside
+    each test do not bleed into other tests that share the same DataFrame.
+
     Args:
         sample_dataframe: Sample DataFrame fixture from conftest.py.
 
     Returns:
-        DataFrameProcessor instance.
+        DataFrameProcessor instance initialised with a fresh copy of the data.
     """
-    return DataFrameProcessor(sample_dataframe)
+    return DataFrameProcessor(sample_dataframe.copy())
 
 
 @pytest.mark.unit
 class TestColumnOperations:
     """Test suite for column manipulation operations."""
 
-    def setup_method(self) -> None:
-        """Setup test fixtures before each test method."""
-        self.rename_mapping = {"Date": "TransactionDate", "Amount": "Value"}
-        self.column_alternatives = ("Ticker", "Symbol")
-        self.new_column_name = "New Column"
-
-    def teardown_method(self) -> None:
-        """Cleanup after each test method."""
-        pass
+    rename_mapping = {"Date": "TransactionDate", "Amount": "Value"}
+    column_alternatives = ("Ticker", "Symbol")
+    new_column_name = "New Column"
 
     def test_rename_when_valid_mapping_then_columns_updated(
         self, processor: DataFrameProcessor
@@ -78,13 +75,7 @@ class TestColumnOperations:
 class TestDataTransformation:
     """Test suite for data transformation operations."""
 
-    def setup_method(self) -> None:
-        """Setup test fixtures before each test method."""
-        self.required_ticker_column = "Ticker"
-
-    def teardown_method(self) -> None:
-        """Cleanup after each test method."""
-        pass
+    required_ticker_column = "Ticker"
 
     def test_colorize_when_applied_then_ticker_column_retained(
         self, processor: DataFrameProcessor
@@ -152,13 +143,7 @@ class TestDataTransformation:
 class TestFilteringOperations:
     """Test suite for data filtering operations."""
 
-    def setup_method(self) -> None:
-        """Setup test fixtures before each test method."""
-        self.valid_dividend_types = ["Dividend", "Dywidenda"]
-
-    def teardown_method(self) -> None:
-        """Cleanup after each test method."""
-        pass
+    valid_dividend_types = ["Dividend", "Dywidenda"]
 
     def test_filter_when_called_then_row_count_not_increased(
         self, processor: DataFrameProcessor
@@ -196,14 +181,8 @@ class TestFilteringOperations:
 class TestAggregationOperations:
     """Test suite for data aggregation operations."""
 
-    def setup_method(self) -> None:
-        """Setup test fixtures before each test method."""
-        self.dummy_paths = ["dummy_path"]
-        self.language = "en"
-
-    def teardown_method(self) -> None:
-        """Cleanup after each test method."""
-        pass
+    dummy_paths = ["dummy_path"]
+    language = "en"
 
     def test_group_when_called_then_returns_grouped_dataframe(
         self, processor: DataFrameProcessor
@@ -237,15 +216,7 @@ class TestAggregationOperations:
 class TestTaxProcessing:
     """Test suite for tax-related processing operations."""
 
-    @classmethod
-    def setup_class(cls) -> None:
-        """Setup class-level fixtures before all tests."""
-        cls.base_amount = 100.0
-
-    @classmethod
-    def teardown_class(cls) -> None:
-        """Cleanup class-level fixtures after all tests."""
-        pass
+    base_amount = 100.0
 
     @pytest.mark.parametrize(
         "tax_values,expected_valid",
@@ -284,14 +255,6 @@ class TestTaxProcessing:
 class TestDataFrameAccess:
     """Test suite for DataFrame access methods."""
 
-    def setup_method(self) -> None:
-        """Setup test fixtures before each test method."""
-        pass
-
-    def teardown_method(self) -> None:
-        """Cleanup after each test method."""
-        pass
-
     def test_get_processed_when_called_then_returns_valid_dataframe(
         self, processor: DataFrameProcessor
     ) -> None:
@@ -309,13 +272,7 @@ class TestDataFrameAccess:
 class TestEdgeCases:
     """Test suite for edge cases and boundary conditions."""
 
-    def setup_method(self) -> None:
-        """Setup test fixtures before each test method."""
-        self.rename_mapping = {"Date": "TransactionDate"}
-
-    def teardown_method(self) -> None:
-        """Cleanup after each test method."""
-        pass
+    rename_mapping = {"Date": "TransactionDate"}
 
     def test_process_when_empty_dataframe_then_handles_gracefully(self) -> None:
         """Tests that empty DataFrame is handled without errors."""
@@ -335,16 +292,8 @@ class TestEdgeCases:
 class TestPerformance:
     """Test suite for performance with large datasets."""
 
-    @classmethod
-    def setup_class(cls) -> None:
-        """Setup class-level fixtures before all tests."""
-        cls.date_start = "2024-01-01"
-        cls.frequency = "D"
-
-    @classmethod
-    def teardown_class(cls) -> None:
-        """Cleanup class-level fixtures after all tests."""
-        pass
+    date_start = "2024-01-01"
+    frequency = "D"
 
     @pytest.mark.parametrize(
         "periods,tickers,amounts,types,comments,expected_min_length",

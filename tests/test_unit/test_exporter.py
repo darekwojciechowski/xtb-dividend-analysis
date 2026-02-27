@@ -12,15 +12,8 @@ from data_processing.exporter import GoogleSpreadsheetExporter
 class TestAnsiRemoval:
     """Test suite for ANSI escape sequence removal functionality."""
 
-    def setup_method(self) -> None:
-        """Setup test fixtures before each test method."""
-        self.ansi_text = "\x1b[31mMSFT\x1b[0m"
-        self.expected_clean_text = "MSFT"
-
-    def teardown_method(self) -> None:
-        """Cleanup after each test method."""
-        # Clean up any resources if needed
-        pass
+    ansi_text = "\x1b[31mMSFT\x1b[0m"
+    expected_clean_text = "MSFT"
 
     def test_remove_ansi_when_text_contains_escape_codes_then_returns_clean_text(
         self, sample_dataframe_with_ansi: pd.DataFrame
@@ -55,14 +48,8 @@ class TestAnsiRemoval:
 class TestDataTransformation:
     """Test suite for data transformation operations during export."""
 
-    def setup_method(self) -> None:
-        """Setup test fixtures before each test method."""
-        self.decimal_places = 2
-        self.replacement_value = "0"
-
-    def teardown_method(self) -> None:
-        """Cleanup after each test method."""
-        pass
+    decimal_places = 2
+    replacement_value = "0"
 
     def test_export_when_nan_present_then_replaces_with_zero(
         self, sample_dataframe_with_ansi: pd.DataFrame, tmp_path: Path

@@ -9,18 +9,10 @@ from data_processing.date_converter import DateConverter
 class TestValidDateConversion:
     """Test suite for valid date conversion operations."""
 
-    @classmethod
-    def setup_class(cls) -> None:
-        """Setup class-level fixtures before all tests."""
-        cls.standard_date_string = "01.01.2024 12:00:00"
-        cls.custom_date_string = "2024/01/01"
-        cls.custom_format = "%Y/%m/%d"
-        cls.expected_date = "2024-01-01"
-
-    @classmethod
-    def teardown_class(cls) -> None:
-        """Cleanup class-level fixtures after all tests."""
-        pass
+    standard_date_string = "01.01.2024 12:00:00"
+    custom_date_string = "2024/01/01"
+    custom_format = "%Y/%m/%d"
+    expected_date = "2024-01-01"
 
     def test_convert_when_standard_format_provided_then_returns_correct_date(
         self,
@@ -56,17 +48,9 @@ class TestValidDateConversion:
 class TestInvalidDateHandling:
     """Test suite for invalid date handling and edge cases."""
 
-    @classmethod
-    def setup_class(cls) -> None:
-        """Setup class-level fixtures before all tests."""
-        cls.invalid_format_string = "invalid-date"
-        cls.empty_string = ""
-        cls.non_leap_year_date = "29.02.2023 00:00:00"
-
-    @classmethod
-    def teardown_class(cls) -> None:
-        """Cleanup class-level fixtures after all tests."""
-        pass
+    invalid_format_string = "invalid-date"
+    empty_string = ""
+    non_leap_year_date = "29.02.2023 00:00:00"
 
     def test_convert_when_invalid_format_then_returns_none(self) -> None:
         """Tests that invalid date format returns None."""
@@ -122,16 +106,8 @@ class TestInvalidDateHandling:
 class TestLeapYearHandling:
     """Test suite for leap year date handling."""
 
-    @classmethod
-    def setup_class(cls) -> None:
-        """Setup class-level fixtures before all tests."""
-        cls.leap_year_date = "29.02.2024 00:00:00"
-        cls.expected_result = "2024-02-29"
-
-    @classmethod
-    def teardown_class(cls) -> None:
-        """Cleanup class-level fixtures after all tests."""
-        pass
+    leap_year_date = "29.02.2024 00:00:00"
+    expected_result = "2024-02-29"
 
     def test_convert_when_leap_year_feb_29_then_converts_correctly(self) -> None:
         """Tests that leap year February 29th is correctly converted."""
