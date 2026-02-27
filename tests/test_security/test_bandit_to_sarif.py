@@ -1,11 +1,25 @@
-"""
-Tests for Bandit to SARIF converter script.
+"""Tests for the Bandit-to-SARIF converter script.
 
-This module tests the bandit_to_sarif.py script following pytest best practices
-and ensuring proper conversion of security scan results to SARIF 2.1.0 format.
+Verifies that ``scripts/bandit_to_sarif.py`` correctly converts Bandit JSON
+output to SARIF 2.1.0 format for upload to the GitHub Security tab.
+
+Test areas:
+    - Severity mapping (HIGH → error, MEDIUM → warning, LOW → note)
+    - SARIF structure construction (schema URI, version, runs array)
+    - Single-result conversion (filename, line number, rule ID, message)
+    - Full report conversion from JSON file to SARIF output file
+    - Error handling for missing or malformed input files
+
+All tests are marked ``@pytest.mark.security``.
 """
 
 from __future__ import annotations
+from bandit_to_sarif import (
+    _map_severity,
+    _create_sarif_structure,
+    _convert_result,
+    convert_bandit_to_sarif,
+)
 
 import json
 import sys
@@ -16,13 +30,6 @@ import pytest
 
 # Add scripts directory to path before importing
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
-
-from bandit_to_sarif import (
-    _map_severity,
-    _create_sarif_structure,
-    _convert_result,
-    convert_bandit_to_sarif,
-)
 
 
 if TYPE_CHECKING:

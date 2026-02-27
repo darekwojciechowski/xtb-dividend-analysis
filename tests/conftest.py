@@ -43,18 +43,33 @@ from typing import TYPE_CHECKING
 
 import pandas as pd
 import pytest
+from hypothesis import HealthCheck, settings
 from loguru import logger
 
 if TYPE_CHECKING:
     from collections.abc import Generator
 
+# ---------------------------------------------------------------------------
+# Hypothesis global profile
+# Registered here so every @given test picks it up without per-test @settings.
+# max_examples=50 keeps the CI run fast while still exercising edge cases;
+# suppress HealthCheck.too_slow to avoid flaky timeouts on slow runners.
+# ---------------------------------------------------------------------------
+settings.register_profile(
+    "default",
+    max_examples=100,
+    suppress_health_check=[HealthCheck.too_slow],
+)
+settings.load_profile("default")
+
 
 @pytest.fixture(scope="session")
-def sample_dataframe() -> pd.DataFrame:
+def _base_sample_dataframe() -> pd.DataFrame:
     """
-    Provides a standard sample DataFrame for testing data processing operations.
+    Session-level, private source-of-truth DataFrame. Never mutated directly.
 
-    Scope: session - Data is immutable and can be reused across all tests.
+    Scope: session - Created once; consumed only through the function-scoped
+    public wrapper ``sample_dataframe`` which returns a per-test copy.
 
     Returns:
         pd.DataFrame with typical transaction data including Date, Ticker, Amount, etc.
@@ -76,12 +91,30 @@ def sample_dataframe() -> pd.DataFrame:
     return df
 
 
-@pytest.fixture(scope="session")
-def sample_dataframe_with_ansi() -> pd.DataFrame:
+@pytest.fixture(scope="function")
+def sample_dataframe(_base_sample_dataframe: pd.DataFrame) -> pd.DataFrame:
     """
-    Provides a DataFrame with ANSI escape sequences for testing cleanup operations.
+    Provides a per-test copy of the standard sample DataFrame.
 
-    Scope: session - Data is immutable and can be reused across all tests.
+    Scope: function - Each test receives an independent copy so mutations
+    (e.g. column assignments) cannot leak between tests.
+
+    Args:
+        _base_sample_dataframe: Session-level source DataFrame.
+
+    Returns:
+        pd.DataFrame copy safe for mutation within a single test.
+    """
+    return _base_sample_dataframe.copy()
+
+
+@pytest.fixture(scope="session")
+def _base_sample_dataframe_with_ansi() -> pd.DataFrame:
+    """
+    Session-level, private source-of-truth DataFrame containing ANSI sequences.
+
+    Scope: session - Created once; consumed only through the function-scoped
+    public wrapper ``sample_dataframe_with_ansi``.
 
     Returns:
         pd.DataFrame containing ANSI-colored ticker symbols.
@@ -94,6 +127,25 @@ def sample_dataframe_with_ansi() -> pd.DataFrame:
             "Comment": ["Dividend", None],
         }
     )
+
+
+@pytest.fixture(scope="function")
+def sample_dataframe_with_ansi(
+    _base_sample_dataframe_with_ansi: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Provides a per-test copy of the ANSI-decorated DataFrame.
+
+    Scope: function - Each test receives an independent copy so mutations
+    cannot leak between tests.
+
+    Args:
+        _base_sample_dataframe_with_ansi: Session-level source DataFrame.
+
+    Returns:
+        pd.DataFrame copy safe for mutation within a single test.
+    """
+    return _base_sample_dataframe_with_ansi.copy()
 
 
 @pytest.fixture(scope="session")
@@ -110,13 +162,12 @@ def empty_dataframe() -> pd.DataFrame:
 
 
 @pytest.fixture(scope="session")
-def dataframe_with_missing_values() -> pd.DataFrame:
+def _base_dataframe_with_missing_values() -> pd.DataFrame:
     """
-    Provides a DataFrame with NaN values for testing data validation.
+    Session-level, private source-of-truth DataFrame containing NaN values.
 
-    Scope: session - Data is immutable and can be reused across all tests.
-    A defensive copy is returned so that any test code that receives this
-    fixture cannot mutate the shared session-level object.
+    Scope: session - Created once; consumed only through the function-scoped
+    public wrapper ``dataframe_with_missing_values``.
 
     Returns:
         pd.DataFrame containing None/NaN values.
@@ -129,7 +180,26 @@ def dataframe_with_missing_values() -> pd.DataFrame:
             "Type": ["Cash", None],
             "Comment": ["Dividend", None],
         }
-    ).copy()
+    )
+
+
+@pytest.fixture(scope="function")
+def dataframe_with_missing_values(
+    _base_dataframe_with_missing_values: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Provides a per-test copy of the DataFrame containing NaN values.
+
+    Scope: function - Each test receives an independent copy so mutations
+    cannot leak between tests.
+
+    Args:
+        _base_dataframe_with_missing_values: Session-level source DataFrame.
+
+    Returns:
+        pd.DataFrame copy safe for mutation within a single test.
+    """
+    return _base_dataframe_with_missing_values.copy()
 
 
 @pytest.fixture(scope="session")

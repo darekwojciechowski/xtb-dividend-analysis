@@ -57,16 +57,28 @@ addopts = [
     "--cov-report=xml",
     "--strict-markers"
 ]
+filterwarnings = [
+    # Escalate deprecations only from our own source modules so we never
+    # silently ship deprecated APIs. Third-party libraries have their own
+    # release cycles and are excluded from strict enforcement.
+    "error::DeprecationWarning:data_processing",
+    "error::DeprecationWarning:config",
+    "error::DeprecationWarning:scripts",
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
 markers = [
     "unit: Unit tests for individual functions",
     "integration: Integration tests for multiple components",
     "security: Security and CI/CD script tests",
     "performance: Performance and stress tests",
     "edge_case: Edge case and boundary tests",
-    "property_based: Property-based tests using Hypothesis"
+    "property_based: Property-based tests using Hypothesis",
+    "slow: Slow tests (excluded from fast-feedback runs with -m 'not slow')"
 ]
 
 [tool.coverage.run]
+branch = true
 source = ["data_processing", "data_acquisition", "visualization", "config"]
 omit = [
     "tests/*",
@@ -77,6 +89,7 @@ omit = [
 ]
 
 [tool.coverage.report]
+fail_under = 80
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",

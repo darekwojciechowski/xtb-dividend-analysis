@@ -12,6 +12,8 @@ Test Coverage:
     - Proper logging behavior during errors
 """
 
+from __future__ import annotations
+
 from unittest.mock import MagicMock, patch
 
 import pandas as pd

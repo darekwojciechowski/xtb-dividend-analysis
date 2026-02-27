@@ -1,11 +1,23 @@
-"""
-Tests for security summary generator script.
+"""Tests for the security summary generator script.
 
-This module tests the security_summary.py script following pytest best practices
-and ensuring proper generation of security scan summaries for CI/CD pipelines.
+Verifies that ``scripts/security_summary.py`` correctly formats Bandit scan
+results into human-readable summaries for CI/CD pipeline step summaries.
+
+Test areas:
+    - Severity statistics formatting (HIGH, MEDIUM, LOW counts)
+    - Common-issues table formatting (top rule IDs with occurrence counts)
+    - Full summary generation from a complete Bandit JSON report
+    - Error handling for missing or empty input files
+
+All tests are marked ``@pytest.mark.security``.
 """
 
 from __future__ import annotations
+from security_summary import (
+    _format_severity_stats,
+    _format_common_issues,
+    generate_security_summary,
+)
 
 import json
 import sys
@@ -18,12 +30,6 @@ import pytest
 
 # Add scripts directory to path before importing
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
-
-from security_summary import (
-    _format_severity_stats,
-    _format_common_issues,
-    generate_security_summary,
-)
 
 
 if TYPE_CHECKING:

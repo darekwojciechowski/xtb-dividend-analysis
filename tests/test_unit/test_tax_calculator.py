@@ -1,10 +1,20 @@
-"""
-Unit tests for TaxCalculator class.
+"""Unit tests for TaxCalculator.
 
-This module contains tests for tax calculation logic including:
-- Calculation of tax amounts in PLN
-- Parsing of values with currencies
-- Handling of different tax scenarios
+Covers the Belka-tax calculation formulas, currency-string parsing, and error
+handling of ``TaxCalculator``.
+
+Test classes:
+    TestTaxCalculation  — parametrised scenarios for the PLN-statement formula
+                          (net × 19% − WHT) × rate, the USD-statement formula
+                          (gross × 19% − WHT) × rate, and edge cases
+                          (WHT ≥ 19%, zero WHT, total-tax summation,
+                          PLN vs USD formula divergence)
+    TestValueParsing    — ``_parse_value_with_currency``,
+                          ``_parse_tax_collected_amount``,
+                          ``_parse_exchange_rate`` with valid and sentinel inputs
+    TestErrorHandling   — missing required columns, invalid currency-string format
+
+All tests are marked ``@pytest.mark.unit``.
 """
 
 from __future__ import annotations
@@ -15,6 +25,7 @@ import pytest
 from data_processing.tax_calculator import TaxCalculator
 
 
+@pytest.mark.unit
 class TestTaxCalculation:
     """Test suite for tax calculation logic."""
 

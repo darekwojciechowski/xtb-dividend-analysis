@@ -1,5 +1,7 @@
 """Tests for DateConverter module."""
 
+from __future__ import annotations
+
 import pytest
 
 from data_processing.date_converter import DateConverter

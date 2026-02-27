@@ -1,4 +1,25 @@
-"""Tests for DataFrameProcessor module."""
+"""Unit tests for DataFrameProcessor.
+
+Verifies the column-manipulation, data-transformation, filtering, aggregation,
+tax-processing, and performance characteristics of ``DataFrameProcessor``.
+
+Test classes:
+    TestColumnOperations       — rename_columns, get_column_name, add_empty_column
+    TestDataTransformation     — apply_colorize_ticker, apply_extractor,
+                                 move_negative_values, add_currency_to_dividends
+    TestFilteringOperations    — filter_dividends (row count, NaN removal)
+    TestAggregationOperations  — group_by_dividends, calculate_dividend
+    TestTaxProcessing          — replace_tax_with_percentage (parametrised)
+    TestDataFrameAccess        — get_processed_df
+    TestEdgeCases              — empty DataFrame handling
+    TestPerformance            — group_by_dividends with large payloads
+
+All tests carry the ``@pytest.mark.unit`` marker. External IO is isolated via
+``unittest.mock.patch``. Performance tests additionally carry
+``@pytest.mark.performance``; edge-case tests carry ``@pytest.mark.edge_case``.
+"""
+
+from __future__ import annotations
 
 import pandas as pd
 import pytest
