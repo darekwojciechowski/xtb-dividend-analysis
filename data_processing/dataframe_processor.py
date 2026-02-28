@@ -516,7 +516,6 @@ class DataFrameProcessor:
         Returns:
             The fully processed DataFrame ready for export or analysis.
         """
-        logger.info("Step 13 - Returning the processed DataFrame.")
         return self.df
 
     @staticmethod
@@ -552,6 +551,8 @@ class DataFrameProcessor:
             statement_currency: Currency of the statement ('USD' or 'PLN').
         """
         from tabulate import tabulate
+
+        logger.info("Step 13 - Returning the processed DataFrame.")
 
         # Prepare DataFrame for display (remove numeric Tax Collected column)
         df_display = self.df.copy()

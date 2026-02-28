@@ -41,9 +41,12 @@ def process_data(file_path: str, courses_paths: list[str]) -> pd.DataFrame:
         FileNotFoundError: If input file or exchange rate files are missing.
         ValueError: If data format is invalid or required columns are missing.
     """
-    df, currency = import_and_process_data(file_path)
+    df, currency = import_and_process_data(Path(file_path))
 
     processor = DataFrameProcessor(df)
+
+    if currency is None:
+        raise ValueError("Could not detect account currency from the statement file.")
 
     statement_currency = processor.detect_statement_currency(currency)
 
@@ -63,7 +66,7 @@ def process_data(file_path: str, courses_paths: list[str]) -> pd.DataFrame:
     processor.merge_rows_and_reorder()
     processor.replace_tax_with_percentage()
     processor.add_tax_percentage_display()
-    processor.create_date_d_minus_1_column("8")
+    processor.create_date_d_minus_1_column()
     processor.add_currency_to_dividends()
     processor.create_exchange_rate_d_minus_1_column(courses_paths)
     processor.add_tax_collected_amount(statement_currency)
@@ -89,12 +92,12 @@ def main() -> None:
     """
     setup_logging()
 
-    file_path = settings.get_input_file_path()
+    input_path = settings.get_input_file_path()
 
-    file_path, courses_paths = get_file_paths(str(file_path))
+    xlsx_path, courses_paths = get_file_paths(str(input_path))
 
     try:
-        df_processed = process_data(file_path, courses_paths)
+        df_processed = process_data(xlsx_path, courses_paths)
     except ValueError as e:
         logger.error(f"Processing failed: {e}")
         logger.warning(

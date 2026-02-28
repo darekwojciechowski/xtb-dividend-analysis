@@ -78,7 +78,8 @@ def dividend_comments(draw) -> str:
     Returns:
         str: Comment string with dividend information
     """
-    amount = draw(st.decimals(min_value=0.01, max_value=1000, places=4))
+    amount = draw(st.decimals(min_value=Decimal("0.01"),
+                  max_value=Decimal("1000"), places=4))
     currency = draw(currency_codes())
 
     # Different comment patterns used by brokers

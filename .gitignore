@@ -8,6 +8,12 @@
 !data/demo_XTB_broker_statement_currency_PLN.xlsx
 !data/demo_XTB_broker_statement_currency_USD.xlsx
 
+# VHS demo recording files
+demo.tape
+scripts/demo_replay.sh
+scripts/record_demo.sh
+record_demo.sh
+
 # Private or sensitive files
 *.pdf
 account*
