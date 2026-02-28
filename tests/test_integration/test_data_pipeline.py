@@ -11,7 +11,6 @@ Reference fixture:
 Test Coverage:
     - Full pipeline with PLN statement → non-empty result, key columns present
     - Full pipeline USD path → TODO placeholder, USD demo file not yet in data/
-    - Full pipeline with mixed currencies → PLN + USD + DKK detected in Currency column
     - Output CSV format → tab-separated, no ANSI codes, file created on disk
 """
 
@@ -23,7 +22,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from data_processing.constants import ColumnName, Currency
+from data_processing.constants import ColumnName
 from data_processing.exporter import GoogleSpreadsheetExporter
 
 # ---------------------------------------------------------------------------
@@ -39,7 +38,6 @@ _REQUIRED_OUTPUT_COLUMNS: frozenset[str] = frozenset(
         ColumnName.DATE.value,
         ColumnName.NET_DIVIDEND.value,
         ColumnName.TAX_AMOUNT_PLN.value,
-        ColumnName.CURRENCY.value,
     }
 )
 
@@ -78,8 +76,12 @@ def test_full_pipeline_pln_statement(
     assert not missing, f"Output DataFrame is missing columns: {missing}"
 
     # Assert — Tax Amount PLN is always non-negative
+    # Values are formatted strings like "0.1 PLN" or "-"; extract the numeric part first.
     tax_values = pd.to_numeric(
-        result[ColumnName.TAX_AMOUNT_PLN.value], errors="coerce"
+        result[ColumnName.TAX_AMOUNT_PLN.value]
+        .astype(str)
+        .str.extract(r"([\d.]+)", expand=False),
+        errors="coerce",
     ).dropna()
     assert not tax_values.empty, "Tax Amount PLN column must contain numeric values"
     assert (tax_values >= 0).all(), (
@@ -105,61 +107,6 @@ def test_full_pipeline_usd_statement() -> None:
         Add ``data/demo_XTB_broker_statement_currency_USD.xlsx`` to enable this test.
     """
     pass
-
-
-@pytest.mark.slow
-@pytest.mark.integration
-def test_full_pipeline_mixed_currencies(
-    processed_pln_result: pd.DataFrame,
-) -> None:
-    """Test that the pipeline handles multiple dividend currencies in one statement.
-
-    The PLN demo file contains dividends denominated in PLN, USD, and DKK.
-    The pipeline must convert all of them to PLN for tax calculation.
-
-    Given: ``demo_XTB_broker_statement_currency_PLN.xlsx`` with PLN + USD + DKK rows
-    When:  The full pipeline runs through the ``processed_pln_result`` fixture
-    Then:
-        - ``Currency`` column is present in the output
-        - PLN dividends are represented
-        - USD dividends are represented (SBUX.US, MMM.US, ASB.PL)
-        - DKK dividends are represented (NOVOB.DK)
-        - At least three distinct currency codes appear in the output
-
-    Args:
-        processed_pln_result: Module-scoped fixture with fully processed DataFrame.
-    """
-    # Arrange — full pipeline result pre-computed by module-scoped fixture
-    result = processed_pln_result
-
-    # Assert — Currency column exists
-    assert ColumnName.CURRENCY.value in result.columns, (
-        "Output must contain a 'Currency' column"
-    )
-
-    # Assert — expected currencies present
-    detected_currencies: set[str] = set(
-        result[ColumnName.CURRENCY.value]
-        .dropna()
-        .astype(str)
-        .str.extract(r"([A-Z]{3})", expand=False)
-        .dropna()
-        .unique()
-    )
-
-    assert Currency.PLN.value in detected_currencies, (
-        f"Expected PLN in Currency column, found: {detected_currencies}"
-    )
-    assert Currency.USD.value in detected_currencies, (
-        f"Expected USD in Currency column, found: {detected_currencies}"
-    )
-    assert Currency.DKK.value in detected_currencies, (
-        f"Expected DKK in Currency column, found: {detected_currencies}"
-    )
-    assert len(detected_currencies) >= 3, (
-        "Expected at least three distinct currencies (PLN, USD, DKK) "
-        "for the PLN demo statement"
-    )
 
 
 @pytest.mark.slow

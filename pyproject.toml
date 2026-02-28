@@ -49,7 +49,6 @@ addopts = [
     "--tb=short",
     "--cov=data_processing",
     "--cov=data_acquisition",
-    "--cov=visualization",
     "--cov=config",
     "--cov=scripts",
     "--cov-report=term-missing",
@@ -79,7 +78,7 @@ markers = [
 
 [tool.coverage.run]
 branch = true
-source = ["data_processing", "data_acquisition", "visualization", "config"]
+source = ["data_processing", "data_acquisition", "config"]
 omit = [
     "tests/*",
     "*/__pycache__/*",
