@@ -13,14 +13,8 @@ All tests are marked ``@pytest.mark.security``.
 """
 
 from __future__ import annotations
-from security_summary import (
-    _format_severity_stats,
-    _format_common_issues,
-    generate_security_summary,
-)
 
 import json
-import sys
 from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -28,8 +22,11 @@ from unittest.mock import patch
 
 import pytest
 
-# Add scripts directory to path before importing
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
+from security_summary import (
+    _format_common_issues,
+    _format_severity_stats,
+    generate_security_summary,
+)
 
 
 if TYPE_CHECKING:

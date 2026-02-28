@@ -14,22 +14,19 @@ All tests are marked ``@pytest.mark.security``.
 """
 
 from __future__ import annotations
-from bandit_to_sarif import (
-    _map_severity,
-    _create_sarif_structure,
-    _convert_result,
-    convert_bandit_to_sarif,
-)
 
 import json
-import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 
-# Add scripts directory to path before importing
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
+from bandit_to_sarif import (
+    _convert_result,
+    _create_sarif_structure,
+    _map_severity,
+    convert_bandit_to_sarif,
+)
 
 
 if TYPE_CHECKING:
