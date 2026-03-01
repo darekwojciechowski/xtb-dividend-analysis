@@ -13,6 +13,13 @@ on:
     branches: [ main, master, develop ]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+
 jobs:
   changes:
     runs-on: ubuntu-latest
@@ -41,6 +48,7 @@ jobs:
       checks: write
       pull-requests: write
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
@@ -166,9 +174,9 @@ jobs:
         
     - name: Upload coverage to Codecov
       if: matrix.python-version == '3.12' && matrix.os == 'ubuntu-latest'
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       with:
-        file: ./coverage.xml
+        files: ./coverage.xml
         flags: unittests
         name: codecov-umbrella
         fail_ci_if_error: false
@@ -186,10 +194,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Python 3.12
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
       uses: actions/setup-python@v5
       with:
-        python-version: "3.12"
+        python-version: ${{ env.PYTHON_VERSION }}
         
     - name: Install Poetry
       run: |
@@ -199,7 +207,6 @@ jobs:
     - name: Install dependencies with linting tools
       run: |
         poetry install --with dev
-        poetry run pip install flake8 black isort mypy types-tabulate
         
     - name: Run flake8
       id: flake8
@@ -243,10 +250,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Python 3.12
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
       uses: actions/setup-python@v5
       with:
-        python-version: "3.12"
+        python-version: ${{ env.PYTHON_VERSION }}
         
     - name: Install Poetry
       run: |
@@ -256,7 +263,6 @@ jobs:
     - name: Install dependencies and security scanning tools
       run: |
         poetry install --with dev
-        poetry run pip install safety bandit
         
     - name: Run safety check
       id: safety
@@ -273,7 +279,7 @@ jobs:
       continue-on-error: true
       
     - name: Upload SARIF to GitHub Security
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@v4
       if: always()
       with:
         sarif_file: bandit-results.sarif
