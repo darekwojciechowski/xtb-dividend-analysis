@@ -309,9 +309,9 @@ class TestFindAndDownloadLatestFiles:
         download_mock = mock_page.expect_download.return_value.__enter__.return_value.value
         call_args = download_mock.save_as.call_args
         assert call_args is not None
-        saved_path = str(call_args[0][0])
-        assert "data" in saved_path.split("/")
-        assert saved_path.endswith("archiwum_tab_a_2025.csv")
+        saved_path = Path(call_args[0][0])
+        assert "data" in saved_path.parts
+        assert saved_path.name == "archiwum_tab_a_2025.csv"
 
     def test_find_and_download_latest_files_uses_suggested_filename(self) -> None:
         """``download.suggested_filename`` must be used as the saved file name."""

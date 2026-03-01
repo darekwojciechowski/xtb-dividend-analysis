@@ -81,6 +81,7 @@ branch = true
 source = ["data_processing", "data_acquisition", "config"]
 omit = [
     "tests/*",
+    "visualization/*",
     "*/__pycache__/*",
     "*/migrations/*",
     "venv/*",
