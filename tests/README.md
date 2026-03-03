@@ -92,7 +92,3 @@ poetry lock --no-update
 Coverage reports are generated in `htmlcov/`. Open `htmlcov/index.html` in your browser to view detailed coverage by file and line.
 
 Target coverage: 80%+ overall, enforced via CI/CD workflow.
-
-## Further reading
-
-For comprehensive testing documentation, see [../docs/testing-guide.md](../docs/testing-guide.md).

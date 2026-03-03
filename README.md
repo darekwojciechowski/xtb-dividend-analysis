@@ -1,7 +1,7 @@
 # XTB dividend analysis
 
 ![CI/CD](https://img.shields.io/github/actions/workflow/status/darekwojciechowski/xtb-dividend-analysis/ci.yml?branch=main&style=flat-square&logo=github-actions&logoColor=white&label=CI/CD)
-![Coverage](https://img.shields.io/codecov/c/github/darekwojciechowski/xtb-dividend-analysis?style=flat-square&logo=codecov&logoColor=white&label=Coverage)
+![Coverage](https://img.shields.io/badge/dynamic/json?url=https://raw.githubusercontent.com/darekwojciechowski/xtb-dividend-analysis/main/coverage.json&query=$.totals.percent_covered_display&label=Coverage&suffix=%25&style=flat-square&color=success)
 ![Python Version](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2Fdarekwojciechowski%2Fxtb-dividend-analysis%2Fmain%2Fpyproject.toml&style=flat-square&logo=python&logoColor=white&label=Python)
 ![Playwright](https://img.shields.io/pypi/v/playwright?label=Playwright&style=flat-square&logo=playwright&logoColor=white&color=2EAD33)
 ![Pandas](https://img.shields.io/pypi/v/pandas?label=Pandas&style=flat-square&logo=pandas&logoColor=white&color=150458)

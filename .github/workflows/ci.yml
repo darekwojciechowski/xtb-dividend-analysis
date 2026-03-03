@@ -328,24 +328,52 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test-unit, test-integration, test-security, test-property, test-performance]
     if: always()
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download coverage artifacts
-        uses: actions/download-artifact@v4
-        continue-on-error: true
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
         with:
-          name: coverage-unit
-          path: coverage/
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Run all tests with combined coverage
+        run: |
+          poetry run pytest tests/ \
+            --cov=config --cov=data_processing --cov=data_acquisition --cov=scripts \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-report=json \
+            --cov-fail-under=0 \
+            -v
 
       - name: Display coverage summary
         run: |
           echo "## Coverage Report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          if [ -f coverage/coverage.json ]; then
-            COVERAGE=$(python3 -c "import json; data=json.load(open('coverage/coverage.json')); print(data['totals']['percent_covered_display'])")
+          if [ -f coverage.json ]; then
+            COVERAGE=$(python3 -c "import json; data=json.load(open('coverage.json')); print(data['totals']['percent_covered_display'])")
             echo "**Total Coverage: ${COVERAGE}%**" >> $GITHUB_STEP_SUMMARY
           fi
 
@@ -353,8 +381,20 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report-final
-          path: coverage/
+          path: |
+            coverage.xml
+            coverage.json
+            htmlcov/
           retention-days: 30
+
+      - name: Commit coverage.json to repository
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add coverage.json
+          git diff --staged --quiet || git commit -m "chore(ci): update coverage.json [skip ci]"
+          git push
 
   # ============================================================================
   # STAGE 4: CI Summary
@@ -362,7 +402,7 @@ jobs:
   ci-summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [lint, test-unit, test-integration, test-security, test-property, test-performance]
+    needs: [lint, test-unit, test-integration, test-security, test-property, test-performance, coverage-report]
     if: always()
 
     steps:
@@ -378,6 +418,7 @@ jobs:
           echo "| Security Tests | ${{ needs.test-security.result == 'success' && 'PASSED' || 'FAILED' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Property Tests | ${{ needs.test-property.result == 'success' && 'PASSED' || 'FAILED' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Performance Tests | ${{ needs.test-performance.result == 'success' && 'PASSED' || 'FAILED' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Coverage Report | ${{ needs.coverage-report.result == 'success' && 'PASSED' || 'FAILED' }} |" >> $GITHUB_STEP_SUMMARY
 
       - name: Fail if any job failed
         if: |
@@ -386,5 +427,6 @@ jobs:
           needs.test-integration.result == 'failure' ||
           needs.test-security.result == 'failure' ||
           needs.test-property.result == 'failure' ||
-          needs.test-performance.result == 'failure'
+          needs.test-performance.result == 'failure' ||
+          needs.coverage-report.result == 'failure'
         run: exit 1
