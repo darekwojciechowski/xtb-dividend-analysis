@@ -97,12 +97,15 @@ def temp_bandit_json(tmp_path: Path, sample_bandit_report: dict) -> Path:
 class TestSeverityMapping:
     """Test severity level mapping from Bandit to SARIF."""
 
-    @pytest.mark.parametrize("bandit_severity,expected_sarif_level", [
-        ("HIGH", "error"),
-        ("MEDIUM", "warning"),
-        ("LOW", "note"),
-        ("UNKNOWN", "note"),  # Default case
-    ])
+    @pytest.mark.parametrize(
+        "bandit_severity,expected_sarif_level",
+        [
+            ("HIGH", "error"),
+            ("MEDIUM", "warning"),
+            ("LOW", "note"),
+            ("UNKNOWN", "note"),  # Default case
+        ],
+    )
     def test_map_severity_returns_correct_level(
         self, bandit_severity: str, expected_sarif_level: str
     ) -> None:
@@ -191,7 +194,9 @@ class TestResultConversion:
         }
 
         sarif_result = _convert_result(windows_result)
-        uri = sarif_result["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
+        uri = sarif_result["locations"][0]["physicalLocation"]["artifactLocation"][
+            "uri"
+        ]
 
         assert "\\" not in uri
         assert uri == "src/app/main.py"

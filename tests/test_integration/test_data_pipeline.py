@@ -94,7 +94,9 @@ def test_full_pipeline_pln_statement(
     )
 
 
-@pytest.mark.skip(reason="TODO: data/demo_XTB_broker_statement_currency_USD.xlsx not yet added")
+@pytest.mark.skip(
+    reason="TODO: data/demo_XTB_broker_statement_currency_USD.xlsx not yet added"
+)
 @pytest.mark.integration
 def test_full_pipeline_usd_statement() -> None:
     """Test full pipeline with USD-denominated account statement.

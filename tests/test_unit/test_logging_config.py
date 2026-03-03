@@ -98,7 +98,9 @@ class TestSetupLogging:
         # Assert
         assert (tmp_path / "logs" / "custom_test.log").exists()
 
-    @pytest.mark.parametrize("log_level", ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
+    @pytest.mark.parametrize(
+        "log_level", ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+    )
     def test_setup_logging_when_valid_level_then_returns_logger(
         self, log_level: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

@@ -15,6 +15,7 @@ class Currency(str, Enum):
     Defines standard ISO 4217 currency codes for all supported currencies
     in the XTB dividend analysis system.
     """
+
     USD = "USD"
     PLN = "PLN"
     EUR = "EUR"
@@ -28,6 +29,7 @@ class TickerSuffix(str, Enum):
     Defines ticker suffixes for different stock exchanges to determine
     currency, tax rates, and other country-specific parameters.
     """
+
     US = ".US"
     PL = ".PL"
     UK = ".UK"
@@ -50,7 +52,18 @@ class TickerSuffix(str, Enum):
         Returns:
             List of ``TickerSuffix`` values representing Eurozone countries.
         """
-        return [cls.FR, cls.DE, cls.IE, cls.NL, cls.ES, cls.IT, cls.BE, cls.AT, cls.FI, cls.PT]
+        return [
+            cls.FR,
+            cls.DE,
+            cls.IE,
+            cls.NL,
+            cls.ES,
+            cls.IT,
+            cls.BE,
+            cls.AT,
+            cls.FI,
+            cls.PT,
+        ]
 
 
 class ColumnName(str, Enum):
@@ -59,6 +72,7 @@ class ColumnName(str, Enum):
     Centralized definition of all DataFrame column names to ensure consistency
     across the application and eliminate magic strings.
     """
+
     DATE = "Date"
     TICKER = "Ticker"
     SHARES = "Shares"

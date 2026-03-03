@@ -19,9 +19,9 @@ def _format_severity_stats(metrics: dict[str, Any]) -> None:
         metrics: Bandit metrics dictionary with severity counts
     """
     severities = [
-        ("High", metrics.get('SEVERITY.HIGH', 0)),
-        ("Medium", metrics.get('SEVERITY.MEDIUM', 0)),
-        ("Low", metrics.get('SEVERITY.LOW', 0))
+        ("High", metrics.get("SEVERITY.HIGH", 0)),
+        ("Medium", metrics.get("SEVERITY.MEDIUM", 0)),
+        ("Low", metrics.get("SEVERITY.LOW", 0)),
     ]
 
     for name, count in severities:
@@ -35,10 +35,7 @@ def _format_common_issues(results: list[dict[str, Any]], top_n: int = 3) -> None
         results: List of bandit results
         top_n: Number of top issues to display
     """
-    issue_types = Counter(
-        result.get('test_id', 'unknown')
-        for result in results
-    )
+    issue_types = Counter(result.get("test_id", "unknown") for result in results)
 
     if issue_types:
         print("- **Most Common Issues**:")
@@ -65,10 +62,10 @@ def generate_security_summary(bandit_json_path: str) -> None:
         with report_path.open() as f:
             data = json.load(f)
 
-        metrics = data.get('metrics', {}).get('_totals', {})
-        results = data.get('results', [])
+        metrics = data.get("metrics", {}).get("_totals", {})
+        results = data.get("results", [])
 
-        total_lines = metrics.get('loc', 0)
+        total_lines = metrics.get("loc", 0)
         total_issues = len(results)
 
         print(f"- **Lines of Code Scanned**: {total_lines:,}")

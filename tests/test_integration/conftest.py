@@ -73,7 +73,11 @@ def nbp_courses() -> list[str]:
     # multiple calendar years (e.g. a D-1 falling in late December 2024)
     # can be resolved without a ValueError from the converter.
     years = ["2024", "2025", "2026"]
-    return [str(data_dir / f"archiwum_tab_a_{y}.csv") for y in years if (data_dir / f"archiwum_tab_a_{y}.csv").exists()]
+    return [
+        str(data_dir / f"archiwum_tab_a_{y}.csv")
+        for y in years
+        if (data_dir / f"archiwum_tab_a_{y}.csv").exists()
+    ]
 
 
 @pytest.fixture(scope="module")
@@ -143,10 +147,7 @@ def sample_exchange_rates_path() -> Path:
             to ``tests/test_integration/fixtures/exchange_rates/``.
     """
     path = (
-        Path(__file__).parent
-        / "fixtures"
-        / "exchange_rates"
-        / "nbp_rates_sample.csv"
+        Path(__file__).parent / "fixtures" / "exchange_rates" / "nbp_rates_sample.csv"
     )
     if not path.exists():
         pytest.skip(f"Fixture file not found: {path} — add it to enable these tests.")

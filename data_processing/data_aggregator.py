@@ -39,7 +39,9 @@ class DataAggregator:
 
         return self.df
 
-    def add_empty_column(self, col_name: str = "Tax Collected", position: int = 4) -> pd.DataFrame:
+    def add_empty_column(
+        self, col_name: str = "Tax Collected", position: int = 4
+    ) -> pd.DataFrame:
         """Add an empty column to the DataFrame if it does not already exist.
 
         Args:
@@ -87,7 +89,9 @@ class DataAggregator:
 
         return self.df
 
-    def merge_rows_and_reorder(self, drop_columns: list[str] = ["Type", "Comment"]) -> pd.DataFrame:
+    def merge_rows_and_reorder(
+        self, drop_columns: list[str] = ["Type", "Comment"]
+    ) -> pd.DataFrame:
         """Merge rows in the DataFrame with the same 'Date' and 'Ticker'.
 
         Removes the specified columns ('Type', 'Comment' by default),
@@ -125,11 +129,13 @@ class DataAggregator:
 
         # Round the numeric columns to 2 decimal places
         self.df["Net Dividend"] = pd.to_numeric(
-            self.df["Net Dividend"], errors='coerce').round(2)
+            self.df["Net Dividend"], errors="coerce"
+        ).round(2)
         self.df["Tax Collected"] = pd.to_numeric(
-            self.df["Tax Collected"], errors='coerce').round(2)
+            self.df["Tax Collected"], errors="coerce"
+        ).round(2)
         # If Shares column exists and needs rounding
-        self.df["Shares"] = pd.to_numeric(self.df["Shares"], errors='coerce').round(2)
+        self.df["Shares"] = pd.to_numeric(self.df["Shares"], errors="coerce").round(2)
 
         # Move 'Shares' column to the end
         shares_col = self.df.pop("Shares")
@@ -140,7 +146,7 @@ class DataAggregator:
     def reorder_columns(self) -> pd.DataFrame:
         """Reorder the DataFrame columns to the desired sequence.
 
-        Order: Date, Ticker, Shares, Net Dividend, Tax Collected Amount, 
+        Order: Date, Ticker, Shares, Net Dividend, Tax Collected Amount,
                Tax Collected %, Tax Amount PLN
 
         Returns:
@@ -155,7 +161,7 @@ class DataAggregator:
             "Tax Collected %",
             "Date D-1",
             "Exchange Rate D-1",
-            "Tax Amount PLN"
+            "Tax Amount PLN",
         ]
 
         # Filter to only include columns that exist in the DataFrame
@@ -164,8 +170,6 @@ class DataAggregator:
         # Reorder the DataFrame columns
         self.df = self.df[existing_columns]
 
-        logger.info(
-            f"Step 12 - Reordered columns to: {', '.join(existing_columns)}"
-        )
+        logger.info(f"Step 12 - Reordered columns to: {', '.join(existing_columns)}")
 
         return self.df

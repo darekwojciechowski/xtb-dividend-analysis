@@ -47,7 +47,7 @@ class TaxExtractor:
             return float(match.group(1)) / 100
 
         # Try to match any percentage pattern
-        match = re.search(r'(\d+(?:\.\d+)?)\s*%', comment)
+        match = re.search(r"(\d+(?:\.\d+)?)\s*%", comment)
         if match:
             return float(match.group(1)) / 100
 
@@ -88,7 +88,9 @@ class TaxExtractor:
 
         return 0.0  # Default to 0% if country not recognized
 
-    def extract_tax_percentage_from_comment(self, statement_currency: str = "PLN") -> pd.DataFrame:
+    def extract_tax_percentage_from_comment(
+        self, statement_currency: str = "PLN"
+    ) -> pd.DataFrame:
         """Extract tax percentage from Comment column and store in 'Tax Collected' column.
 
         This should be called BEFORE merge_rows_and_reorder() to preserve tax percentage values.
@@ -143,18 +145,20 @@ class TaxExtractor:
 
                 if default_rate == 0.0:
                     logger.info(
-                        f"Using 0% tax rate for {ticker} (no withholding tax at source).")
+                        f"Using 0% tax rate for {ticker} (no withholding tax at source)."
+                    )
                 else:
                     logger.warning(
                         f"No WHT information in Comment for {ticker} on {date}. "
-                        f"Using default rate {default_rate*100:.0f}% (common for small dividend amounts)."
+                        f"Using default rate {default_rate * 100:.0f}% (common for small dividend amounts)."
                     )
 
             results.append(group_copy)
 
         self.df = pd.concat(results, ignore_index=False)
         logger.info(
-            "Extracted tax percentages from Comment column for each Date+Ticker group.")
+            "Extracted tax percentages from Comment column for each Date+Ticker group."
+        )
 
         return self.df
 
@@ -191,8 +195,8 @@ class TaxExtractor:
 
         # Check for US tickers with 30% tax rate
         us_tickers_with_30_tax = self.df[
-            (self.df["Ticker"].str.contains("US", na=False)) &
-            (abs(self.df[tax_col] - 0.30) < 0.01)
+            (self.df["Ticker"].str.contains("US", na=False))
+            & (abs(self.df[tax_col] - 0.30) < 0.01)
         ]
 
         if not us_tickers_with_30_tax.empty:

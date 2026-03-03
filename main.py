@@ -74,7 +74,8 @@ def process_data(file_path: str, courses_paths: list[str]) -> pd.DataFrame:
     # Calculate tax in PLN based on detected statement currency
     if statement_currency == "USD":
         processor.calculate_tax_in_pln_for_detected_usd(
-            courses_paths, statement_currency)
+            courses_paths, statement_currency
+        )
     else:
         processor.calculate_tax_in_pln_for_detected_pln(statement_currency)
 

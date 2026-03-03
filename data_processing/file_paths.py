@@ -27,8 +27,7 @@ def get_file_paths(file_path: str) -> tuple[str, list[str]]:
     # Dynamically find all files starting with "archiwum_tab_a_" in the data folder
     data_folder = Path("data")
     courses_paths = [
-        str(data_folder / f.name)
-        for f in data_folder.glob("archiwum_tab_a_*.csv")
+        str(data_folder / f.name) for f in data_folder.glob("archiwum_tab_a_*.csv")
     ]
 
     # Check if the main file exists

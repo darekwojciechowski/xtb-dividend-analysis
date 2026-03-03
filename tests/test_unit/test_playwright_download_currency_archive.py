@@ -31,6 +31,7 @@ from data_acquisition.playwright_download_currency_archive import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_element(year_label: str) -> MagicMock:
     """Return a mock page element whose inner_text returns *year_label*.
 
@@ -67,7 +68,9 @@ def _make_download_context_manager(suggested_filename: str) -> MagicMock:
     return mock_cm
 
 
-def _build_playwright_mocks(elements_by_index: dict[int, MagicMock]) -> tuple[MagicMock, MagicMock, MagicMock]:
+def _build_playwright_mocks(
+    elements_by_index: dict[int, MagicMock],
+) -> tuple[MagicMock, MagicMock, MagicMock]:
     """Build a hierarchy of Playwright mocks wired to the given elements.
 
     Args:
@@ -105,6 +108,7 @@ def _build_playwright_mocks(elements_by_index: dict[int, MagicMock]) -> tuple[Ma
 # Tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.unit
 class TestFindAndDownloadLatestFiles:
     """Unit tests for ``find_and_download_latest_files``."""
@@ -118,14 +122,18 @@ class TestFindAndDownloadLatestFiles:
         # Arrange
         mock_sync_pw_cm, _, mock_page = _build_playwright_mocks({})
         mock_page.expect_download.return_value = _make_download_context_manager(
-            "dummy.csv")
+            "dummy.csv"
+        )
 
-        with patch(
-            "data_acquisition.playwright_download_currency_archive.sync_playwright",
-            return_value=mock_sync_pw_cm,
-        ), patch(
-            "data_acquisition.playwright_download_currency_archive.settings"
-        ) as mock_settings:
+        with (
+            patch(
+                "data_acquisition.playwright_download_currency_archive.sync_playwright",
+                return_value=mock_sync_pw_cm,
+            ),
+            patch(
+                "data_acquisition.playwright_download_currency_archive.settings"
+            ) as mock_settings,
+        ):
             mock_settings.nbp_archive_url = "https://example.com/archive"
 
             # Act
@@ -154,7 +162,9 @@ class TestFindAndDownloadLatestFiles:
         # Assert – no download was triggered
         mock_page.expect_download.assert_not_called()
 
-    def test_find_and_download_latest_files_extracts_year_from_element_text(self) -> None:
+    def test_find_and_download_latest_files_extracts_year_from_element_text(
+        self,
+    ) -> None:
         """A four-digit year present in element text must trigger a download."""
         # Arrange
         el_2025 = _make_element("Archiwum 2025")
@@ -306,7 +316,9 @@ class TestFindAndDownloadLatestFiles:
             find_and_download_latest_files()
 
         # Assert – save_as called with a path that contains the 'data' directory
-        download_mock = mock_page.expect_download.return_value.__enter__.return_value.value
+        download_mock = (
+            mock_page.expect_download.return_value.__enter__.return_value.value
+        )
         call_args = download_mock.save_as.call_args
         assert call_args is not None
         saved_path = Path(call_args[0][0])
@@ -320,7 +332,8 @@ class TestFindAndDownloadLatestFiles:
         mock_sync_pw_cm, _, mock_page = _build_playwright_mocks({1: el_2026})
         expected_name = "archiwum_tab_a_2026.csv"
         mock_page.expect_download.return_value = _make_download_context_manager(
-            expected_name)
+            expected_name
+        )
 
         with patch(
             "data_acquisition.playwright_download_currency_archive.sync_playwright",
@@ -330,7 +343,9 @@ class TestFindAndDownloadLatestFiles:
             find_and_download_latest_files()
 
         # Assert
-        download_mock = mock_page.expect_download.return_value.__enter__.return_value.value
+        download_mock = (
+            mock_page.expect_download.return_value.__enter__.return_value.value
+        )
         saved_path: str = download_mock.save_as.call_args[0][0]
         assert saved_path.endswith(expected_name)
 

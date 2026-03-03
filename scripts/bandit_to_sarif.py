@@ -33,20 +33,22 @@ def _create_sarif_structure() -> dict[str, Any]:
     return {
         "version": "2.1.0",
         "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
-        "runs": [{
-            "tool": {
-                "driver": {
-                    "name": "bandit",
-                    "version": "1.9.1",
-                    "informationUri": "https://bandit.readthedocs.io/",
-                    "shortDescription": {"text": "Security linter for Python"},
-                    "fullDescription": {
-                        "text": "Bandit is a tool designed to find common security issues in Python code."
+        "runs": [
+            {
+                "tool": {
+                    "driver": {
+                        "name": "bandit",
+                        "version": "1.9.1",
+                        "informationUri": "https://bandit.readthedocs.io/",
+                        "shortDescription": {"text": "Security linter for Python"},
+                        "fullDescription": {
+                            "text": "Bandit is a tool designed to find common security issues in Python code."
+                        },
                     }
-                }
-            },
-            "results": []
-        }]
+                },
+                "results": [],
+            }
+        ],
     }
 
 
@@ -65,22 +67,17 @@ def _convert_result(result: dict[str, Any]) -> dict[str, Any]:
     return {
         "ruleId": result.get("test_id", "unknown"),
         "ruleIndex": 0,
-        "message": {
-            "text": result.get("issue_text", "Security issue detected")
-        },
-        "locations": [{
-            "physicalLocation": {
-                "artifactLocation": {"uri": filename},
-                "region": {
-                    "startLine": line_number,
-                    "startColumn": 1
+        "message": {"text": result.get("issue_text", "Security issue detected")},
+        "locations": [
+            {
+                "physicalLocation": {
+                    "artifactLocation": {"uri": filename},
+                    "region": {"startLine": line_number, "startColumn": 1},
                 }
             }
-        }],
+        ],
         "level": _map_severity(result.get("issue_severity", "LOW")),
-        "partialFingerprints": {
-            "primaryLocationLineHash": f"{filename}:{line_number}"
-        }
+        "partialFingerprints": {"primaryLocationLineHash": f"{filename}:{line_number}"},
     }
 
 
@@ -111,7 +108,8 @@ def convert_bandit_to_sarif(bandit_json_path: str, sarif_output_path: str) -> No
 
         issue_count = len(sarif["runs"][0]["results"])
         print(
-            f"Successfully converted {issue_count} issue{'s' if issue_count != 1 else ''} to SARIF format")
+            f"Successfully converted {issue_count} issue{'s' if issue_count != 1 else ''} to SARIF format"
+        )
 
     except (FileNotFoundError, json.JSONDecodeError) as e:
         print(f"Error converting bandit to SARIF: {e}", file=sys.stderr)

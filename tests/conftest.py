@@ -25,13 +25,13 @@ Test Structure:
 Usage:
     # Run all tests
     pytest
-    
+
     # Run only unit tests
     pytest tests/test_unit/
-    
+
     # Run only security tests
     pytest tests/test_security/ -m security
-    
+
     # Run with coverage
     pytest --cov=data_processing --cov=scripts
 """

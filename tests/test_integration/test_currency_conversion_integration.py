@@ -58,9 +58,11 @@ def test_nbp_exchange_rate_loading(
     """
     # Act
     usd_rate = currency_converter.get_exchange_rate(
-        nbp_courses, "2025-01-03", Currency.USD.value)
+        nbp_courses, "2025-01-03", Currency.USD.value
+    )
     dkk_rate = currency_converter.get_exchange_rate(
-        nbp_courses, "2025-08-18", Currency.DKK.value)
+        nbp_courses, "2025-08-18", Currency.DKK.value
+    )
 
     # Assert
     assert usd_rate > 0, "USD rate must be a positive float"
@@ -83,7 +85,8 @@ def test_currency_conversion_accuracy(
     """
     # Act
     rate = currency_converter.get_exchange_rate(
-        nbp_courses, "2025-01-03", Currency.USD.value)
+        nbp_courses, "2025-01-03", Currency.USD.value
+    )
 
     # Assert
     assert rate == pytest.approx(4.1512, abs=1e-4)
@@ -141,4 +144,5 @@ def test_missing_exchange_rate_handling(
     # Act / Assert
     with pytest.raises(ValueError, match="No exchange rate data found"):
         currency_converter.get_exchange_rate(
-            nbp_courses, date_not_in_any_csv, Currency.USD.value)
+            nbp_courses, date_not_in_any_csv, Currency.USD.value
+        )

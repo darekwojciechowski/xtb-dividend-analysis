@@ -28,8 +28,14 @@ def numeric_strings(draw, min_value: float = 0, max_value: float = 100000) -> st
 
     Patterns: "123.45", "1,234.56", "1 234,56", etc.
     """
-    value = draw(st.floats(min_value=min_value, max_value=max_value,
-                 allow_nan=False, allow_infinity=False))
+    value = draw(
+        st.floats(
+            min_value=min_value,
+            max_value=max_value,
+            allow_nan=False,
+            allow_infinity=False,
+        )
+    )
 
     # Different numeric formats
     formats = [
@@ -97,34 +103,39 @@ def dividend_dataframes(draw, min_rows: int = 1, max_rows: int = 20) -> pd.DataF
     """
     num_rows = draw(st.integers(min_value=min_rows, max_value=max_rows))
 
-    tickers = draw(st.lists(
-        st.text(
-            alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-            min_size=1,
-            max_size=6
-        ),
-        min_size=num_rows,
-        max_size=num_rows,
-    ))
+    tickers = draw(
+        st.lists(
+            st.text(alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ", min_size=1, max_size=6),
+            min_size=num_rows,
+            max_size=num_rows,
+        )
+    )
 
-    amounts = draw(st.lists(
-        st.floats(min_value=0.01, max_value=10000,
-                  allow_nan=False, allow_infinity=False),
-        min_size=num_rows,
-        max_size=num_rows,
-    ))
+    amounts = draw(
+        st.lists(
+            st.floats(
+                min_value=0.01, max_value=10000, allow_nan=False, allow_infinity=False
+            ),
+            min_size=num_rows,
+            max_size=num_rows,
+        )
+    )
 
-    dates = draw(st.lists(
-        date_strings_various_formats(),
-        min_size=num_rows,
-        max_size=num_rows,
-    ))
+    dates = draw(
+        st.lists(
+            date_strings_various_formats(),
+            min_size=num_rows,
+            max_size=num_rows,
+        )
+    )
 
-    return pd.DataFrame({
-        "Ticker": [t.upper() for t in tickers],
-        "Amount": amounts,
-        "Date": dates,
-    })
+    return pd.DataFrame(
+        {
+            "Ticker": [t.upper() for t in tickers],
+            "Amount": amounts,
+            "Date": dates,
+        }
+    )
 
 
 # ============================================================================
@@ -183,8 +194,12 @@ class TestDataTransformationInvariants:
         st.lists(
             st.tuples(
                 st.text(alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ", min_size=1, max_size=6),
-                st.floats(min_value=0.01, max_value=10000,
-                          allow_nan=False, allow_infinity=False),
+                st.floats(
+                    min_value=0.01,
+                    max_value=10000,
+                    allow_nan=False,
+                    allow_infinity=False,
+                ),
             ),
             min_size=1,
             max_size=100,
@@ -201,10 +216,12 @@ class TestDataTransformationInvariants:
         """
         # Arrange
         tickers, amounts = zip(*ticker_amount_pairs)
-        df = pd.DataFrame({
-            "Ticker": tickers,
-            "Amount": amounts,
-        })
+        df = pd.DataFrame(
+            {
+                "Ticker": tickers,
+                "Amount": amounts,
+            }
+        )
 
         # Act
         converter = CurrencyConverter(df)
@@ -212,8 +229,9 @@ class TestDataTransformationInvariants:
         # Assert
         assert len(converter.df) == len(ticker_amount_pairs)
         assert all(isinstance(ticker, str) for ticker in converter.df["Ticker"])
-        assert all(isinstance(amount, (int, float))
-                   for amount in converter.df["Amount"])
+        assert all(
+            isinstance(amount, (int, float)) for amount in converter.df["Amount"]
+        )
 
 
 # ============================================================================
@@ -224,7 +242,9 @@ class TestDataTransformationInvariants:
 class TestBoundaryConditions:
     """Property-based tests for boundary conditions and edge cases."""
 
-    @given(st.floats(min_value=0, max_value=1e-10, allow_nan=False, allow_infinity=False))
+    @given(
+        st.floats(min_value=0, max_value=1e-10, allow_nan=False, allow_infinity=False)
+    )
     @pytest.mark.property_based
     @pytest.mark.edge_case
     def test_very_small_amounts_stay_non_negative(self, small_amount: float) -> None:
@@ -236,7 +256,9 @@ class TestBoundaryConditions:
         assert small_amount >= 0
         assert isinstance(small_amount, float)
 
-    @given(st.floats(min_value=1e10, max_value=1e15, allow_nan=False, allow_infinity=False))
+    @given(
+        st.floats(min_value=1e10, max_value=1e15, allow_nan=False, allow_infinity=False)
+    )
     @pytest.mark.property_based
     @pytest.mark.edge_case
     def test_very_large_amounts_are_numeric(self, large_amount: float) -> None:
@@ -247,7 +269,7 @@ class TestBoundaryConditions:
         # Property: amount should be numeric and positive
         assert isinstance(large_amount, float)
         assert large_amount > 0
-        assert not (large_amount == float('inf') or large_amount == float('-inf'))
+        assert not (large_amount == float("inf") or large_amount == float("-inf"))
 
     @given(st.text(min_size=0, max_size=1))
     @pytest.mark.property_based

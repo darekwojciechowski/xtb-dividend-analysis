@@ -142,9 +142,9 @@ def test_missing_exchange_rates_raises_value_error(
     assert _USD in error_message, (
         "ValueError message should name the currency that could not be resolved"
     )
-    assert "archiwum_tab_a_XXXX.csv" in error_message or "2025-03-15" in error_message, (
-        "ValueError message should include the target date for actionable diagnostics"
-    )
+    assert (
+        "archiwum_tab_a_XXXX.csv" in error_message or "2025-03-15" in error_message
+    ), "ValueError message should include the target date for actionable diagnostics"
 
 
 @pytest.mark.integration
@@ -234,8 +234,12 @@ def test_partial_data_recovery_tax_calculator(
     # Arrange — the fixture has no tax-related columns, so validation must fail
     calculator = TaxCalculator(dataframe_with_missing_values)
     # These are the columns that calculate_tax_for_pln_statement requires
-    expected_missing = ["Net Dividend", "Tax Collected",
-                        "Tax Collected Amount", "Exchange Rate D-1"]
+    expected_missing = [
+        "Net Dividend",
+        "Tax Collected",
+        "Tax Collected Amount",
+        "Exchange Rate D-1",
+    ]
 
     # Act / Assert — test via the public interface, not the private helper
     with pytest.raises(ValueError) as exc_info:

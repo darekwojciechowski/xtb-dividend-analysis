@@ -84,9 +84,7 @@ def test_import_duplicate_removal(
     duplicate_count = df["ID"].duplicated().sum()
 
     # Assert
-    assert duplicate_count == 0, (
-        f"Expected 0 duplicate IDs but found {duplicate_count}"
-    )
+    assert duplicate_count == 0, f"Expected 0 duplicate IDs but found {duplicate_count}"
 
 
 @pytest.mark.integration
@@ -112,8 +110,12 @@ def test_import_data_type_consistency(
     )
 
     # Assert — string columns (use ColumnName enum for normalised names)
+    # pandas 2.x may infer StringDtype instead of object for string columns;
+    # accept both to stay compatible across pandas versions.
     for col in ("ID", ColumnName.TYPE.value, ColumnName.COMMENT.value):
-        assert df[col].dtype == object, f"Column '{col}' must be object dtype"
+        dtype = df[col].dtype
+        is_str_like = dtype == object or isinstance(dtype, pd.StringDtype)
+        assert is_str_like, f"Column '{col}' must be object dtype"
 
     # Assert — row count intact
     assert len(df) == _EXPECTED_ROW_COUNT
@@ -184,6 +186,4 @@ def test_import_detects_pln_currency(
     _, currency = pln_statement
 
     # Assert
-    assert currency == "PLN", (
-        f"Expected detected currency 'PLN' but got '{currency}'"
-    )
+    assert currency == "PLN", f"Expected detected currency 'PLN' but got '{currency}'"

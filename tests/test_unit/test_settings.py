@@ -89,15 +89,18 @@ class TestSettingsDefaults:
 class TestValidateTaxRateInvalid:
     """validate_tax_rate rejects values strictly outside [0, 1]."""
 
-    @pytest.mark.parametrize("invalid_rate", [
-        1.01,
-        1.5,
-        2.0,
-        100.0,
-        -0.01,
-        -0.19,
-        -1.0,
-    ])
+    @pytest.mark.parametrize(
+        "invalid_rate",
+        [
+            1.01,
+            1.5,
+            2.0,
+            100.0,
+            -0.01,
+            -0.19,
+            -1.0,
+        ],
+    )
     def test_validate_tax_rate_raises_for_out_of_range_value(
         self, invalid_rate: float
     ) -> None:
@@ -116,15 +119,16 @@ class TestValidateTaxRateInvalid:
 class TestValidateTaxRateValid:
     """validate_tax_rate accepts all values inside [0, 1]."""
 
-    @pytest.mark.parametrize("valid_rate", [
-        0.0,
-        0.19,
-        0.5,
-        1.0,
-    ])
-    def test_validate_tax_rate_accepts_valid_value(
-        self, valid_rate: float
-    ) -> None:
+    @pytest.mark.parametrize(
+        "valid_rate",
+        [
+            0.0,
+            0.19,
+            0.5,
+            1.0,
+        ],
+    )
+    def test_validate_tax_rate_accepts_valid_value(self, valid_rate: float) -> None:
         """Tax rate in [0, 1] must be stored unchanged."""
         # Arrange / Act
         s = Settings(POLISH_TAX_RATE=valid_rate)
@@ -142,7 +146,9 @@ class TestValidateTaxRateValid:
 class TestValidateTaxRateProperty:
     """Property: every float in [0, 1] is accepted; everything outside is rejected."""
 
-    @given(st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False))
+    @given(
+        st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False)
+    )
     def test_any_rate_in_unit_interval_is_valid(self, rate: float) -> None:
         """Any float in [0.0, 1.0] must not raise."""
         # Arrange / Act
@@ -154,8 +160,12 @@ class TestValidateTaxRateProperty:
     @given(
         st.one_of(
             st.floats(max_value=-1e-9, allow_nan=False, allow_infinity=False),
-            st.floats(min_value=1.0 + 1e-9, max_value=1e6,
-                      allow_nan=False, allow_infinity=False),
+            st.floats(
+                min_value=1.0 + 1e-9,
+                max_value=1e6,
+                allow_nan=False,
+                allow_infinity=False,
+            ),
         )
     )
     def test_any_rate_outside_unit_interval_is_invalid(self, rate: float) -> None:
@@ -196,14 +206,15 @@ class TestGetInputFilePath:
         # Assert
         assert result == Path(s.default_input_file)
 
-    @pytest.mark.parametrize("custom_path", [
-        "data/my_statement.xlsx",
-        "reports/2025_statement.xlsx",
-        "input/xtb_export.xlsx",
-    ])
-    def test_get_input_file_path_reflects_custom_value(
-        self, custom_path: str
-    ) -> None:
+    @pytest.mark.parametrize(
+        "custom_path",
+        [
+            "data/my_statement.xlsx",
+            "reports/2025_statement.xlsx",
+            "input/xtb_export.xlsx",
+        ],
+    )
+    def test_get_input_file_path_reflects_custom_value(self, custom_path: str) -> None:
         """Returned path reflects a custom DEFAULT_INPUT_FILE value."""
         # Arrange
         s = Settings(DEFAULT_INPUT_FILE=custom_path)
@@ -246,11 +257,14 @@ class TestGetDataDirectoryPath:
         # Assert
         assert result == Path(s.data_directory)
 
-    @pytest.mark.parametrize("custom_dir", [
-        "custom_data",
-        "archive/2025",
-        "tmp/nbp",
-    ])
+    @pytest.mark.parametrize(
+        "custom_dir",
+        [
+            "custom_data",
+            "archive/2025",
+            "tmp/nbp",
+        ],
+    )
     def test_get_data_directory_path_reflects_custom_value(
         self, custom_dir: str
     ) -> None:
@@ -274,7 +288,9 @@ class TestGetDataDirectoryPath:
 class TestSettingsEnvOverrides:
     """Settings fields are overridden by environment variables."""
 
-    def test_polish_tax_rate_overridden_by_env_var(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_polish_tax_rate_overridden_by_env_var(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """POLISH_TAX_RATE env var overrides the default tax rate."""
         # Arrange
         monkeypatch.setenv("POLISH_TAX_RATE", "0.25")
@@ -285,7 +301,9 @@ class TestSettingsEnvOverrides:
         # Assert
         assert s.polish_tax_rate == pytest.approx(0.25)
 
-    def test_data_directory_overridden_by_env_var(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_data_directory_overridden_by_env_var(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """DATA_DIRECTORY env var overrides the default directory name."""
         # Arrange
         monkeypatch.setenv("DATA_DIRECTORY", "overridden_data")
@@ -296,7 +314,9 @@ class TestSettingsEnvOverrides:
         # Assert
         assert s.data_directory == "overridden_data"
 
-    def test_nbp_archive_url_overridden_by_env_var(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_nbp_archive_url_overridden_by_env_var(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """NBP_ARCHIVE_URL env var overrides the default URL."""
         # Arrange
         custom_url = "https://custom.nbp.example/archive/"
@@ -308,7 +328,9 @@ class TestSettingsEnvOverrides:
         # Assert
         assert s.nbp_archive_url == custom_url
 
-    def test_default_output_file_overridden_by_env_var(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_default_output_file_overridden_by_env_var(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """DEFAULT_OUTPUT_FILE env var overrides the default output filename."""
         # Arrange
         monkeypatch.setenv("DEFAULT_OUTPUT_FILE", "my_output.csv")

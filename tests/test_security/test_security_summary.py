@@ -196,8 +196,9 @@ class TestCommonIssuesFormatting:
         _format_common_issues(sample_bandit_results, top_n=2)
 
         captured = capsys.readouterr()
-        lines = [line for line in captured.out.split(
-            '\n') if line.strip().startswith('- B')]
+        lines = [
+            line for line in captured.out.split("\n") if line.strip().startswith("- B")
+        ]
 
         # Should show only top 2 issues
         assert len(lines) == 2
@@ -334,10 +335,9 @@ class TestEdgeCases:
             capsys: pytest capture fixture
         """
         clean_report = tmp_path / "clean.json"
-        clean_report.write_text(json.dumps({
-            "metrics": {"_totals": {"loc": 500}},
-            "results": []
-        }))
+        clean_report.write_text(
+            json.dumps({"metrics": {"_totals": {"loc": 500}}, "results": []})
+        )
 
         generate_security_summary(str(clean_report))
 
@@ -356,9 +356,7 @@ class TestEdgeCases:
             capsys: pytest capture fixture
         """
         minimal_report = tmp_path / "minimal.json"
-        minimal_report.write_text(json.dumps({
-            "results": []
-        }))
+        minimal_report.write_text(json.dumps({"results": []}))
 
         # Should not crash
         generate_security_summary(str(minimal_report))

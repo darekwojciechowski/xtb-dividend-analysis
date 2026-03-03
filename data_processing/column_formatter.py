@@ -54,6 +54,7 @@ class ColumnFormatter:
         Returns:
             DataFrame with processed comments.
         """
+
         def apply_extractor_func(text: str) -> str:
             extractor = MultiConditionExtractor(text)
             return extractor.extract_condition()
@@ -67,6 +68,7 @@ class ColumnFormatter:
         Returns:
             DataFrame with converted dates.
         """
+
         def apply_converter(date_string: str) -> pd.Timestamp | None:
             converter = DateConverter(date_string)
             converter.convert_to_date()
@@ -85,6 +87,7 @@ class ColumnFormatter:
         Returns:
             DataFrame with added 'Tax Collected %' column.
         """
+
         def format_tax_percentage(value):
             """Format tax percentage for display."""
             if pd.isna(value) or value == 0:
@@ -94,7 +97,8 @@ class ColumnFormatter:
 
         # Create display column from numeric column
         self.df["Tax Collected %"] = self.df["Tax Collected"].apply(
-            format_tax_percentage)
+            format_tax_percentage
+        )
 
         logger.info(
             "Step 7 - Created 'Tax Collected %' display column with percentage formatting."
@@ -126,7 +130,8 @@ class ColumnFormatter:
         tax_col = ColumnName.TAX_COLLECTED.value
         if tax_col in self.df.columns:
             mask = self.df[tax_col].notna() & (
-                self.df[tax_col] >= settings.polish_tax_rate)
+                self.df[tax_col] >= settings.polish_tax_rate
+            )
             if mask.any():
                 # Cast to object so a string sentinel "-" can coexist with Timestamps.
                 self.df["Date D-1"] = self.df["Date D-1"].astype(object)
@@ -138,7 +143,9 @@ class ColumnFormatter:
 
         return self.df
 
-    def create_exchange_rate_d_minus_1_column(self, courses_paths: list[str]) -> pd.DataFrame:
+    def create_exchange_rate_d_minus_1_column(
+        self, courses_paths: list[str]
+    ) -> pd.DataFrame:
         """Create 'Exchange Rate D-1' column showing exchange rate for currency on D-1 date.
 
         Exchange rate is only shown when Tax Collected < 19% (polish_tax_rate).
@@ -221,6 +228,7 @@ class ColumnFormatter:
         Returns:
             DataFrame with added 'Tax Collected Amount' column.
         """
+
         def calculate_tax_amount(row):
             """Calculate actual tax amount collected with currency."""
             net_dividend_str = str(row.get("Net Dividend", ""))

@@ -63,7 +63,9 @@ class CurrencyConverter:
         # Default to USD if can't determine
         return Currency.USD.value
 
-    def extract_dividend_from_comment(self, comment: str) -> tuple[float | None, str | None]:
+    def extract_dividend_from_comment(
+        self, comment: str
+    ) -> tuple[float | None, str | None]:
         """Extract dividend per share and currency from the comment string.
 
         Args:
@@ -111,7 +113,9 @@ class CurrencyConverter:
 
         return None, None
 
-    def get_exchange_rate(self, courses_paths: list[str], target_date_str: str, currency: str) -> float:
+    def get_exchange_rate(
+        self, courses_paths: list[str], target_date_str: str, currency: str
+    ) -> float:
         """Retrieve the exchange rate for a specific currency on a specific date from CSV files.
 
         If the date is not found (e.g., weekend or holiday), searches backwards for the previous business day.
@@ -145,7 +149,8 @@ class CurrencyConverter:
         column_name = currency_column_map.get(currency)
         if not column_name:
             logger.warning(
-                f"Currency '{currency}' not supported for exchange rate lookup. Using 1.0")
+                f"Currency '{currency}' not supported for exchange rate lookup. Using 1.0"
+            )
             return 1.0
 
         # Try to find exchange rate for target date or previous business days
@@ -163,8 +168,9 @@ class CurrencyConverter:
                     if column_name not in df.columns:
                         continue
 
-                    currency_value = df[df["data"] ==
-                                        current_date_str_formatted][column_name].values
+                    currency_value = df[df["data"] == current_date_str_formatted][
+                        column_name
+                    ].values
 
                     if len(currency_value) > 0:
                         rate = float(currency_value[0].replace(",", "."))
@@ -178,7 +184,8 @@ class CurrencyConverter:
                     logger.warning(f"Exchange rate file '{csv_file}' was not found.")
                 except Exception as e:
                     logger.warning(
-                        f"An error occurred while processing '{csv_file}': {e}")
+                        f"An error occurred while processing '{csv_file}': {e}"
+                    )
 
             # Move to previous day
             current_date = current_date - timedelta(days=1)
@@ -266,7 +273,10 @@ class CurrencyConverter:
                 self.df.at[index, currency_col] = currency
 
                 exchange_rate = 1.0
-                if statement_currency == Currency.PLN.value and currency == Currency.USD.value:
+                if (
+                    statement_currency == Currency.PLN.value
+                    and currency == Currency.USD.value
+                ):
                     exchange_rate = self.get_exchange_rate(
                         courses_paths, target_date_str, currency
                     )
@@ -292,7 +302,8 @@ class CurrencyConverter:
             axis=1,
         )
         logger.info(
-            "Step 5 - Calculated dividends and updated shares using exchange rates.")
+            "Step 5 - Calculated dividends and updated shares using exchange rates."
+        )
         return self.df
 
     def add_currency_to_dividends(self) -> pd.DataFrame:
@@ -303,6 +314,7 @@ class CurrencyConverter:
         Returns:
             DataFrame with currency-annotated dividends.
         """
+
         def append_currency(row):
             ticker = row["Ticker"]
             dividend = row["Net Dividend"]
@@ -320,7 +332,9 @@ class CurrencyConverter:
                 return f"{dividend} {Currency.DKK.value}"
             elif TickerSuffix.UK.value in ticker:
                 return f"{dividend} {Currency.GBP.value}"
-            elif any(suffix.value in ticker for suffix in TickerSuffix.eurozone_suffixes()):
+            elif any(
+                suffix.value in ticker for suffix in TickerSuffix.eurozone_suffixes()
+            ):
                 return f"{dividend} {Currency.EUR.value}"
 
             # No change if the condition doesn't match

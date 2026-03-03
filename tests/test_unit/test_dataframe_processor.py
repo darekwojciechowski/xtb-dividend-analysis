@@ -226,7 +226,10 @@ class TestAggregationOperations:
         processor.df["Comment"] = ["Dividend 1.5"] * len(processor.df)
 
         # Act - Mock CurrencyConverter.get_exchange_rate to avoid ValueError when no exchange rate files exist
-        with patch('data_processing.currency_converter.CurrencyConverter.get_exchange_rate', return_value=4.0):
+        with patch(
+            "data_processing.currency_converter.CurrencyConverter.get_exchange_rate",
+            return_value=4.0,
+        ):
             processor.calculate_dividend(self.dummy_paths, statement_currency="PLN")
 
         # Assert

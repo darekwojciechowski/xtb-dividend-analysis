@@ -64,17 +64,21 @@ class DividendFilter:
             Grouped DataFrame with aggregated amounts.
         """
         self.df = (
-            self.df.groupby([
-                ColumnName.DATE.value,
-                ColumnName.TICKER.value,
-                ColumnName.TYPE.value,
-                ColumnName.COMMENT.value,
-            ])
+            self.df.groupby(
+                [
+                    ColumnName.DATE.value,
+                    ColumnName.TICKER.value,
+                    ColumnName.TYPE.value,
+                    ColumnName.COMMENT.value,
+                ]
+            )
             .agg({ColumnName.AMOUNT.value: "sum"})
             .reset_index()
         )
         self.df.rename(
-            columns={ColumnName.AMOUNT.value: ColumnName.NET_DIVIDEND.value}, inplace=True)
+            columns={ColumnName.AMOUNT.value: ColumnName.NET_DIVIDEND.value},
+            inplace=True,
+        )
         logger.info(
             "Step 4 - Grouped data by date, ticker, and type; aggregated amounts."
         )

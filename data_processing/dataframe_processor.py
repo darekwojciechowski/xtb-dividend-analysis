@@ -195,7 +195,9 @@ class DataFrameProcessor:
         """
         self.merge_rows_and_reorder()
 
-    def extract_tax_percentage_from_comment(self, statement_currency: str = "PLN") -> None:
+    def extract_tax_percentage_from_comment(
+        self, statement_currency: str = "PLN"
+    ) -> None:
         """Extract tax percentage from Comment column and store in 'Tax Collected' column.
 
         Args:
@@ -234,7 +236,8 @@ class DataFrameProcessor:
             or getattr(self, "_cached_currency_converter_df", None) is not current_df
         ):
             self._cached_currency_converter: CurrencyConverter = CurrencyConverter(
-                current_df)
+                current_df
+            )
             self._cached_currency_converter_df = current_df
         return self._cached_currency_converter
 
@@ -260,7 +263,9 @@ class DataFrameProcessor:
     # Private forwarding delegates (use cached specialists)
     # ------------------------------------------------------------------
 
-    def _extract_dividend_from_comment(self, comment: str) -> tuple[float | None, str | None]:
+    def _extract_dividend_from_comment(
+        self, comment: str
+    ) -> tuple[float | None, str | None]:
         """Extract dividend per share and currency from the comment string.
 
         Args:
@@ -281,7 +286,9 @@ class DataFrameProcessor:
         Returns:
             Determined currency ('USD', 'PLN', 'EUR', 'DKK', 'GBP')
         """
-        return self._get_currency_converter().determine_currency(ticker, extracted_currency)
+        return self._get_currency_converter().determine_currency(
+            ticker, extracted_currency
+        )
 
     def _extract_tax_rate_from_comment(self, comment: str) -> float | None:
         """Extract tax rate from comment string (e.g., 'WHT 27%' or '19%').
@@ -305,7 +312,9 @@ class DataFrameProcessor:
         """
         return self._get_tax_extractor().get_default_tax_rate(ticker)
 
-    def _get_exchange_rate(self, courses_paths: list[str], target_date_str: str, currency: str) -> float:
+    def _get_exchange_rate(
+        self, courses_paths: list[str], target_date_str: str, currency: str
+    ) -> float:
         """Retrieve the exchange rate for a specific currency on a specific date.
 
         Args:
@@ -316,7 +325,9 @@ class DataFrameProcessor:
         Returns:
             The exchange rate for the specified currency on the specified date.
         """
-        return self._get_currency_converter().get_exchange_rate(courses_paths, target_date_str, currency)
+        return self._get_currency_converter().get_exchange_rate(
+            courses_paths, target_date_str, currency
+        )
 
     def add_currency_to_dividends(self) -> None:
         """Append currency symbols to the 'Net Dividend' column based on the ticker."""
@@ -356,7 +367,10 @@ class DataFrameProcessor:
         return self.df
 
     def replace_tax_values(
-        self, ticker_col: str | None = None, amount_col: str | None = None, tax_col: str = ColumnName.TAX_COLLECTED.value
+        self,
+        ticker_col: str | None = None,
+        amount_col: str | None = None,
+        tax_col: str = ColumnName.TAX_COLLECTED.value,
     ) -> pd.DataFrame:
         """Update the 'Tax Collected' column based on the 'Net Dividend' column and ticker type.
 
@@ -394,7 +408,9 @@ class DataFrameProcessor:
 
         return self.df
 
-    def replace_tax_with_percentage(self, tax_col: str = "Tax Collected", amount_col: str = "Net Dividend") -> pd.DataFrame:
+    def replace_tax_with_percentage(
+        self, tax_col: str = "Tax Collected", amount_col: str = "Net Dividend"
+    ) -> pd.DataFrame:
         """Validate Tax Collected column and warn about high US tax rates.
 
         Args:
@@ -474,7 +490,9 @@ class DataFrameProcessor:
         self.df = formatter.create_date_d_minus_1_column(step_number)
         return self.df
 
-    def create_exchange_rate_d_minus_1_column(self, courses_paths: list[str]) -> pd.DataFrame:
+    def create_exchange_rate_d_minus_1_column(
+        self, courses_paths: list[str]
+    ) -> pd.DataFrame:
         """Create 'Exchange Rate D-1' column showing exchange rate for currency on D-1 date.
 
         Args:
@@ -577,21 +595,29 @@ class DataFrameProcessor:
         )
 
         # Format table with tax summary footer
-        table_lines = table.split('\n')
+        table_lines = table.split("\n")
         table_width = len(table_lines[0]) if table_lines else 80
 
         # Create separator line
         separator = "+" + "-" * (table_width - 2) + "+"
 
         # Create summary texts
-        dividends_text = f"Total dividends received (gross): {total_dividends_pln:.2f} PLN"
+        dividends_text = (
+            f"Total dividends received (gross): {total_dividends_pln:.2f} PLN"
+        )
         tax_text = f"Total tax due in PLN: {total_tax:.2f} PLN"
         net_text = f"Net dividends after tax: {net_after_tax:.2f} PLN"
 
         # Center the summary texts
         def center_text(text, width):
             padding = (width - len(text) - 2) // 2
-            return "|" + " " * padding + text + " " * (width - len(text) - padding - 2) + "|"
+            return (
+                "|"
+                + " " * padding
+                + text
+                + " " * (width - len(text) - padding - 2)
+                + "|"
+            )
 
         dividends_line = center_text(dividends_text, table_width)
         tax_line = center_text(tax_text, table_width)

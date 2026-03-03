@@ -59,25 +59,35 @@ class TestTaxCalculation:
         Returns:
             pd.DataFrame: Test data in expected format
         """
-        tax_collected_str = "-" if tax_collected_amount == 0 or tax_collected_amount == "-" else f"{tax_collected_amount} {currency}"
-        exchange_rate_str = "-" if exchange_rate == "-" or exchange_rate == 1.0 else f"{exchange_rate} PLN"
+        tax_collected_str = (
+            "-"
+            if tax_collected_amount == 0 or tax_collected_amount == "-"
+            else f"{tax_collected_amount} {currency}"
+        )
+        exchange_rate_str = (
+            "-"
+            if exchange_rate == "-" or exchange_rate == 1.0
+            else f"{exchange_rate} PLN"
+        )
 
-        return pd.DataFrame({
-            "Date": [date],
-            "Ticker": [ticker],
-            "Shares": [shares],
-            "Net Dividend": [f"{net_dividend} {currency}"],
-            "Tax Collected": [tax_collected_pct],
-            "Tax Collected Amount": [tax_collected_str],
-            "Exchange Rate D-1": [exchange_rate_str],
-        })
+        return pd.DataFrame(
+            {
+                "Date": [date],
+                "Ticker": [ticker],
+                "Shares": [shares],
+                "Net Dividend": [f"{net_dividend} {currency}"],
+                "Tax Collected": [tax_collected_pct],
+                "Tax Collected Amount": [tax_collected_str],
+                "Exchange Rate D-1": [exchange_rate_str],
+            }
+        )
 
     @staticmethod
     def calculate_expected_tax_pln_statement(
         net_dividend: float,
         tax_collected_amount: float,
         exchange_rate: float,
-        tax_collected_pct: float
+        tax_collected_pct: float,
     ) -> str:
         """
         Calculate expected tax for PLN statement using the same formula as TaxCalculator.
@@ -102,7 +112,7 @@ class TestTaxCalculation:
         net_dividend: float,
         tax_collected_amount: float,
         exchange_rate: float,
-        tax_collected_pct: float
+        tax_collected_pct: float,
     ) -> str:
         """
         Calculate expected tax for USD statement using the same formula as TaxCalculator.
@@ -141,7 +151,13 @@ class TestTaxCalculation:
         ],
     )
     def test_calculate_tax_for_pln_statement_with_tax_below_19_percent(
-        self, net_dividend, tax_collected_amount, tax_collected_pct, exchange_rate, ticker, date
+        self,
+        net_dividend,
+        tax_collected_amount,
+        tax_collected_pct,
+        exchange_rate,
+        ticker,
+        date,
     ) -> None:
         """Test tax calculation for PLN statement when tax collected is below 19%."""
         # Arrange
@@ -205,7 +221,7 @@ class TestTaxCalculation:
 
         # Assert - verify that tax percentage check works correctly
         assert result_df.loc[0, "Tax Amount PLN"] == "-", (
-            f"Expected no additional tax for {tax_collected_pct*100}% tax rate, "
+            f"Expected no additional tax for {tax_collected_pct * 100}% tax rate, "
             f"but got {result_df.loc[0, 'Tax Amount PLN']}"
         )
 
@@ -255,7 +271,13 @@ class TestTaxCalculation:
         ],
     )
     def test_calculate_tax_for_usd_statement(
-        self, net_dividend, tax_collected_amount, tax_collected_pct, exchange_rate, ticker, date
+        self,
+        net_dividend,
+        tax_collected_amount,
+        tax_collected_pct,
+        exchange_rate,
+        ticker,
+        date,
     ) -> None:
         """Test tax calculation for USD statement - uses gross dividend formula."""
         # Arrange
@@ -343,7 +365,9 @@ class TestTaxCalculation:
 
         assert tax_pln == expected_pln
         assert tax_usd == expected_usd
-        assert tax_pln != tax_usd, "PLN and USD statements should produce different results with same input"
+        assert tax_pln != tax_usd, (
+            "PLN and USD statements should produce different results with same input"
+        )
 
 
 class TestValueParsing:
@@ -419,20 +443,26 @@ class TestValueParsing:
 class TestErrorHandling:
     """Test suite for error handling in tax calculations."""
 
-    def test_calculate_tax_when_missing_required_columns_then_raises_error(self) -> None:
+    def test_calculate_tax_when_missing_required_columns_then_raises_error(
+        self,
+    ) -> None:
         """Test that missing required columns raise ValueError."""
         # Arrange
-        df = pd.DataFrame({
-            "Date": ["2025-01-06"],
-            "Ticker": ["SBUX.US"],
-        })
+        df = pd.DataFrame(
+            {
+                "Date": ["2025-01-06"],
+                "Ticker": ["SBUX.US"],
+            }
+        )
         calculator = TaxCalculator(df)
 
         # Act & Assert
         with pytest.raises(ValueError, match="Required columns missing"):
             calculator.calculate_tax_for_pln_statement("PLN")
 
-    def test_parse_value_with_currency_when_invalid_format_then_raises_error(self) -> None:
+    def test_parse_value_with_currency_when_invalid_format_then_raises_error(
+        self,
+    ) -> None:
         """Test that invalid currency format raises ValueError."""
         # Arrange
         df = pd.DataFrame({"dummy": [1]})

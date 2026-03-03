@@ -35,7 +35,7 @@ def import_and_process_data(
         # First, extract currency from cell F6 using openpyxl
         wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
         ws = wb[sheet_name]
-        currency = ws['F6'].value
+        currency = ws["F6"].value
         wb.close()
 
         # Load the entire sheet

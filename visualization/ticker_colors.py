@@ -29,6 +29,4 @@ ticker_colors: list[str] = [
 
 def get_random_color() -> str:
     """Return a randomly selected color from the ticker_colors list."""
-    return random.choice(
-        ticker_colors
-    )  # nosec B311 - Not used for cryptographic purposes
+    return random.choice(ticker_colors)  # nosec B311 - Not used for cryptographic purposes

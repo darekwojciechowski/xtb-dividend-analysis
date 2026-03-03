@@ -30,7 +30,9 @@ class TaxCalculator:
                 rate from ``settings.polish_tax_rate``.
         """
         self.df = df
-        self.polish_tax_rate = polish_tax_rate if polish_tax_rate is not None else settings.polish_tax_rate
+        self.polish_tax_rate = (
+            polish_tax_rate if polish_tax_rate is not None else settings.polish_tax_rate
+        )
 
     def _validate_required_columns(self, required_columns: list[str]) -> None:
         """Validate that required columns exist in the DataFrame.
@@ -260,9 +262,7 @@ class TaxCalculator:
 
         return self.df
 
-    def calculate_tax_for_usd_statement(
-        self, statement_currency: str
-    ) -> pd.DataFrame:
+    def calculate_tax_for_usd_statement(self, statement_currency: str) -> pd.DataFrame:
         """Calculate Belka tax in PLN for a USD-denominated statement.
 
         Adds a ``Tax Amount PLN`` column. Because the USD statement

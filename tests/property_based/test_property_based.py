@@ -43,10 +43,11 @@ def ticker_strategies(draw) -> str:
         str: Valid ticker symbol in format SYMBOL.SUFFIX
     """
     symbols = st.text(
-        alphabet=st.characters(blacklist_categories=(
-            "Cc", "Cs"), blacklist_characters=".,!?"),
+        alphabet=st.characters(
+            blacklist_categories=("Cc", "Cs"), blacklist_characters=".,!?"
+        ),
         min_size=1,
-        max_size=5
+        max_size=5,
     )
     suffixes = st.sampled_from([".US", ".PL", ".DE", ".FR", ".UK", ".DK", ".SE", ""])
 
@@ -63,11 +64,9 @@ def currency_codes(draw) -> str:
         str: Currency code (USD, EUR, PLN, etc.)
     """
     common_currencies = ["USD", "EUR", "PLN", "GBP", "DKK", "SEK", "CAD", "JPY", "CHF"]
-    generated = draw(st.text(
-        alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-        min_size=3,
-        max_size=3
-    ))
+    generated = draw(
+        st.text(alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ", min_size=3, max_size=3)
+    )
     return draw(st.sampled_from(common_currencies + [generated]))
 
 
@@ -78,8 +77,9 @@ def dividend_comments(draw) -> str:
     Returns:
         str: Comment string with dividend information
     """
-    amount = draw(st.decimals(min_value=Decimal("0.01"),
-                  max_value=Decimal("1000"), places=4))
+    amount = draw(
+        st.decimals(min_value=Decimal("0.01"), max_value=Decimal("1000"), places=4)
+    )
     currency = draw(currency_codes())
 
     # Different comment patterns used by brokers
@@ -119,7 +119,10 @@ def valid_date_formats_with_values(draw) -> tuple[str, str]:
 
     # Create date string and matching format
     date_formats = [
-        (f"{day:02d}.{month:02d}.{year} {hour:02d}:{minute:02d}:{second:02d}", "%d.%m.%Y %H:%M:%S"),
+        (
+            f"{day:02d}.{month:02d}.{year} {hour:02d}:{minute:02d}:{second:02d}",
+            "%d.%m.%Y %H:%M:%S",
+        ),
         (f"{year}/{month:02d}/{day:02d}", "%Y/%m/%d"),
         (f"{year}-{month:02d}-{day:02d}", "%Y-%m-%d"),
         (f"{month:02d}/{day:02d}/{year}", "%m/%d/%Y"),
@@ -140,12 +143,14 @@ def positive_floats(draw, min_value: float = 0.01, max_value: float = 10000) -> 
     Returns:
         float: Positive float value
     """
-    return draw(st.floats(
-        min_value=min_value,
-        max_value=max_value,
-        allow_nan=False,
-        allow_infinity=False
-    ))
+    return draw(
+        st.floats(
+            min_value=min_value,
+            max_value=max_value,
+            allow_nan=False,
+            allow_infinity=False,
+        )
+    )
 
 
 # ============================================================================
@@ -218,9 +223,7 @@ class TestCurrencyConverterProperties:
         # Assert
         assert result in known_currencies
 
-    @given(
-        st.lists(dividend_comments(), min_size=1, max_size=20, unique=True)
-    )
+    @given(st.lists(dividend_comments(), min_size=1, max_size=20, unique=True))
     @pytest.mark.property_based
     @pytest.mark.unit
     def test_extract_dividend_from_comment_returns_valid_tuple(
@@ -247,12 +250,13 @@ class TestCurrencyConverterProperties:
             # Property: dividend is either None or positive float
             assert dividend is None or (isinstance(dividend, float) and dividend >= 0)
             # Property: currency is either None or 3-letter string
-            assert currency is None or (isinstance(
-                currency, str) and len(currency) == 3)
+            assert currency is None or (
+                isinstance(currency, str) and len(currency) == 3
+            )
 
     @given(
         dividend_comments(),
-        st.just(None)  # No extracted currency
+        st.just(None),  # No extracted currency
     )
     @pytest.mark.property_based
     @pytest.mark.unit
@@ -275,7 +279,14 @@ class TestCurrencyConverterProperties:
             assert dividend >= 0
             assert isinstance(dividend, float)
 
-    @given(st.one_of(st.integers(), st.floats(allow_nan=False, allow_infinity=False), st.lists(st.integers()), st.none()))
+    @given(
+        st.one_of(
+            st.integers(),
+            st.floats(allow_nan=False, allow_infinity=False),
+            st.lists(st.integers()),
+            st.none(),
+        )
+    )
     @pytest.mark.property_based
     @pytest.mark.unit
     def test_extract_dividend_handles_non_string_input(self, non_string) -> None:
@@ -323,9 +334,9 @@ class TestDateConverterProperties:
 
         # Assert
         assert result is not None
-        assert hasattr(result, 'year')
-        assert hasattr(result, 'month')
-        assert hasattr(result, 'day')
+        assert hasattr(result, "year")
+        assert hasattr(result, "month")
+        assert hasattr(result, "day")
 
     @given(st.none())
     @pytest.mark.property_based
@@ -399,7 +410,7 @@ class TestDateConverterProperties:
         try:
             converter.convert_to_date()
             result = converter.get_date()
-            assert result is None or hasattr(result, 'year')
+            assert result is None or hasattr(result, "year")
         except Exception as e:
             pytest.fail(f"convert_to_date raised {type(e).__name__}: {e}")
 
@@ -484,11 +495,9 @@ class TestTaxCalculatorProperties:
         The original DataFrame should not be modified during initialization.
         """
         # Arrange
-        original_df = pd.DataFrame({
-            "Ticker": ["AAPL"],
-            "Amount": [amount],
-            "Date": ["2024-01-01"]
-        })
+        original_df = pd.DataFrame(
+            {"Ticker": ["AAPL"], "Amount": [amount], "Date": ["2024-01-01"]}
+        )
         original_len = len(original_df)
         original_columns = set(original_df.columns)
 
@@ -508,15 +517,17 @@ class TestTaxCalculatorProperties:
 class TestDataProcessingInvariants:
     """Property-based tests for invariants across multiple components."""
 
-    @given(st.lists(
-        st.tuples(
-            ticker_strategies(),
-            dividend_comments(),
-            valid_date_formats_with_values(),
-        ),
-        min_size=1,
-        max_size=20,
-    ))
+    @given(
+        st.lists(
+            st.tuples(
+                ticker_strategies(),
+                dividend_comments(),
+                valid_date_formats_with_values(),
+            ),
+            min_size=1,
+            max_size=20,
+        )
+    )
     @pytest.mark.property_based
     @pytest.mark.unit
     def test_currency_detection_always_consistent(

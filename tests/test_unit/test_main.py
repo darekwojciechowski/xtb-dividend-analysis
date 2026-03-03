@@ -32,12 +32,14 @@ def sample_processed_df() -> pd.DataFrame:
         pd.DataFrame: DataFrame containing sample dividend data with columns:
             Date, Ticker, Net Dividend, and Tax Amount PLN.
     """
-    return pd.DataFrame({
-        "Date": ["2025-01-01"],
-        "Ticker": ["AAPL.US"],
-        "Net Dividend": ["10.00 USD"],
-        "Tax Amount PLN": ["5.0 PLN"]
-    })
+    return pd.DataFrame(
+        {
+            "Date": ["2025-01-01"],
+            "Ticker": ["AAPL.US"],
+            "Net Dividend": ["10.00 USD"],
+            "Tax Amount PLN": ["5.0 PLN"],
+        }
+    )
 
 
 @pytest.fixture
@@ -180,7 +182,12 @@ class TestMainFunction:
     @patch("main.get_file_paths")
     @patch("main.setup_logging")
     def test_main_when_successful_then_exports_results(
-        self, mock_logging, mock_get_paths, mock_process, mock_exporter_class, sample_processed_df
+        self,
+        mock_logging,
+        mock_get_paths,
+        mock_process,
+        mock_exporter_class,
+        sample_processed_df,
     ):
         """Tests that main() successfully processes and exports data.
 
@@ -212,7 +219,8 @@ class TestMainFunction:
         mock_process.assert_called_once_with("input.xlsx", ["rates.csv"])
         mock_exporter_class.assert_called_once_with(sample_processed_df)
         mock_exporter_instance.export_to_google.assert_called_once_with(
-            settings.default_output_file)
+            settings.default_output_file
+        )
 
     @patch("main.logger")
     @patch("main.process_data")
@@ -251,7 +259,12 @@ class TestMainFunction:
     @patch("main.get_file_paths")
     @patch("main.setup_logging")
     def test_main_when_called_then_uses_default_input_file(
-        self, mock_logging, mock_get_paths, mock_process, mock_exporter_class, sample_processed_df
+        self,
+        mock_logging,
+        mock_get_paths,
+        mock_process,
+        mock_exporter_class,
+        sample_processed_df,
     ):
         """Tests that main() uses settings.default_input_file.
 

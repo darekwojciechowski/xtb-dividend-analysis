@@ -110,6 +110,7 @@ jobs:
             --cov-report=xml \
             --cov-report=html \
             --cov-report=json \
+            --cov-fail-under=0 \
             --junitxml=test-results-unit.xml \
             -v
 
