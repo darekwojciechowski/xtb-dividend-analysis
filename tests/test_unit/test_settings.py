@@ -21,7 +21,6 @@ from pydantic import ValidationError
 
 from config.settings import Settings
 
-
 # ---------------------------------------------------------------------------
 # Default values
 # ---------------------------------------------------------------------------

@@ -11,7 +11,7 @@ import re
 import pandas as pd
 from loguru import logger
 
-from .constants import Currency, TickerSuffix
+from .constants import TickerSuffix
 
 
 class TaxExtractor:

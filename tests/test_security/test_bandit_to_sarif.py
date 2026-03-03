@@ -20,7 +20,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
-
 from bandit_to_sarif import (
     _convert_result,
     _create_sarif_structure,
@@ -28,9 +27,8 @@ from bandit_to_sarif import (
     convert_bandit_to_sarif,
 )
 
-
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    pass
 
 
 @pytest.fixture

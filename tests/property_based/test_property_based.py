@@ -18,17 +18,16 @@ Test Coverage:
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
 from decimal import Decimal
 
 import pandas as pd
 import pytest
-from hypothesis import given, strategies as st
+from hypothesis import given
+from hypothesis import strategies as st
 
 from data_processing.currency_converter import CurrencyConverter
 from data_processing.date_converter import DateConverter
 from data_processing.tax_calculator import TaxCalculator
-
 
 # ============================================================================
 # Custom Hypothesis Strategies
@@ -560,10 +559,13 @@ class TestDataProcessingInvariants:
         should produce identical results.
         """
         # Arrange
+
         df = pd.DataFrame()
+
         converter = CurrencyConverter(df)
 
         # Act
+
         result1 = converter.extract_dividend_from_comment(comment)
         result2 = converter.extract_dividend_from_comment(comment)
         result3 = converter.extract_dividend_from_comment(comment)

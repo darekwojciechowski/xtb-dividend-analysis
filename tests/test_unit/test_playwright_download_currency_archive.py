@@ -18,14 +18,13 @@ tests run without a real browser or network connection.
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from data_acquisition.playwright_download_currency_archive import (
     find_and_download_latest_files,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

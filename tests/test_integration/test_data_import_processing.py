@@ -114,7 +114,7 @@ def test_import_data_type_consistency(
     # accept both to stay compatible across pandas versions.
     for col in ("ID", ColumnName.TYPE.value, ColumnName.COMMENT.value):
         dtype = df[col].dtype
-        is_str_like = dtype == object or isinstance(dtype, pd.StringDtype)
+        is_str_like = dtype.kind == "O" or isinstance(dtype, pd.StringDtype)
         assert is_str_like, f"Column '{col}' must be object dtype"
 
     # Assert — row count intact

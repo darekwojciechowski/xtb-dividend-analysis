@@ -7,7 +7,6 @@ Downloads the three most recent annual NBP Table A CSV files
 
 from __future__ import annotations
 
-import os
 import re
 from pathlib import Path
 

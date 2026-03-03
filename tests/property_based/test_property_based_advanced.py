@@ -6,16 +6,12 @@ including data aggregation, column formatting, and multi-step transformations.
 
 from __future__ import annotations
 
-import re
-from decimal import Decimal
-
 import pandas as pd
 import pytest
-from hypothesis import given, strategies as st, assume
+from hypothesis import given
+from hypothesis import strategies as st
 
-from data_processing.column_formatter import ColumnFormatter
 from data_processing.currency_converter import CurrencyConverter
-
 
 # ============================================================================
 # Custom Strategies for Complex Data Structures
@@ -67,7 +63,9 @@ def date_strings_various_formats(draw) -> str:
 
     Examples: "2024-01-15", "01/15/2024", "2024.01.15", "15.01.2024"
     """
+
     year = draw(st.integers(min_value=2000, max_value=2050))
+
     month = draw(st.integers(min_value=1, max_value=12))
 
     # Determine max day

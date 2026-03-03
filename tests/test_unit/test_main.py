@@ -121,7 +121,7 @@ class TestProcessDataFunction:
         mock_processor_class.return_value = mock_processor_instance
 
         # Act
-        result = process_data("test_file.xlsx", mock_courses_paths)
+        process_data("test_file.xlsx", mock_courses_paths)
 
         # Assert
         mock_processor_instance.calculate_tax_in_pln_for_detected_usd.assert_called_once_with(

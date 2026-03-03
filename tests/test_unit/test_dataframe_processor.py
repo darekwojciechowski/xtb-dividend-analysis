@@ -21,9 +21,10 @@ All tests carry the ``@pytest.mark.unit`` marker. External IO is isolated via
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pandas as pd
 import pytest
-from unittest.mock import patch
 
 from data_processing.dataframe_processor import DataFrameProcessor
 

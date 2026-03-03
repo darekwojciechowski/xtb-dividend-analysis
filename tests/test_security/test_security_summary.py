@@ -15,22 +15,18 @@ All tests are marked ``@pytest.mark.security``.
 from __future__ import annotations
 
 import json
-from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING
-from unittest.mock import patch
 
 import pytest
-
 from security_summary import (
     _format_common_issues,
     _format_severity_stats,
     generate_security_summary,
 )
 
-
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    pass
 
 
 @pytest.fixture

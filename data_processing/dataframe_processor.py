@@ -13,7 +13,7 @@ from loguru import logger
 
 from .column_formatter import ColumnFormatter
 from .column_normalizer import ColumnNormalizer
-from .constants import Currency, TickerSuffix, ColumnName
+from .constants import ColumnName
 from .currency_converter import CurrencyConverter
 from .data_aggregator import DataAggregator
 from .dividend_filter import DividendFilter
