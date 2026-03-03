@@ -36,7 +36,17 @@ This will create a virtual environment and install:
 - **Core dependencies**: `pandas`, `numpy`, `matplotlib`, `openpyxl`, `playwright`, `tabulate`, `loguru`
 - **Dev dependencies**: `pytest`, `pytest-cov`, `black`, `isort`, `flake8`, `mypy`, `safety`, `bandit`, `tox`, `pre-commit`
 
-## Step 4: Work with the Virtual Environment
+## Step 4: Install Playwright Browsers
+
+`poetry install` installs the `playwright` Python package, but the browser binaries (Chromium, ~170 MB) are managed separately and must be downloaded once:
+
+```bash
+poetry run playwright install chromium
+```
+
+> **Note:** This is a one-time setup step. The browser files are stored in your user profile (`~/.cache/ms-playwright` on macOS/Linux, `%LOCALAPPDATA%\ms-playwright` on Windows) and are not managed by Poetry.
+
+## Step 5: Work with the Virtual Environment
 
 You can work with Poetry in two ways:
 
@@ -47,17 +57,17 @@ poetry run pytest
 ```
 
 
-## Step 5: Download Currency Exchange Rates (First Time Setup)
+## Step 6: Download Currency Exchange Rates (First Time Setup)
 
 Before running the main project, download the required NBP currency exchange rate files:
 
 ```bash
-poetry run python data_acquisition/playwright_download_currency_archive.py
+poetry run python -m data_acquisition.playwright_download_currency_archive
 ```
 
 This downloads the last 3 years of exchange rate data from NBP to the `data/` directory. You only need to run this once, or periodically to update the rates.
 
-## Step 6: Run Your Project
+## Step 7: Run Your Project
 
 Process your transaction data:
 
@@ -65,7 +75,7 @@ Process your transaction data:
 poetry run python main.py
 ```
 
-## Step 7: Run Tests
+## Step 8: Run Tests
 
 Execute the test suite:
 
@@ -83,3 +93,12 @@ Here are some other useful Poetry commands:
 - **List all dependencies**: `poetry show`
 - **Remove a dependency**: `poetry remove package-name`
 - **Check for outdated packages**: `poetry show --outdated`
+
+
+## Code Quality: Lint and Format with Ruff
+
+Run linting with auto-fix and formatting using Ruff:
+
+```bash
+poetry run ruff check --fix .
+poetry run ruff format .

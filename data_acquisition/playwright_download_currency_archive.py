@@ -32,6 +32,15 @@ def find_and_download_latest_files() -> None:
         # Navigate to NBP currency archive page
         page.goto(settings.nbp_archive_url)
 
+        # Dismiss cookie consent dialog if present
+        try:
+            cookie_button = page.get_by_text("Zostaw niezbędne pliki cookies")
+            cookie_button.wait_for(timeout=5000)
+            cookie_button.click()
+            logger.info("Cookie consent dialog dismissed.")
+        except Exception:
+            logger.debug("No cookie consent dialog found, continuing.")
+
         # Initialize a list to store file elements and their names
         file_elements = []
 
@@ -55,7 +64,7 @@ def find_and_download_latest_files() -> None:
         file_elements.sort(reverse=True, key=lambda x: x[0])
 
         # Download the largest file and the next two largest files by decrementing the year
-        downloaded_years = set()
+        downloaded_years: set[int] = set()
         for year, file_name, element in file_elements:
             if year not in downloaded_years and len(downloaded_years) < 3:
                 logger.info(f"Downloading file: {file_name}")

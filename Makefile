@@ -8,6 +8,7 @@ install:  ## Install all dependencies
 	python -m pip install --upgrade pip
 	pip install poetry
 	poetry install
+	poetry run playwright install chromium
 
 test:  ## Run all tests
 	poetry run pytest tests/ -v
