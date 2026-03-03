@@ -57,7 +57,8 @@ jobs:
       - name: Security scan with Bandit
         run: |
           poetry run bandit -r data_processing data_acquisition config main.py \
-            -f sarif -o bandit.sarif --exit-zero
+            -f json -o bandit.json --exit-zero
+          poetry run python scripts/bandit_to_sarif.py bandit.json bandit.sarif
 
       - name: Upload Bandit SARIF report
         uses: actions/upload-artifact@v4
