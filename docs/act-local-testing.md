@@ -1,24 +1,28 @@
-# Running `act` Locally
+# Run `act` locally
 
-This note covers the minimum setup required to run the GitHub Actions workflow locally with [`act`](https://github.com/nektos/act) on macOS.
+Run GitHub Actions workflows locally with [`act`](https://github.com/nektos/act)
+on macOS.
 
 ## Prerequisites
 
-1. **Docker Desktop running** – start Docker Desktop (`open -a Docker`). `act` uses Docker containers for every job, so the daemon must stay online.
-2. **Fix Docker credential helper** – if `act` fails with `error getting credentials - err: exit status 1`, edit `~/.docker/config.json` and remove the line:
+1. **Start Docker Desktop** (`open -a Docker`). `act` uses Docker containers for
+   every job, so the daemon must stay online.
+2. **Fix the Docker credential helper** if `act` fails with
+   `error getting credentials - err: exit status 1`. Edit
+   `~/.docker/config.json` and remove:
    ```json
    "credsStore": "desktop",
    ```
-   Save the file and rerun `docker pull hello-world` to verify the CLI works without prompting for credentials. You can restore the entry later if needed.
-3. **Install the VS Code CLI (optional but handy)** – follow `docs/code-cli-setup.md` if you want to open files via `code ~/.docker/config.json`.
+   Verify with `docker pull hello-world`. You can restore the entry later.
+3. **Optional:** Install the VS Code CLI — see [docs/code-cli-setup.md](code-cli-setup.md).
 
-## Installing act
+## Install act
 
 ```bash
 brew install act
 ```
 
-## Recommended invocation
+## Run
 
 ```bash
 act push -j test \
@@ -26,25 +30,23 @@ act push -j test \
   -P ubuntu-latest=catthehacker/ubuntu:act-latest
 ```
 
-Explanation:
-- `--container-architecture linux/amd64` – required on Apple Silicon so Docker pulls the correct image.
-- `-P ubuntu-latest=...` – tells `act` which image to use for GitHub's `ubuntu-latest` runners.
-- Add more `-P` mappings if you want to emulate Windows or macOS jobs (or remove those OS entries from the workflow while testing locally).
+- `--container-architecture linux/amd64` — required on Apple Silicon.
+- `-P ubuntu-latest=...` — specifies the image for `ubuntu-latest` runners.
 
-## Handling workflow steps that need GitHub tokens
+## GitHub tokens
 
-Some steps (e.g., artifact upload, test reporter) expect `GITHUB_TOKEN`/`ACTIONS_RUNTIME_TOKEN`. When running locally, either:
-- Provide a personal access token via a secrets file: `act ... --secret-file .secrets` with `GH_TOKEN=...`, or
-- Guard those steps in the workflow with `if: ${{ !env.ACT }}` so they skip during local dry runs.
+Steps such as artifact upload and test reporter expect `GITHUB_TOKEN` or
+`ACTIONS_RUNTIME_TOKEN`. To handle this locally:
 
-With these adjustments, the `act` execution can progress through the relevant jobs without the Docker credential errors or missing-token failures.
+- Pass a personal access token via `act ... --secret-file .secrets` with
+  `GH_TOKEN=<token>`, or
+- Skip those steps in the workflow with `if: ${{ !env.ACT }}`.
 
-## Cleaning up after running `act`
+## Clean up
 
-`act` removes its temporary containers automatically, but it leaves downloaded images and cached files on disk. To free space:
+`act` removes temporary containers automatically but leaves images and caches
+on disk:
 
-- Remove unused Docker images/layers: `docker system prune -f` (add `--volumes` if you also want to drop anonymous volumes).
-- Clear cached actions: `rm -rf ~/.cache/act`.
-- Delete workflow artifacts created in the repo (e.g., `coverage.xml`, `test-results.xml`) using standard `rm`/`git clean -fd` commands.
-
-Run these commands only when you are sure you no longer need the cached data.
+- `docker system prune -f` — removes unused images and layers.
+- `rm -rf ~/.cache/act` — clears cached actions.
+- `git clean -fd` — removes generated artifacts such as `coverage.xml`.

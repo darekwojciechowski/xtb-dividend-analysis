@@ -1,7 +1,6 @@
 # Homebrew update guide
 
-This guide covers the standard workflow for keeping Homebrew and its packages
-up to date on macOS.
+Keep Homebrew and its packages up to date on macOS.
 
 ## Update Homebrew
 
@@ -40,16 +39,6 @@ Check which version of a formula is active:
 ```bash
 brew info python@3.14
 python3 --version
-```
-
-## Recommended full update sequence
-
-Run these commands in order to fully update your Homebrew environment:
-
-```bash
-brew update
-brew upgrade
-brew cleanup
 ```
 
 ## Next steps

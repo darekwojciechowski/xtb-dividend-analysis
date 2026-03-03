@@ -37,7 +37,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from data_processing.constants import ColumnName, Currency, TickerSuffix
+from data_processing.constants import ColumnName, Currency
 from data_processing.currency_converter import CurrencyConverter
 from data_processing.dataframe_processor import DataFrameProcessor
 from data_processing.dividend_filter import DividendFilter
@@ -45,7 +45,7 @@ from data_processing.tax_calculator import TaxCalculator
 from data_processing.tax_extractor import TaxExtractor
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    pass
 
 # ---------------------------------------------------------------------------
 # Performance budget constants
