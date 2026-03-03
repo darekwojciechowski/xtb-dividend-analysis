@@ -307,7 +307,7 @@ jobs:
       - name: Run performance tests
         run: |
           poetry run pytest tests/ \
-            -m "performance or slow" \
+            -m "performance" \
             --junitxml=test-results-performance.xml \
             --timeout=120 \
             --no-cov \
