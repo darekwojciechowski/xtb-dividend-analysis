@@ -1,43 +1,71 @@
 name: CI Pipeline
 
-permissions:
-  contents: read
-  checks: write
-  pull-requests: write
-  security-events: write
-
 on:
   push:
-    branches: [ main, master, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, master, develop ]
+    branches: [main]
   workflow_dispatch:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 env:
-  PYTHON_VERSION: "3.12"
+  PYTHON_VERSION: "3.13"
 
 jobs:
-  changes:
+  # ============================================================================
+  # STAGE 1: Code Quality Gates (fail-fast)
+  # ============================================================================
+  lint:
+    name: Lint and Type Check
     runs-on: ubuntu-latest
-    outputs:
-      python: ${{ steps.changes.outputs.python }}
+
     steps:
-    - uses: actions/checkout@v4
-    - name: Check for Python changes
-      id: changes
-      uses: dorny/paths-filter@v3
-      with:
-        base: 'main'
-        filters: |
-          python:
-            - '**/*.py'
-            - 'pyproject.toml'
-            - 'tox.ini'
-            - '.github/workflows/**'
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Check code formatting with Ruff
+        run: poetry run ruff format --check --diff .
+
+      - name: Lint with Ruff
+        run: poetry run ruff check .
+
+      - name: Type checking with mypy
+        run: poetry run mypy config data_processing data_acquisition main.py --ignore-missing-imports
+
+      - name: Security scan with Bandit
+        run: |
+          poetry run bandit -r data_processing data_acquisition config main.py \
+            -f sarif -o bandit.sarif --exit-zero
+
+      - name: Upload Bandit SARIF report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit-sarif
+          path: bandit.sarif
+          retention-days: 30
 
   # ============================================================================
   # STAGE 2: Test Matrix (parallel execution)
@@ -45,549 +73,316 @@ jobs:
   test-unit:
     name: Unit Tests
     runs-on: ubuntu-latest
-    needs: [changes, lint]
-    if: needs.changes.outputs.python == 'true'
-    permissions:
-      contents: read
-      checks: write
-      pull-requests: write
+    needs: lint
+
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Python ${{ env.PYTHON_VERSION }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
-    - name: Install Poetry
-      uses: snok/install-poetry@v1
-      with:
-        virtualenvs-create: true
-        virtualenvs-in-project: true
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
 
-    - name: Cache Poetry dependencies
-      uses: actions/cache@v4
-      with:
-        path: .venv
-        key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
-        restore-keys: |
-          venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
 
-    - name: Install dependencies
-      run: poetry install --with dev --no-interaction
+      - name: Install dependencies
+        run: poetry install --no-interaction
 
-    - name: Run unit tests with coverage
-      run: |
-        poetry run pytest tests/ \
-          -m "not integration and not security and not performance and not property_based and not slow" \
-          --cov-report=json \
-          --junitxml=test-results-unit.xml
-      shell: bash
+      - name: Run unit tests
+        run: |
+          poetry run pytest tests/ \
+            -m "not integration and not slow and not security and not performance and not property_based" \
+            --cov=config --cov=data_processing --cov=data_acquisition --cov=main \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-report=json \
+            --junitxml=test-results-unit.xml \
+            -v
 
-    - name: Publish Unit Test Results
-      uses: dorny/test-reporter@v1.9.1
-      if: always()
-      with:
-        name: Unit Test Results
-        path: test-results-unit.xml
-        reporter: java-junit
-        fail-on-error: false
-      continue-on-error: true
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-unit
+          path: |
+            coverage.xml
+            coverage.json
+            htmlcov/
 
-    - name: Upload coverage report
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: coverage-unit
-        path: |
-          coverage.xml
-          coverage.json
-          htmlcov/
-        retention-days: 30
-
-    - name: Upload test results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-results-unit
-        path: test-results-unit.xml
-        retention-days: 30
-
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v5
-      with:
-        files: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false
-
-    - name: Coverage Report PR Comment
-      if: github.event_name == 'pull_request'
-      uses: py-cov-action/python-coverage-comment-action@v3
-      with:
-        GITHUB_TOKEN: ${{ github.token }}
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-unit
+          path: test-results-unit.xml
 
   test-integration:
     name: Integration Tests
     runs-on: ubuntu-latest
-    needs: [changes, lint]
-    if: needs.changes.outputs.python == 'true'
+    needs: lint
+
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Python ${{ env.PYTHON_VERSION }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
-    - name: Install Poetry
-      uses: snok/install-poetry@v1
-      with:
-        virtualenvs-create: true
-        virtualenvs-in-project: true
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
 
-    - name: Cache Poetry dependencies
-      uses: actions/cache@v4
-      with:
-        path: .venv
-        key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
-        restore-keys: |
-          venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
 
-    - name: Install dependencies
-      run: poetry install --with dev --no-interaction
+      - name: Install dependencies
+        run: poetry install --no-interaction
 
-    - name: Install Playwright browsers
-      run: poetry run playwright install
-      continue-on-error: true
+      - name: Run integration tests
+        run: |
+          poetry run pytest tests/ \
+            -m "integration" \
+            --junitxml=test-results-integration.xml \
+            --no-cov \
+            -v
 
-    - name: Run integration tests
-      run: |
-        poetry run pytest tests/ \
-          -m "integration" \
-          --no-cov \
-          --junitxml=test-results-integration.xml
-      shell: bash
-
-    - name: Publish Integration Test Results
-      uses: dorny/test-reporter@v1.9.1
-      if: always()
-      with:
-        name: Integration Test Results
-        path: test-results-integration.xml
-        reporter: java-junit
-        fail-on-error: false
-      continue-on-error: true
-
-    - name: Upload test results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-results-integration
-        path: test-results-integration.xml
-        retention-days: 30
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-integration
+          path: test-results-integration.xml
 
   test-security:
     name: Security Tests
     runs-on: ubuntu-latest
-    needs: [changes, lint]
-    if: needs.changes.outputs.python == 'true'
+    needs: lint
+
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Python ${{ env.PYTHON_VERSION }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
-    - name: Install Poetry
-      uses: snok/install-poetry@v1
-      with:
-        virtualenvs-create: true
-        virtualenvs-in-project: true
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
 
-    - name: Cache Poetry dependencies
-      uses: actions/cache@v4
-      with:
-        path: .venv
-        key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
-        restore-keys: |
-          venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
 
-    - name: Install dependencies
-      run: poetry install --with dev --no-interaction
+      - name: Install dependencies
+        run: poetry install --no-interaction
 
-    - name: Run security tests
-      run: |
-        poetry run pytest tests/ \
-          -m "security" \
-          --no-cov \
-          --junitxml=test-results-security.xml
-      shell: bash
+      - name: Run security tests
+        run: |
+          poetry run pytest tests/ \
+            -m "security" \
+            --junitxml=test-results-security.xml \
+            --no-cov \
+            -v
 
-    - name: Publish Security Test Results
-      uses: dorny/test-reporter@v1.9.1
-      if: always()
-      with:
-        name: Security Test Results
-        path: test-results-security.xml
-        reporter: java-junit
-        fail-on-error: false
-      continue-on-error: true
-
-    - name: Upload test results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-results-security
-        path: test-results-security.xml
-        retention-days: 30
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-security
+          path: test-results-security.xml
 
   test-property:
     name: Property-Based Tests
     runs-on: ubuntu-latest
-    needs: [changes, lint]
-    if: needs.changes.outputs.python == 'true'
+    needs: lint
+
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Python ${{ env.PYTHON_VERSION }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
-    - name: Install Poetry
-      uses: snok/install-poetry@v1
-      with:
-        virtualenvs-create: true
-        virtualenvs-in-project: true
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
 
-    - name: Cache Poetry dependencies
-      uses: actions/cache@v4
-      with:
-        path: .venv
-        key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
-        restore-keys: |
-          venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
 
-    - name: Install dependencies
-      run: poetry install --with dev --no-interaction
+      - name: Install dependencies
+        run: poetry install --no-interaction
 
-    - name: Run property-based tests
-      run: |
-        poetry run pytest tests/ \
-          -m "property_based" \
-          --no-cov \
-          --junitxml=test-results-property.xml
-      shell: bash
+      - name: Run property-based tests
+        run: |
+          poetry run pytest tests/ \
+            -m "property_based" \
+            --junitxml=test-results-property.xml \
+            --no-cov \
+            -v
 
-    - name: Publish Property-Based Test Results
-      uses: dorny/test-reporter@v1.9.1
-      if: always()
-      with:
-        name: Property-Based Test Results
-        path: test-results-property.xml
-        reporter: java-junit
-        fail-on-error: false
-      continue-on-error: true
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-property
+          path: test-results-property.xml
 
-    - name: Upload test results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-results-property
-        path: test-results-property.xml
-        retention-days: 30
-
-  lint:
+  test-performance:
+    name: Performance Tests
     runs-on: ubuntu-latest
-    needs: changes
-    if: needs.changes.outputs.python == 'true'
-    continue-on-error: true  # non-blocking: lint failures are reported but do not block the pipeline
+    needs: lint
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python ${{ env.PYTHON_VERSION }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
-        
-    - name: Install Poetry
-      run: |
-        python -m pip install --upgrade pip
-        pip install poetry
-        
-    - name: Install dependencies with linting tools
-      run: |
-        poetry install --with dev
-        
-    - name: Check code formatting with Ruff
-      id: ruff_format
-      run: poetry run ruff format --check --diff .
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Lint with Ruff
-      id: ruff_lint
-      run: poetry run ruff check . --output-format=github
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
-    - name: Type checking with mypy
-      id: mypy
-      run: poetry run mypy data_processing data_acquisition visualization config --ignore-missing-imports
-      continue-on-error: true  # mypy strictness may have pre-existing issues; reported but not blocking
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
 
-    - name: Generate Lint Summary
-      if: always()
-      run: |
-        echo "## Code Quality Results" >> $GITHUB_STEP_SUMMARY
-        echo "| Tool | Status |" >> $GITHUB_STEP_SUMMARY
-        echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
-        echo "| ruff format | ${{ steps.ruff_format.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| ruff lint | ${{ steps.ruff_lint.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| mypy | ${{ steps.mypy.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
 
-  security:
-    runs-on: ubuntu-latest
-    needs: changes
-    if: needs.changes.outputs.python == 'true'
-    continue-on-error: true  # non-blocking: security findings are reported but do not block the pipeline
-    permissions:
-      contents: read
-      security-events: write
-      actions: read
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python ${{ env.PYTHON_VERSION }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
-        
-    - name: Install Poetry
-      run: |
-        python -m pip install --upgrade pip
-        pip install poetry
-        
-    - name: Install dependencies and security scanning tools
-      run: |
-        poetry install --with dev
-        
-    - name: Run safety check
-      id: safety
-      run: poetry run safety scan
-      continue-on-error: true
-      
-    - name: Run bandit security scan
-      id: bandit
-      run: |
-        # Run bandit and generate JSON report
-        poetry run bandit -r data_processing data_acquisition visualization config -f json -o bandit-report.json
-        # Convert to SARIF format
-        poetry run python scripts/bandit_to_sarif.py bandit-report.json bandit-results.sarif
-      continue-on-error: true  # bandit exits non-zero when findings exist; result captured in step id
-      
-    - name: Upload SARIF to GitHub Security
-      uses: github/codeql-action/upload-sarif@v4
-      if: always()
-      with:
-        sarif_file: bandit-results.sarif
-      continue-on-error: true
-      
-    - name: Generate Security Summary
-      if: always()
-      run: |
-        echo "## Security Scan Results" >> $GITHUB_STEP_SUMMARY
-        echo "| Tool | Status | Details |" >> $GITHUB_STEP_SUMMARY
-        echo "|------|--------|---------|" >> $GITHUB_STEP_SUMMARY
-        echo "| Safety | ${{ steps.safety.outcome == 'success' && '✅ Passed' || '❌ Failed' }} | Dependency vulnerability scan |" >> $GITHUB_STEP_SUMMARY
-        echo "| Bandit | ${{ steps.bandit.outcome == 'success' && '✅ Passed' || '❌ Failed' }} | Static security analysis |" >> $GITHUB_STEP_SUMMARY
-        
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Security Scan Details" >> $GITHUB_STEP_SUMMARY
-        python scripts/security_summary.py bandit-report.json >> $GITHUB_STEP_SUMMARY
-      
-    - name: Upload bandit report
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: security-reports
-        path: |
-          bandit-report.json
-          bandit-results.sarif
-        retention-days: 30
+      - name: Install dependencies
+        run: poetry install --no-interaction
 
-# ============================================================================
-  # STAGE 3: Coverage Report
+      - name: Run performance tests
+        run: |
+          poetry run pytest tests/ \
+            -m "performance or slow" \
+            --junitxml=test-results-performance.xml \
+            --timeout=120 \
+            --no-cov \
+            -v
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-performance
+          path: test-results-performance.xml
+
+  # ============================================================================
+  # STAGE 3: Coverage Report and Summary
   # ============================================================================
   coverage-report:
     name: Coverage Report
     runs-on: ubuntu-latest
-    needs: [test-unit]
-    if: always() && needs.test-unit.result != 'skipped'
+    needs: [test-unit, test-integration, test-security, test-property, test-performance]
+    if: always()
+
     steps:
-    - name: Download coverage artifacts
-      uses: actions/download-artifact@v4
-      continue-on-error: true
-      with:
-        name: coverage-unit
-        path: coverage/
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Display coverage summary
-      run: |
-        echo "## Coverage Report" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        if [ -f coverage/coverage.json ]; then
-          COVERAGE=$(python3 -c "import json; data=json.load(open('coverage/coverage.json')); print(data['totals']['percent_covered_display'])")
-          echo "**Total Coverage: ${COVERAGE}%**" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "Coverage data not available" >> $GITHUB_STEP_SUMMARY
-        fi
+      - name: Download coverage artifacts
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: coverage-unit
+          path: coverage/
 
-    - name: Upload final coverage report
-      uses: actions/upload-artifact@v4
-      if: success()
-      with:
-        name: coverage-report-final
-        path: coverage/
-        retention-days: 30
+      - name: Display coverage summary
+        run: |
+          echo "## Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f coverage/coverage.json ]; then
+            COVERAGE=$(python3 -c "import json; data=json.load(open('coverage/coverage.json')); print(data['totals']['percent_covered_display'])")
+            echo "**Total Coverage: ${COVERAGE}%**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload final coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-final
+          path: coverage/
+          retention-days: 30
 
   # ============================================================================
   # STAGE 4: CI Summary
   # ============================================================================
-  summary:
+  ci-summary:
+    name: CI Summary
     runs-on: ubuntu-latest
-    needs: [changes, lint, test-unit, test-integration, test-security, test-property, security]
-    if: always() && needs.changes.outputs.python == 'true'
-    permissions:
-      pull-requests: write
-      contents: read
-      security-events: write
+    needs: [lint, test-unit, test-integration, test-security, test-property, test-performance]
+    if: always()
+
     steps:
-    - name: Download test artifacts
-      uses: actions/download-artifact@v4
-      with:
-        pattern: test-results-*
-        merge-multiple: true
-      continue-on-error: true
+      - name: Generate CI Summary
+        run: |
+          echo "## CI Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Lint and Type Check | ${{ needs.lint.result == 'success' && 'PASSED' || 'FAILED' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit Tests | ${{ needs.test-unit.result == 'success' && 'PASSED' || 'FAILED' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integration Tests | ${{ needs.test-integration.result == 'success' && 'PASSED' || 'FAILED' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Tests | ${{ needs.test-security.result == 'success' && 'PASSED' || 'FAILED' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Property Tests | ${{ needs.test-property.result == 'success' && 'PASSED' || 'FAILED' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Performance Tests | ${{ needs.test-performance.result == 'success' && 'PASSED' || 'FAILED' }} |" >> $GITHUB_STEP_SUMMARY
 
-    - name: Generate Comprehensive Pipeline Summary
-      shell: python
-      run: |
-        import os
-        import xml.etree.ElementTree as ET
-        import glob
-
-        # Collect all test results
-        test_files = glob.glob('*.xml') + glob.glob('**/*.xml', recursive=True)
-        test_files = [f for f in test_files if 'test-results' in f]
-
-        total_tests = 0
-        total_failures = 0
-        total_errors = 0
-        failed_tests = []
-
-        for file_path in test_files:
-            try:
-                tree = ET.parse(file_path)
-                root = tree.getroot()
-
-                total_tests += int(root.get('tests', '0'))
-                total_failures += int(root.get('failures', '0'))
-                total_errors += int(root.get('errors', '0'))
-
-                for testcase in root.findall('.//testcase'):
-                    failure = testcase.find('failure')
-                    error = testcase.find('error')
-                    if failure is not None or error is not None:
-                        name = testcase.get('name', 'Unknown')
-                        classname = testcase.get('classname', '')
-                        failed_tests.append(f"{classname}::{name}")
-            except Exception as e:
-                print(f"Error parsing {file_path}: {e}")
-
-        unit_result = "${{ needs.test-unit.result }}"
-        integration_result = "${{ needs.test-integration.result }}"
-        security_result = "${{ needs.test-security.result }}"
-        property_result = "${{ needs.test-property.result }}"
-        lint_result = "${{ needs.lint.result }}"
-        scan_result = "${{ needs.security.result }}"
-
-        def status(r):
-            return "Passed" if r == 'success' else "Failed"
-
-        all_passed = all(
-            r == 'success' for r in
-            [unit_result, integration_result, security_result, property_result, lint_result]
-        )
-
-        with open(os.environ['GITHUB_STEP_SUMMARY'], 'w', encoding='utf-8') as f:
-            f.write("# CI Pipeline Summary\n\n")
-            headline = "All checks passed! Ready to merge." if all_passed else "Some checks failed. Please review."
-            f.write(f"## {headline}\n\n")
-
-            f.write("## Results\n\n")
-            f.write("| Stage | Job | Status |\n")
-            f.write("|-------|-----|--------|\n")
-            f.write(f"| Code Quality | Lint and Type Check | {'Passed' if lint_result == 'success' else 'Failed'} |\n")
-            f.write(f"| Tests | Unit Tests | {status(unit_result)} |\n")
-            f.write(f"| Tests | Integration Tests | {status(integration_result)} |\n")
-            f.write(f"| Tests | Security Tests | {status(security_result)} |\n")
-            f.write(f"| Tests | Property-Based Tests | {status(property_result)} |\n")
-            f.write(f"| Security | Bandit / Safety | {status(scan_result)} |\n\n")
-
-            if failed_tests:
-                f.write("## Failed Tests\n")
-                for test in failed_tests[:5]:
-                    f.write(f"- {test}\n")
-                if len(failed_tests) > 5:
-                    f.write(f"- ... and {len(failed_tests) - 5} more\n")
-                f.write("\n")
-
-            f.write("## Pipeline Metrics\n\n")
-            f.write("| Metric | Value |\n")
-            f.write("|--------|-------|\n")
-            f.write("| Workflow Run | [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |\n")
-            f.write("| Triggered By | ${{ github.event_name }} |\n")
-            f.write("| Branch | ${{ github.ref_name }} |\n")
-            f.write("| Commit | [`${{ github.sha }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) |\n")
-
-    - name: Comment PR with Results
-      if: github.event_name == 'pull_request'
-      uses: marocchino/sticky-pull-request-comment@v2
-      with:
-        message: |
-          # CI Pipeline Results
-
-          ## Status Overview
-          | Stage | Job | Status |
-          |-------|-----|--------|
-          | Code Quality | Lint and Type Check | ${{ needs.lint.result == 'success' && '<span style="color:green">Passed</span>' || '<span style="color:red">Failed</span>' }} |
-          | Tests | Unit Tests | ${{ needs.test-unit.result == 'success' && '<span style="color:green">Passed</span>' || '<span style="color:red">Failed</span>' }} |
-          | Tests | Integration Tests | ${{ needs.test-integration.result == 'success' && '<span style="color:green">Passed</span>' || '<span style="color:red">Failed</span>' }} |
-          | Tests | Security Tests | ${{ needs.test-security.result == 'success' && '<span style="color:green">Passed</span>' || '<span style="color:red">Failed</span>' }} |
-          | Tests | Property-Based Tests | ${{ needs.test-property.result == 'success' && '<span style="color:green">Passed</span>' || '<span style="color:red">Failed</span>' }} |
-          | Security | Bandit / Safety | ${{ needs.security.result == 'success' && '<span style="color:green">Passed</span>' || '<span style="color:red">Failed</span>' }} |
-
-          ${{ (needs.lint.result == 'success' && needs.test-unit.result == 'success' && needs.test-integration.result == 'success' && needs.test-security.result == 'success' && needs.test-property.result == 'success') && '### All checks passed! Ready to merge.' || '### Some checks failed. Please review the errors.' }}
-
-          ---
-          **Workflow:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) | **Commit:** ${{ github.sha }} | **Branch:** ${{ github.head_ref }}
-
-    - name: Set final status
-      run: |
-        echo "Pipeline Results Summary:"
-        echo "- Lint job: ${{ needs.lint.result }}"
-        echo "- Unit Tests: ${{ needs.test-unit.result }}"
-        echo "- Integration Tests: ${{ needs.test-integration.result }}"
-        echo "- Security Tests: ${{ needs.test-security.result }}"
-        echo "- Property-Based Tests: ${{ needs.test-property.result }}"
-        echo "- Security scan: ${{ needs.security.result }}"
-
-        if [ "${{ needs.lint.result }}" = "success" ] \
-          && [ "${{ needs.test-unit.result }}" = "success" ] \
-          && [ "${{ needs.test-integration.result }}" = "success" ] \
-          && [ "${{ needs.test-security.result }}" = "success" ] \
-          && [ "${{ needs.test-property.result }}" = "success" ]; then
-          echo "Pipeline completed successfully"
-        else
-          echo "Pipeline completed with some failures - check individual job results"
-        fi
-        echo "Summary job completed"
+      - name: Fail if any job failed
+        if: |
+          needs.lint.result == 'failure' ||
+          needs.test-unit.result == 'failure' ||
+          needs.test-integration.result == 'failure' ||
+          needs.test-security.result == 'failure' ||
+          needs.test-property.result == 'failure' ||
+          needs.test-performance.result == 'failure'
+        run: exit 1

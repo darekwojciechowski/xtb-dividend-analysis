@@ -41,7 +41,8 @@ jobs:
         
     - name: Run fast tests
       run: |
-        poetry run pytest -v --tb=short
+        poetry run pytest -v --tb=short \
+          -m "not integration and not slow and not security and not performance and not property_based"
         
     - name: Test import of main modules
       run: |
