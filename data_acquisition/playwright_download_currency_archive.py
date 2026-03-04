@@ -1,8 +1,7 @@
-"""Playwright-based downloader for NBP currency exchange rate archives.
+"""Download NBP currency exchange rate archives using Playwright.
 
-Downloads the three most recent annual NBP Table A CSV files
-(``archiwum_tab_a_*.csv``) from the NBP website and saves them to the
-``data/`` directory in the project root.
+Fetches the three most recent annual NBP Table A CSV files to the data/
+directory.
 """
 
 from __future__ import annotations
@@ -17,22 +16,19 @@ from config.settings import settings
 
 
 def find_and_download_latest_files() -> None:
-    """Download the three most recent NBP currency archive CSV files.
+    """Download three most recent NBP currency archive files.
 
-    Opens a Chromium browser, navigates to the NBP archive page defined
-    in ``settings.nbp_archive_url``, identifies download buttons by
-    extracting four-digit year numbers from their labels, and downloads
-    the files for the three most recent years to the ``data/`` directory.
+    Launches Chromium, navigates to the NBP archive URL, extracts year
+    numbers from button labels, and downloads files for the three most
+    recent years to data/.
     """
     logger.info("Starting the Playwright script.")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False)
         page = browser.new_page()
 
-        # Navigate to NBP currency archive page
         page.goto(settings.nbp_archive_url)
 
-        # Dismiss cookie consent dialog if present
         try:
             cookie_button = page.get_by_text("Zostaw niezbędne pliki cookies")
             cookie_button.wait_for(timeout=5000)
@@ -41,52 +37,42 @@ def find_and_download_latest_files() -> None:
         except Exception:
             logger.debug("No cookie consent dialog found, continuing.")
 
-        # Initialize a list to store file elements and their names
         file_elements = []
-
-        # Iterate over potential child elements within the specified parent div
         logger.info("Searching for file elements on the page.")
-        for i in range(0, 50):  # Adjust the range as needed
+        # Iterate up to 50 child elements; NBP page structure may vary
+        for i in range(0, 50):
             selector = f".wp-block-buttons.is-layout-flex.wp-block-buttons-is-layout-flex div:nth-child({i})"
             element = page.query_selector(selector)
 
             if element:
                 file_name = element.inner_text()
                 logger.debug(f"Found element with text: {file_name}")
-                # Extract the year or version number using regex
+                # Extract four-digit year to sort by recency
                 match = re.search(r"\d{4}", file_name)
                 if match:
                     year = int(match.group())
                     file_elements.append((year, file_name, element))
 
-        # Sort the files by year in descending order
         logger.info("Sorting files by year in descending order.")
         file_elements.sort(reverse=True, key=lambda x: x[0])
 
-        # Download the largest file and the next two largest files by decrementing the year
         downloaded_years: set[int] = set()
         for year, file_name, element in file_elements:
             if year not in downloaded_years and len(downloaded_years) < 3:
                 logger.info(f"Downloading file: {file_name}")
-
-                # Set up download listener
+                # Wait for download to complete before saving
                 with page.expect_download() as download_info:
                     element.click()  # Click on the element to initiate download
 
-                # Wait for the download to complete
                 download = download_info.value
-                # Save to project root 'data' directory
                 project_root = Path(__file__).parent.parent
                 data_dir = project_root / "data"
                 data_dir.mkdir(exist_ok=True)
                 download_path = data_dir / download.suggested_filename
                 download.save_as(str(download_path))
                 logger.info(f"File downloaded to: {download_path}")
-
-                # Add the year to the set of downloaded years
                 downloaded_years.add(year)
 
-        logger.info("Closing the browser.")
         browser.close()
 
 
