@@ -8,16 +8,28 @@ Test Structure:
     tests/
     ├── conftest.py              # Shared fixtures (this file)
     ├── test_unit/               # Unit tests for business logic
+    │   ├── test_column_formatter.py
     │   ├── test_dataframe_processor.py
     │   ├── test_date_converter.py
     │   ├── test_exporter.py
-    │   ├── test_tax_calculator.py
-    │   └── test_main.py
+    │   ├── test_logging_config.py
+    │   ├── test_main.py
+    │   ├── test_playwright_download_currency_archive.py
+    │   ├── test_settings.py
+    │   └── test_tax_calculator.py
     ├── test_integration/        # Integration tests (multiple components)
     │   ├── conftest.py          # Integration-specific fixtures
-    │   ├── test_data_pipeline.py
+    │   ├── test_currency_conversion_integration.py
     │   ├── test_data_import_processing.py
-    │   └── ... (see tests/test_integration/README.md)
+    │   ├── test_data_pipeline.py
+    │   ├── test_error_handling_integration.py
+    │   ├── test_export_functionality.py
+    │   └── test_tax_calculation_integration.py
+    ├── property_based/          # Property-based tests using Hypothesis
+    │   ├── test_property_based.py
+    │   └── test_property_based_advanced.py
+    ├── performance/             # Performance / benchmark tests
+    │   └── test_performance.py
     └── test_security/           # Tests for security/CI scripts
         ├── test_bandit_to_sarif.py
         └── test_security_summary.py
@@ -28,6 +40,15 @@ Usage:
 
     # Run only unit tests
     pytest tests/test_unit/
+
+    # Run only integration tests
+    pytest tests/test_integration/
+
+    # Run only property-based tests
+    pytest tests/property_based/ -m property_based
+
+    # Run only performance tests
+    pytest tests/performance/
 
     # Run only security tests
     pytest tests/test_security/ -m security
