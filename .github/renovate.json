@@ -1,0 +1,45 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "timezone": "Europe/Warsaw",
+  "schedule": ["* * * * 1"],
+  "packageRules": [
+    {
+      "description": "Python prod deps — group + automerge patch/minor",
+      "matchManagers": ["poetry"],
+      "matchDepTypes": ["dependencies"],
+      "groupName": "Python prod deps",
+      "labels": ["dependencies", "python"],
+      "semanticCommitType": "chore",
+      "semanticCommitScope": "deps",
+      "automerge": true,
+      "matchUpdateTypes": ["patch", "minor"]
+    },
+    {
+      "description": "Python dev deps — group + automerge patch/minor",
+      "matchManagers": ["poetry"],
+      "matchDepTypes": ["dev-dependencies"],
+      "groupName": "Python dev deps",
+      "labels": ["dependencies", "python"],
+      "semanticCommitType": "chore",
+      "semanticCommitScope": "deps",
+      "automerge": true,
+      "matchUpdateTypes": ["patch", "minor"]
+    },
+    {
+      "description": "GitHub Actions — group + automerge patch/minor",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions",
+      "labels": ["dependencies", "github-actions"],
+      "semanticCommitType": "ci",
+      "semanticCommitScope": "deps",
+      "automerge": true,
+      "matchUpdateTypes": ["patch", "minor"]
+    },
+    {
+      "description": "Block automerge for all major updates",
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    }
+  ]
+}
