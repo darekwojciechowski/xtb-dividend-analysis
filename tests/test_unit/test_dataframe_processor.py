@@ -58,39 +58,48 @@ class TestColumnOperations:
         self, processor: DataFrameProcessor
     ) -> None:
         """Tests that columns are renamed correctly with valid mapping."""
-        # Arrange - processor from fixture
+        # Arrange
+        original_date_values = processor.df["Date"].tolist()
 
         # Act
         processor.rename_columns(self.rename_mapping)
 
-        # Assert
+        # Assert — old names gone, new names present, data preserved
         assert "TransactionDate" in processor.df.columns
         assert "Value" in processor.df.columns
+        assert "Date" not in processor.df.columns
+        assert "Amount" not in processor.df.columns
+        assert processor.df["TransactionDate"].tolist() == original_date_values
 
-    def test_get_column_name_when_column_exists_then_returns_correct_name(
+    def test_get_column_name_when_column_exists_then_returns_exact_match(
         self, processor: DataFrameProcessor
     ) -> None:
-        """Tests that correct column name is returned when it exists."""
-        # Arrange - processor from fixture
+        """Tests that the english column name is returned when it exists."""
+        # Arrange - processor has "Ticker" column
 
         # Act
         result = processor.get_column_name(*self.column_alternatives)
 
-        # Assert
-        assert result in self.column_alternatives
+        # Assert — English name takes priority when present
+        assert result == "Ticker"
 
-    def test_add_empty_column_when_called_then_column_with_nans_added(
+    def test_add_empty_column_when_called_then_inserted_at_correct_position(
         self, processor: DataFrameProcessor
     ) -> None:
-        """Tests that new column with NaN values is added."""
-        # Arrange - processor from fixture
+        """Tests that new column with NaN values is inserted at position 4."""
+        # Arrange
+        original_columns = list(processor.df.columns)
 
         # Act
         processor.add_empty_column(self.new_column_name)
 
-        # Assert
+        # Assert — column exists, all NaN, and at correct position
         assert self.new_column_name in processor.df.columns
         assert processor.df[self.new_column_name].isnull().all()
+        assert list(processor.df.columns).index(self.new_column_name) == 4
+        # Original columns are all still present
+        for col in original_columns:
+            assert col in processor.df.columns
 
 
 @pytest.mark.unit
@@ -99,41 +108,84 @@ class TestDataTransformation:
 
     required_ticker_column = "Ticker"
 
-    def test_colorize_when_applied_then_ticker_column_retained(
+    def test_colorize_when_applied_then_colored_ticker_column_created(
         self, processor: DataFrameProcessor
     ) -> None:
-        """Tests that Ticker column is retained after colorization."""
+        """Tests that Colored Ticker column is created with ANSI escape codes."""
         # Arrange - processor from fixture
 
         # Act
         processor.apply_colorize_ticker()
 
-        # Assert
+        # Assert — original Ticker preserved, new Colored Ticker created with ANSI
         assert self.required_ticker_column in processor.df.columns
+        assert "Colored Ticker" in processor.df.columns
+        for idx, row in processor.df.iterrows():
+            colored = row["Colored Ticker"]
+            original = row["Ticker"]
+            # Colored ticker must contain the original ticker text
+            assert original in colored
+            # Must contain ANSI reset code
+            assert "\033[0m" in colored
 
-    def test_extract_when_applied_then_returns_valid_dataframe(
-        self, processor: DataFrameProcessor
-    ) -> None:
-        """Tests that extractor returns a valid DataFrame."""
-        # Arrange - processor from fixture
+    def test_extract_when_applied_then_comments_transformed(self) -> None:
+        """Tests that extractor transforms comment values based on keywords."""
+        # Arrange — use known keyword-matching comments
+        df = pd.DataFrame(
+            {
+                "Date": ["2024-01-01", "2024-01-02", "2024-01-03"],
+                "Ticker": ["A", "B", "C"],
+                "Amount": [10.0, 20.0, 30.0],
+                "Type": ["Cash", "Cash", "Cash"],
+                "Comment": [
+                    "Transfer from Blik account",
+                    "Pekao bank wire",
+                    "SBUX.US USD 0.5700/ SHR",
+                ],
+                "Net Dividend": [10.0, 20.0, 30.0],
+                "Shares": [1, 2, 3],
+                "Currency": ["PLN", "PLN", "USD"],
+            }
+        )
+        processor = DataFrameProcessor(df)
 
         # Act
         processor.apply_extractor()
 
-        # Assert
-        assert isinstance(processor.df, pd.DataFrame)
+        # Assert — keyword matches become canonical labels
+        assert processor.df.loc[0, "Comment"] == "Blik(Payu) deposit"
+        assert processor.df.loc[1, "Comment"] == "Pekao S.A. deposit"
+        # Non-matching comment stays unchanged
+        assert processor.df.loc[2, "Comment"] == "SBUX.US USD 0.5700/ SHR"
 
-    def test_move_negative_when_executed_then_returns_dataframe(
-        self, processor: DataFrameProcessor
+    def test_move_negative_when_executed_then_negatives_moved_to_tax_collected(
+        self,
     ) -> None:
-        """Tests that move_negative_values executes successfully."""
-        # Arrange - processor from fixture
+        """Tests that negative Net Dividend values move to Tax Collected column."""
+        # Arrange
+        df = pd.DataFrame(
+            {
+                "Date": ["2024-01-01", "2024-01-02", "2024-01-03"],
+                "Ticker": ["AAPL", "MSFT", "GOOGL"],
+                "Amount": [10.0, -1.5, 20.0],
+                "Type": ["Cash", "Cash", "Cash"],
+                "Comment": ["Div", "Tax", "Div"],
+                "Net Dividend": [10.0, -1.5, 20.0],
+                "Shares": [1, 1, 2],
+                "Currency": ["USD", "USD", "USD"],
+            }
+        )
+        processor = DataFrameProcessor(df)
 
         # Act
         processor.move_negative_values()
 
-        # Assert
-        assert isinstance(processor.df, pd.DataFrame)
+        # Assert — negative value moved to Tax Collected
+        assert processor.df.loc[1, "Tax Collected"] == -1.5
+        assert pd.isna(processor.df.loc[1, "Net Dividend"])
+        # Positive values unchanged
+        assert processor.df.loc[0, "Net Dividend"] == 10.0
+        assert processor.df.loc[2, "Net Dividend"] == 20.0
 
     def test_move_negative_when_no_negatives_then_dataframe_unchanged(
         self, processor: DataFrameProcessor
@@ -148,37 +200,80 @@ class TestDataTransformation:
         # Assert
         pd.testing.assert_frame_equal(processor.df, original_df)
 
-    def test_add_currency_when_called_then_executes_without_error(
-        self, processor: DataFrameProcessor
+    def test_add_currency_when_called_then_appends_correct_currency_suffix(
+        self,
     ) -> None:
-        """Tests that currency addition executes without errors."""
-        # Arrange - processor from fixture
+        """Tests that correct currency suffix is appended based on ticker."""
+        # Arrange
+        df = pd.DataFrame(
+            {
+                "Date": ["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
+                "Ticker": ["SBUX.US", "TKT.PL", "NOVOB.DK", "SHEL.UK"],
+                "Amount": [10.0, 20.0, 30.0, 40.0],
+                "Type": ["Cash", "Cash", "Cash", "Cash"],
+                "Comment": ["Div", "Div", "Div", "Div"],
+                "Net Dividend": [5.7, 3.2, 8.1, 12.0],
+                "Shares": [1, 2, 1, 3],
+                "Currency": ["USD", "PLN", "DKK", "GBP"],
+            }
+        )
+        processor = DataFrameProcessor(df)
 
         # Act
         processor.add_currency_to_dividends()
 
         # Assert
-        assert isinstance(processor.df, pd.DataFrame)
+        assert processor.df.loc[0, "Net Dividend"] == "5.7 USD"
+        assert processor.df.loc[1, "Net Dividend"] == "3.2 PLN"
+        assert processor.df.loc[2, "Net Dividend"] == "8.1 DKK"
+        assert processor.df.loc[3, "Net Dividend"] == "12.0 GBP"
 
 
 @pytest.mark.unit
 class TestFilteringOperations:
     """Test suite for data filtering operations."""
 
-    valid_dividend_types = ["Dividend", "Dywidenda"]
+    all_valid_dividend_types = [
+        "Dividend",
+        "Dywidenda",
+        "DIVIDENT",
+        "Withholding Tax",
+        "Podatek od dywidend",
+    ]
 
-    def test_filter_when_called_then_row_count_not_increased(
-        self, processor: DataFrameProcessor
-    ) -> None:
-        """Tests that filtering does not increase row count."""
+    def test_filter_when_called_then_only_dividend_types_remain(self) -> None:
+        """Tests that only valid dividend type rows survive filtering."""
         # Arrange
-        original_len = len(processor.df)
+        df = pd.DataFrame(
+            {
+                "Type": [
+                    "Dividend",
+                    "Fee",
+                    "Dywidenda",
+                    "Commission",
+                    "Withholding Tax",
+                    "Cash",
+                    "Podatek od dywidend",
+                    "DIVIDENT",
+                ],
+                "Amount": [10.0, 5.0, 20.0, 3.0, -1.5, 100.0, -2.0, 15.0],
+            }
+        )
+        processor = DataFrameProcessor(df)
 
         # Act
         processor.filter_dividends()
 
         # Assert
-        assert len(processor.df) <= original_len
+        assert len(processor.df) == 5
+        assert set(processor.df["Type"].tolist()) == {
+            "Dividend",
+            "Dywidenda",
+            "Withholding Tax",
+            "Podatek od dywidend",
+            "DIVIDENT",
+        }
+        assert all(processor.df["Type"].isin(self.all_valid_dividend_types))
 
     def test_filter_when_missing_values_then_removes_invalid_rows(self) -> None:
         """Tests that filtering removes rows with missing Type values."""
@@ -195,8 +290,10 @@ class TestFilteringOperations:
         processor.filter_dividends()
 
         # Assert
+        assert len(processor.df) == 2
         assert processor.df["Type"].isnull().sum() == 0
-        assert all(processor.df["Type"].isin(self.valid_dividend_types))
+        assert list(processor.df["Type"]) == ["Dividend", "Dywidenda"]
+        assert list(processor.df["Amount"]) == [10.0, 30.0]
 
 
 @pytest.mark.unit
@@ -206,35 +303,69 @@ class TestAggregationOperations:
     dummy_paths = ["dummy_path"]
     language = "en"
 
-    def test_group_when_called_then_returns_grouped_dataframe(
-        self, processor: DataFrameProcessor
+    def test_group_when_called_then_amounts_are_summed_by_group(
+        self,
     ) -> None:
-        """Tests that grouping returns a valid grouped DataFrame."""
-        # Arrange - processor from fixture
+        """Tests that grouping sums amounts per Date+Ticker+Type+Comment group."""
+        # Arrange — two rows for same ticker on same date, different amounts
+        df = pd.DataFrame(
+            {
+                "Date": ["2024-01-01", "2024-01-01", "2024-01-02"],
+                "Ticker": ["SBUX.US", "SBUX.US", "MSFT.US"],
+                "Amount": [5.7, 3.3, 12.0],
+                "Type": ["Dividend", "Dividend", "Dividend"],
+                "Comment": [
+                    "SBUX.US USD 0.5700/ SHR",
+                    "SBUX.US USD 0.5700/ SHR",
+                    "MSFT.US USD 0.7500/ SHR",
+                ],
+            }
+        )
+        processor = DataFrameProcessor(df)
 
         # Act
         processor.group_by_dividends()
 
-        # Assert
-        assert isinstance(processor.df, pd.DataFrame)
+        # Assert — two SBUX rows merged into one, MSFT stays separate
+        assert len(processor.df) == 2
+        assert "Net Dividend" in processor.df.columns
+        sbux_row = processor.df[processor.df["Ticker"] == "SBUX.US"]
+        assert sbux_row["Net Dividend"].values[0] == pytest.approx(9.0)
+        msft_row = processor.df[processor.df["Ticker"] == "MSFT.US"]
+        assert msft_row["Net Dividend"].values[0] == pytest.approx(12.0)
 
-    def test_calculate_when_called_then_executes_without_error(
-        self, processor: DataFrameProcessor
+    def test_calculate_when_called_then_shares_computed_correctly(
+        self,
     ) -> None:
-        """Tests that dividend calculation executes successfully."""
-        # Arrange - Add required columns for calculate_dividend
-        processor.df["Date D-1"] = processor.df["Date"]
-        processor.df["Comment"] = ["Dividend 1.5"] * len(processor.df)
+        """Tests that dividend calculation produces correct Shares values."""
+        # Arrange — known data: total_dividend=5.7, per_share=0.57, rate=4.0
+        # Expected shares = 5.7 / (0.57 * 4.0) = 5.7 / 2.28 = 2.5 → round = 2
+        df = pd.DataFrame(
+            {
+                "Date": pd.to_datetime(["2024-01-02"]),
+                "Ticker": ["SBUX.US"],
+                "Net Dividend": [5.7],
+                "Shares": [0],
+                "Comment": ["SBUX.US USD 0.5700/ SHR"],
+                "Date D-1": pd.to_datetime(["2024-01-01"]),
+                "Type": ["Dividend"],
+                "Currency": ["USD"],
+            }
+        )
+        processor = DataFrameProcessor(df)
 
-        # Act - Mock CurrencyConverter.get_exchange_rate to avoid ValueError when no exchange rate files exist
+        # Act
         with patch(
             "data_processing.currency_converter.CurrencyConverter.get_exchange_rate",
             return_value=4.0,
         ):
-            processor.calculate_dividend(self.dummy_paths, statement_currency="PLN")
+            processor.calculate_dividend(["dummy_path"], statement_currency="PLN")
 
-        # Assert
-        assert isinstance(processor.df, pd.DataFrame)
+        # Assert — shares = round(5.7 / (0.57 * 4.0)) = round(2.500...) = 3
+        assert processor.df.loc[0, "Shares"] == 3
+        assert processor.df.loc[0, "Currency"] == "USD"
+        # Net Dividend recalculated: shares * dividend_per_share = 3 * 0.57 = 1.71
+        assert processor.df.loc[0, "Net Dividend"] == pytest.approx(1.71)
 
 
 @pytest.mark.unit
@@ -244,17 +375,17 @@ class TestTaxProcessing:
     base_amount = 100.0
 
     @pytest.mark.parametrize(
-        "tax_values,expected_valid",
+        "tax_values,has_zero_or_nan",
         [
-            ([0.15, 0.20, 0.19], True),
-            ([0.05, 0.0, 0.30], False),  # Contains 0
-            ([0.19, 0.25, 0.15], True),
+            ([0.15, 0.20, 0.19], False),
+            ([0.05, 0.0, 0.30], True),  # Contains 0
+            ([0.19, 0.25, 0.15], False),
         ],
     )
     def test_replace_when_various_tax_values_then_validates_correctly(
-        self, tax_values: list[float], expected_valid: bool
+        self, tax_values: list[float], has_zero_or_nan: bool
     ) -> None:
-        """Tests that replace_tax_with_percentage validates tax values correctly."""
+        """Tests that replace_tax_with_percentage preserves tax values and validates them."""
         # Arrange
         df = pd.DataFrame(
             {
@@ -270,20 +401,47 @@ class TestTaxProcessing:
         # Act
         result = processor.replace_tax_with_percentage()
 
-        # Assert - method should return DataFrame without error
-        assert isinstance(result, pd.DataFrame)
-        # If expected_valid is False, there should be warning about zero values
+        # Assert — tax values are preserved unchanged
         assert "Tax Collected" in result.columns
+        assert list(result["Tax Collected"]) == tax_values
+        # Row count preserved
+        assert len(result) == len(tax_values)
+        # Zero-detection works correctly
+        zero_count = (result["Tax Collected"] == 0).sum() + result[
+            "Tax Collected"
+        ].isna().sum()
+        assert (zero_count > 0) == has_zero_or_nan
+
+    def test_replace_when_us_ticker_30_pct_then_data_preserved(self) -> None:
+        """Tests that US tickers with 30% tax rate are detected (W8BEN warning scenario)."""
+        # Arrange
+        df = pd.DataFrame(
+            {
+                "Comment": ["Div", "Div"],
+                "Tax Collected": [0.30, 0.15],
+                "Net Dividend": [100.0, 50.0],
+                "Ticker": ["AAPL.US", "MSFT.US"],
+                "Date": ["2025-01-01", "2025-01-02"],
+            }
+        )
+        processor = DataFrameProcessor(df)
+
+        # Act
+        result = processor.replace_tax_with_percentage()
+
+        # Assert — data preserved, 30% detection works
+        assert result.loc[0, "Tax Collected"] == 0.30
+        assert result.loc[1, "Tax Collected"] == 0.15
 
 
 @pytest.mark.unit
 class TestDataFrameAccess:
     """Test suite for DataFrame access methods."""
 
-    def test_get_processed_when_called_then_returns_valid_dataframe(
+    def test_get_processed_when_called_then_returns_dataframe_with_expected_columns(
         self, processor: DataFrameProcessor
     ) -> None:
-        """Tests that get_processed_df returns a valid DataFrame."""
+        """Tests that get_processed_df returns a DataFrame with the original columns and row count."""
         # Arrange - processor from fixture
 
         # Act
@@ -291,6 +449,10 @@ class TestDataFrameAccess:
 
         # Assert
         assert isinstance(result, pd.DataFrame)
+        assert len(result) == 2
+        assert "Ticker" in result.columns
+        assert "Date" in result.columns
+        assert list(result["Ticker"]) == ["AAPL", "MSFT"]
 
 
 @pytest.mark.edge_case
@@ -299,16 +461,14 @@ class TestEdgeCases:
 
     rename_mapping = {"Date": "TransactionDate"}
 
-    def test_process_when_empty_dataframe_then_handles_gracefully(self) -> None:
-        """Tests that empty DataFrame is handled without errors."""
+    def test_process_when_empty_dataframe_then_rename_raises_key_error(self) -> None:
+        """Tests that empty DataFrame raises KeyError on rename."""
         # Arrange
         empty_processor = DataFrameProcessor(pd.DataFrame())
 
-        # Act & Assert - should handle gracefully
-        try:
+        # Act & Assert
+        with pytest.raises(KeyError):
             empty_processor.rename_columns(self.rename_mapping)
-        except KeyError:
-            pass  # Expected behavior for empty DataFrame
 
         assert empty_processor.df.empty
 
@@ -402,5 +562,16 @@ class TestPerformance:
         # Act
         processor.group_by_dividends()
 
-        # Assert
+        # Assert — grouped result has fewer rows than input (duplicate tickers/dates merged)
         assert len(processor.df) >= expected_min_length
+        assert "Net Dividend" in processor.df.columns
+        # When all rows share same ticker, grouping should reduce row count
+        if len(set(tickers)) == 1 and len(set(types)) == 1 and len(set(comments)) == 1:
+            unique_dates = len(
+                set(
+                    pd.date_range(
+                        start=self.date_start, periods=periods, freq=self.frequency
+                    )
+                )
+            )
+            assert len(processor.df) == unique_dates
