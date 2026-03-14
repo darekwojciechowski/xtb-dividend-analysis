@@ -321,21 +321,27 @@ class CurrencyConverter:
 
             # Special case: ASB.PL uses USD
             if "ASB.PL" in ticker:
-                return f"{dividend} {Currency.USD.value}"
+                currency_code = Currency.USD.value
+                return f"{dividend} {currency_code}"
 
             # Determine currency based on ticker suffix
             if TickerSuffix.US.value in ticker:
-                return f"{dividend} {Currency.USD.value}"
+                currency_code = Currency.USD.value
+                return f"{dividend} {currency_code}"
             elif TickerSuffix.PL.value in ticker:
-                return f"{dividend} {Currency.PLN.value}"
+                currency_code = Currency.PLN.value
+                return f"{dividend} {currency_code}"
             elif TickerSuffix.DK.value in ticker:
-                return f"{dividend} {Currency.DKK.value}"
+                currency_code = Currency.DKK.value
+                return f"{dividend} {currency_code}"
             elif TickerSuffix.UK.value in ticker:
-                return f"{dividend} {Currency.GBP.value}"
+                currency_code = Currency.GBP.value
+                return f"{dividend} {currency_code}"
             elif any(
                 suffix.value in ticker for suffix in TickerSuffix.eurozone_suffixes()
             ):
-                return f"{dividend} {Currency.EUR.value}"
+                currency_code = Currency.EUR.value
+                return f"{dividend} {currency_code}"
 
             # No change if the condition doesn't match
             return dividend

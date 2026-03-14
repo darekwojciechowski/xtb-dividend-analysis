@@ -43,9 +43,13 @@ class ColumnFormatter:
         Returns:
             DataFrame with colored ticker column.
         """
-        self.df["Colored Ticker"] = self.df["Ticker"].apply(
-            lambda ticker: f"{get_random_color()}{ticker}\033[0m"
-        )
+
+        def colorize_ticker(ticker: str) -> str:
+            color = get_random_color()
+            reset = "\033[0m"
+            return f"{color}{ticker}{reset}"
+
+        self.df["Colored Ticker"] = self.df["Ticker"].apply(colorize_ticker)
         return self.df
 
     def apply_extractor(self) -> pd.DataFrame:
@@ -256,7 +260,8 @@ class ColumnFormatter:
                 if not pd.isna(tax_raw) and tax_raw != 0:
                     # Tax Collected Raw contains negative value, take absolute
                     tax_amount = abs(float(tax_raw))
-                    return f"{tax_amount:.2f} {currency}"
+                    formatted_amount = f"{tax_amount:.2f}"
+                    return f"{formatted_amount} {currency}"
 
             # For PLN statement or if raw amount not available: calculate from percentage
             # Net Dividend = Gross Dividend * (1 - tax_percentage)
@@ -266,7 +271,8 @@ class ColumnFormatter:
             tax_amount = gross_dividend * tax_percentage
 
             # Format with currency
-            return f"{tax_amount:.2f} {currency}"
+            formatted_amount = f"{tax_amount:.2f}"
+            return f"{formatted_amount} {currency}"
 
         # Create Tax Collected Amount column
         self.df["Tax Collected Amount"] = self.df.apply(calculate_tax_amount, axis=1)

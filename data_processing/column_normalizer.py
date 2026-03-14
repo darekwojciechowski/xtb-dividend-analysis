@@ -69,8 +69,9 @@ class ColumnNormalizer:
             col for col in column_mapping.keys() if col not in self.df.columns
         ]
         if missing_columns:
+            missing_cols_str = ", ".join(missing_columns)
             raise KeyError(
-                f"The following columns are missing in the DataFrame: {', '.join(missing_columns)}"
+                f"The following columns are missing in the DataFrame: {missing_cols_str}"
             )
 
         self.df = self.df.rename(columns=column_mapping)
@@ -95,7 +96,8 @@ class ColumnNormalizer:
 
         missing_columns = [col for col in columns if col not in self.df.columns]
         if missing_columns:
-            raise ValueError(f"Error: Missing columns: {', '.join(missing_columns)}")
+            missing_cols_str = ", ".join(missing_columns)
+            raise ValueError(f"Error: Missing columns: {missing_cols_str}")
 
         self.df = self.df.drop(columns=columns)
         return self.df

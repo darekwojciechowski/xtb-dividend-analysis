@@ -172,6 +172,9 @@ dmypy.json
 # Mutation testing
 .mutmut-cache
 mutants/
+analyze_incompetent_mutations.py
+detailed_incompetent_analysis.py
+mutmut-run.log
 
 # Pyre type checker
 .pyre/

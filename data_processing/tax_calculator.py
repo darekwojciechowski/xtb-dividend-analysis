@@ -71,25 +71,23 @@ class TaxCalculator:
                 parsed.
         """
         if pd.isna(value_str) or value_str == "" or value_str == "nan":
-            raise ValueError(
+            msg = (
                 f"Missing '{column_name}' value for ticker '{ticker}' on date '{date}'."
             )
+            raise ValueError(msg)
 
         parts = value_str.split()
         if len(parts) != 2:
-            raise ValueError(
-                f"Invalid '{column_name}' format for ticker '{ticker}' on date '{date}': '{value_str}'. "
-                f"Expected format: '6.84 USD' or '28.22 PLN'."
-            )
+            msg = f"Invalid '{column_name}' format for ticker '{ticker}' on date '{date}': '{value_str}'. Expected format: '6.84 USD' or '28.22 PLN'."
+            raise ValueError(msg)
 
         try:
             numeric_value = float(parts[0])
             currency = parts[1]
             return numeric_value, currency
         except ValueError:
-            raise ValueError(
-                f"Invalid numeric value in '{column_name}' for ticker '{ticker}' on date '{date}': '{parts[0]}'"
-            )
+            msg = f"Invalid numeric value in '{column_name}' for ticker '{ticker}' on date '{date}': '{parts[0]}'"
+            raise ValueError(msg)
 
     def _parse_tax_collected_amount(
         self, value_str: str, ticker: str, date: str
@@ -114,17 +112,14 @@ class TaxCalculator:
 
         parts = value_str.split()
         if len(parts) != 2:
-            raise ValueError(
-                f"Invalid 'Tax Collected Amount' format for ticker '{ticker}' on date '{date}': '{value_str}'. "
-                f"Expected format: '1.03 USD' or '-'."
-            )
+            msg = f"Invalid 'Tax Collected Amount' format for ticker '{ticker}' on date '{date}': '{value_str}'. Expected format: '1.03 USD' or '-'."
+            raise ValueError(msg)
 
         try:
             return float(parts[0])
         except ValueError:
-            raise ValueError(
-                f"Invalid numeric value in 'Tax Collected Amount' for ticker '{ticker}' on date '{date}': '{parts[0]}'"
-            )
+            msg = f"Invalid numeric value in 'Tax Collected Amount' for ticker '{ticker}' on date '{date}': '{parts[0]}'"
+            raise ValueError(msg)
 
     def _parse_exchange_rate(self, value_str: str, ticker: str, date: str) -> float:
         """Parse the Exchange Rate D-1, accepting ``"-"`` as ``1.0`` (PLN).
@@ -147,17 +142,14 @@ class TaxCalculator:
 
         parts = value_str.split()
         if len(parts) != 2:
-            raise ValueError(
-                f"Invalid 'Exchange Rate D-1' format for ticker '{ticker}' on date '{date}': '{value_str}'. "
-                f"Expected format: '4.1512 PLN' or '-'."
-            )
+            msg = f"Invalid 'Exchange Rate D-1' format for ticker '{ticker}' on date '{date}': '{value_str}'. Expected format: '4.1512 PLN' or '-'."
+            raise ValueError(msg)
 
         try:
             return float(parts[0])
         except ValueError:
-            raise ValueError(
-                f"Invalid numeric value in 'Exchange Rate D-1' for ticker '{ticker}' on date '{date}': '{parts[0]}'"
-            )
+            msg = f"Invalid numeric value in 'Exchange Rate D-1' for ticker '{ticker}' on date '{date}': '{parts[0]}'"
+            raise ValueError(msg)
 
     def calculate_tax_for_pln_statement(self, statement_currency: str) -> pd.DataFrame:
         """Calculate Belka tax in PLN for a PLN-denominated statement.

@@ -170,6 +170,7 @@ class DataAggregator:
         # Reorder the DataFrame columns
         self.df = self.df[existing_columns]
 
-        logger.info(f"Step 12 - Reordered columns to: {', '.join(existing_columns)}")
+        existing_cols_str = ", ".join(existing_columns)
+        logger.info(f"Step 12 - Reordered columns to: {existing_cols_str}")
 
         return self.df
