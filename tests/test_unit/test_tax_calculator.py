@@ -13,6 +13,7 @@ Test classes:
                           ``_parse_tax_collected_amount``,
                           ``_parse_exchange_rate`` with valid and sentinel inputs
     TestErrorHandling   — missing required columns, invalid currency-string format
+    TestPropertyBased   — hypothesis-based property tests for formula invariants
 
 All tests are marked ``@pytest.mark.unit``.
 """
@@ -21,6 +22,8 @@ from __future__ import annotations
 
 import pandas as pd
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
 from data_processing.tax_calculator import TaxCalculator
 
@@ -105,7 +108,7 @@ class TestTaxCalculation:
         rounded_tax = round(tax_in_pln, 2)
         if rounded_tax == 0.0:
             return "-"
-        return f"{rounded_tax} PLN"
+        return f"{rounded_tax:.2f} PLN"
 
     @staticmethod
     def calculate_expected_tax_usd_statement(
@@ -131,7 +134,7 @@ class TestTaxCalculation:
         rounded_tax = round(tax_in_pln, 2)
         if rounded_tax == 0.0:
             return "-"
-        return f"{rounded_tax} PLN"
+        return f"{rounded_tax:.2f} PLN"
 
     @pytest.mark.parametrize(
         "net_dividend,tax_collected_amount,tax_collected_pct,exchange_rate,ticker,date",
@@ -359,14 +362,301 @@ class TestTaxCalculation:
         tax_usd = result_usd.loc[0, "Tax Amount PLN"]
 
         # PLN statement: (net * 0.19 - tax_collected) * rate = (10*0.19 - 1) * 4 = 3.6
-        expected_pln = f"{round((net_dividend * 0.19 - tax_collected_amount) * exchange_rate, 2)} PLN"
+        expected_pln = f"{round((net_dividend * 0.19 - tax_collected_amount) * exchange_rate, 2):.2f} PLN"
         # USD statement: ((net + tax_collected) * 0.19 - tax_collected) * rate = (11*0.19 - 1) * 4 = 4.36
-        expected_usd = f"{round(((net_dividend + tax_collected_amount) * 0.19 - tax_collected_amount) * exchange_rate, 2)} PLN"
+        expected_usd = f"{round(((net_dividend + tax_collected_amount) * 0.19 - tax_collected_amount) * exchange_rate, 2):.2f} PLN"
 
         assert tax_pln == expected_pln
         assert tax_usd == expected_usd
         assert tax_pln != tax_usd, (
             "PLN and USD statements should produce different results with same input"
+        )
+
+    @pytest.mark.parametrize(
+        "tax_collected_pct",
+        [
+            0.1899,  # Just below 19%
+            0.18999,  # Very close to 19%
+            0.189999,  # Extremely close to 19%
+            0.19,  # Exactly 19% (critical boundary)
+            0.19001,  # Just above 19%
+            0.19999,  # Well above 19%
+            0.20,  # Clearly above 19%
+        ],
+    )
+    def test_tax_boundary_precision_at_19_percent(self, tax_collected_pct) -> None:
+        """Test that >= operator at 19% threshold is correctly implemented.
+
+        This test kills mutations like:
+        - Changing >= to > (would fail for tax_collected_pct == 0.19)
+        - Changing >= to < (would fail for all values)
+        - Changing 0.19 to 0.18 or 0.20
+        """
+        # Arrange - use very large dividend so boundary cases don't round to zero
+        # With net_dividend=100000 and tax_collected_pct=0.189999,
+        # the result is (100000*0.19 - 100000*0.189999) = 0.1, not 0.00
+        net_dividend = 100000.0
+        tax_collected_amount = net_dividend * tax_collected_pct
+        exchange_rate = 1.0
+
+        df = self.create_test_dataframe(
+            date="2025-01-15",
+            ticker="PRECISION.US",
+            shares=1.0,
+            net_dividend=net_dividend,
+            currency="USD",
+            tax_collected_pct=tax_collected_pct,
+            tax_collected_amount=tax_collected_amount,
+            exchange_rate=exchange_rate,
+        )
+        calculator = TaxCalculator(df)
+
+        # Act
+        result_df = calculator.calculate_tax_for_pln_statement("PLN")
+        tax_result = result_df.loc[0, "Tax Amount PLN"]
+
+        # Assert - critical: exactly >= 0.19 should return "-"
+        if tax_collected_pct >= 0.19:
+            assert tax_result == "-", (
+                f"For tax rate {tax_collected_pct:.5f} (>= 0.19), "
+                f"expected '-' but got '{tax_result}'. This indicates >= is incorrectly "
+                f"implemented as > or another operator."
+            )
+        else:
+            assert tax_result != "-", (
+                f"For tax rate {tax_collected_pct:.5f} (< 0.19), "
+                f"expected calculated tax but got '-'. This indicates >= is incorrectly "
+                f"implemented as > or <."
+            )
+            # Verify the numeric part exists
+            parts = tax_result.split()
+            assert len(parts) == 2
+            assert parts[1] == "PLN"
+
+    @pytest.mark.parametrize(
+        "net_dividend,tax_collected_amount,exchange_rate",
+        [
+            # Cases where (net*0.19 - tax_collected)*rate rounds to 0.00
+            (0.01, 0.0019, 1.0),  # 0.001 * 1.0 = 0.001 → rounds to 0.00
+            (0.1, 0.019, 1.0),  # 0.001 * 1.0 = 0.001 → rounds to 0.00
+            (0.05, 0.0095, 1.0),  # 0.0005 * 1.0 = 0.0005 → rounds to 0.00
+            (1.0, 0.19, 1.0),  # 0.0 * 1.0 = 0.0 → rounds to 0.00 (exact zero)
+            (1.0, 0.1901, 1.0),  # -0.0001 * 1.0 = -0.0001 → rounds to 0.00
+            (5.0, 0.9494, 1.0),  # 0.0006 * 1.0 = 0.0006 → rounds to 0.00
+            (2.5, 0.4749, 1.0),  # 0.0001 * 1.0 = 0.0001 → rounds to 0.00
+        ],
+    )
+    def test_tax_rounding_edge_cases_returning_dash(
+        self, net_dividend, tax_collected_amount, exchange_rate
+    ) -> None:
+        """Test that very small tax amounts that round to 0.00 PLN return '-'.
+
+        This test kills mutations like:
+        - Changing == to !=, <, >, <=, >= in the rounding check
+        - Removing the rounding check entirely
+        - Using wrong rounding value (0.01 instead of 0.0)
+        """
+        # Arrange
+        tax_collected_pct = (
+            tax_collected_amount / net_dividend if net_dividend != 0 else 0
+        )
+        df = self.create_test_dataframe(
+            date="2025-02-10",
+            ticker="ROUNDING.US",
+            shares=1.0,
+            net_dividend=net_dividend,
+            currency="USD",
+            tax_collected_pct=tax_collected_pct,
+            tax_collected_amount=tax_collected_amount,
+            exchange_rate=exchange_rate,
+        )
+        calculator = TaxCalculator(df)
+
+        # Act
+        result_df = calculator.calculate_tax_for_pln_statement("PLN")
+        tax_result = result_df.loc[0, "Tax Amount PLN"]
+
+        # Assert - calculate what it would round to
+        calculated_tax = (net_dividend * 0.19 - tax_collected_amount) * exchange_rate
+        rounded_tax = round(calculated_tax, 2)
+
+        if rounded_tax == 0.0:
+            # Must return "-" when rounds to exactly 0.00
+            assert tax_result == "-", (
+                f"Expected '-' when tax rounds to 0.00, but got '{tax_result}'. "
+                f"Raw: {calculated_tax}, rounded: {rounded_tax}. "
+                f"This indicates the == 0.0 check is incorrectly implemented."
+            )
+        else:
+            # Must return formatted amount when doesn't round to 0.00
+            assert tax_result != "-", (
+                f"Expected formatted amount when tax={rounded_tax:.2f}, but got '-'. "
+                f"Raw: {calculated_tax}. This indicates the == 0.0 check is inverted."
+            )
+
+    @pytest.mark.parametrize(
+        "amount_value",
+        [
+            0.001,  # Rounds to 0.00
+            0.004,  # Rounds to 0.00
+            0.005,  # Rounds to 0.01 (banker's rounding may vary)
+            0.006,  # Rounds to 0.01
+            0.014,  # Rounds to 0.01
+            0.015,  # Rounds to 0.02
+            0.234,  # Rounds to 0.23
+            0.567,  # Rounds to 0.57
+            1.001,  # Rounds to 1.00
+            1.234,  # Rounds to 1.23
+            1.235,  # Rounds to 1.24 (or 1.23 with banker's rounding)
+            10.999,  # Rounds to 11.00
+            100.6666,  # Rounds to 100.67
+        ],
+    )
+    def test_tax_decimal_precision_exactly_2_places(self, amount_value) -> None:
+        """Test that all tax amounts maintain exactly 2 decimal places.
+
+        This test kills mutations like:
+        - Changing round(..., 2) to round(..., 1) or round(..., 3)
+        - Removing rounding entirely
+        - Using incomplete rounding logic
+        """
+        # Arrange - design dividend/rate so result is exactly our test amount
+        net_dividend = amount_value / 0.19
+        tax_collected_amount = 0.0
+        exchange_rate = 1.0
+        tax_collected_pct = 0.0
+
+        df = self.create_test_dataframe(
+            date="2025-03-15",
+            ticker="DECIMAL.US",
+            shares=1.0,
+            net_dividend=net_dividend,
+            currency="USD",
+            tax_collected_pct=tax_collected_pct,
+            tax_collected_amount=tax_collected_amount,
+            exchange_rate=exchange_rate,
+        )
+        calculator = TaxCalculator(df)
+
+        # Act
+        result_df = calculator.calculate_tax_for_pln_statement("PLN")
+        tax_result = result_df.loc[0, "Tax Amount PLN"]
+
+        # Assert - verify exactly 2 decimal places
+        if tax_result == "-":
+            # That's OK if it rounds to 0.00
+            assert amount_value < 0.005, (
+                f"Amount {amount_value} should not round to 0.00 and return '-'"
+            )
+        else:
+            amount_str, currency = tax_result.split()
+            parts = amount_str.split(".")
+
+            # Must have exactly 1 decimal point
+            assert len(parts) == 2, (
+                f"Expected exactly one decimal point, got '{amount_str}'. "
+                f"This indicates incorrect decimal precision formatting."
+            )
+
+            # Must have exactly 2 digits after decimal point
+            decimal_places = len(parts[1])
+            assert decimal_places == 2, (
+                f"Expected exactly 2 decimal places in '{amount_str}', "
+                f"but found {decimal_places}. "
+                f"This indicates round(..., 2) is not being used correctly "
+                f"(might be round(..., 1) or round(..., 3))."
+            )
+
+    def test_formula_subtraction_not_addition(self) -> None:
+        """Test that tax calculation uses subtraction, not addition.
+
+        This test kills mutations like:
+        - Changing (net*0.19 - tax_collected) to (net*0.19 + tax_collected)
+        - Changing order of operations
+        """
+        # Arrange - use values where - and + would produce obviously different results
+        net_dividend = 100.0
+        tax_collected_amount = 10.0
+        tax_collected_pct = 0.10
+        exchange_rate = 1.0
+
+        df = self.create_test_dataframe(
+            date="2025-04-01",
+            ticker="FORMULA.US",
+            shares=1.0,
+            net_dividend=net_dividend,
+            currency="USD",
+            tax_collected_pct=tax_collected_pct,
+            tax_collected_amount=tax_collected_amount,
+            exchange_rate=exchange_rate,
+        )
+        calculator = TaxCalculator(df)
+
+        # Act
+        result_df = calculator.calculate_tax_for_pln_statement("PLN")
+        tax_result = result_df.loc[0, "Tax Amount PLN"]
+
+        # Assert
+        # Correct formula: (100 * 0.19 - 10) * 1 = 9.0
+        # Wrong formula (+): (100 * 0.19 + 10) * 1 = 29.0
+        expected_correct = (100.0 * 0.19 - 10.0) * 1.0  # 9.0
+        expected_wrong = (100.0 * 0.19 + 10.0) * 1.0  # 29.0
+
+        assert tax_result != "-"
+        amount = float(tax_result.split()[0])
+
+        assert amount == expected_correct, (
+            f"Expected {expected_correct} (subtraction formula), "
+            f"but got {amount}. "
+            f"This indicates the formula might be using + instead of -."
+        )
+
+        assert amount != expected_wrong, (
+            f"Got {amount} which matches the WRONG formula with +. "
+            f"The code must use subtraction (net*0.19 - tax_collected), not addition."
+        )
+
+    def test_formula_multiplication_with_exchange_rate(self) -> None:
+        """Test that exchange rate is multiplied, not applied otherwise.
+
+        This test kills mutations like:
+        - Removing the * exchange_rate operation
+        - Changing * to / or + or -
+        - Swapping multiplication order
+        """
+        # Arrange - use exchange rate that clearly shows multiplication
+        net_dividend = 100.0
+        tax_collected_amount = 0.0
+        tax_collected_pct = 0.0
+        exchange_rate = 2.5  # Use 2.5 to make multiplication obvious
+
+        df = self.create_test_dataframe(
+            date="2025-04-15",
+            ticker="EXRATE.US",
+            shares=1.0,
+            net_dividend=net_dividend,
+            currency="USD",
+            tax_collected_pct=tax_collected_pct,
+            tax_collected_amount=tax_collected_amount,
+            exchange_rate=exchange_rate,
+        )
+        calculator = TaxCalculator(df)
+
+        # Act
+        result_df = calculator.calculate_tax_for_pln_statement("PLN")
+        tax_result = result_df.loc[0, "Tax Amount PLN"]
+
+        # Assert
+        # Formula: (100 * 0.19 - 0) * 2.5 = 19 * 2.5 = 47.5
+        expected = 19.0 * 2.5  # 47.5
+
+        assert tax_result != "-"
+        amount = float(tax_result.split()[0])
+
+        assert amount == expected, (
+            f"Expected {expected} (with exchange rate multiplication), "
+            f"but got {amount}. "
+            f"This indicates the exchange rate is not being multiplied correctly."
         )
 
 
@@ -634,7 +924,6 @@ class TestTaxBoundaryConditions:
         """Test that tax calculations maintain proper rounding precision."""
         # Arrange - value that produces repeating decimal
         net_dividend = 10.0 / 3  # 3.3333...
-        tax_collected_amount = 0.0
         exchange_rate = 3.3  # Another repeating decimal
 
         df = pd.DataFrame(
@@ -817,3 +1106,216 @@ class TestErrorMessages:
         error_msg = str(exc_info.value)
         assert "missing" in error_msg.lower()
         assert "columns" in error_msg.lower()
+
+
+@pytest.mark.unit
+class TestPropertyBased:
+    """Property-based tests for tax calculation formulas using Hypothesis."""
+
+    @given(
+        tax_collected_pct=st.floats(
+            min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False
+        )
+    )
+    def test_property_tax_rate_boundary_is_19_percent(self, tax_collected_pct) -> None:
+        """Property: tax >= 19% should always return '-', tax < 19% should calculate.
+
+        This property kills any mutations to the >= operator or 0.19 literal.
+        """
+        # Arrange - use large dividend to avoid rounding to zero
+        net_dividend = 1000.0
+        tax_collected_amount = net_dividend * tax_collected_pct
+
+        df = pd.DataFrame(
+            {
+                "Date": ["2025-01-01"],
+                "Ticker": ["PROP.US"],
+                "Shares": [1.0],
+                "Net Dividend": [f"{net_dividend} USD"],
+                "Tax Collected": [tax_collected_pct],
+                "Tax Collected Amount": [f"{tax_collected_amount} USD"],
+                "Exchange Rate D-1": ["1.0 PLN"],
+            }
+        )
+        calculator = TaxCalculator(df)
+
+        # Act
+        result_df = calculator.calculate_tax_for_pln_statement("PLN")
+        tax_result = result_df.loc[0, "Tax Amount PLN"]
+
+        # Assert - the property holds
+        if tax_collected_pct >= 0.19:
+            # Hypothesis: tax_collected_pct >= 0.19 → result is "-"
+            assert tax_result == "-", (
+                f"For tax_pct={tax_collected_pct:.4f} (>= 0.19), "
+                f"expected '-', got '{tax_result}'"
+            )
+        else:
+            # Hypothesis: tax_collected_pct < 0.19 → result is calculated (not "-")
+            assert tax_result != "-", (
+                f"For tax_pct={tax_collected_pct:.4f} (< 0.19), "
+                f"expected calculated value, got '-'"
+            )
+
+    @given(
+        net_dividend=st.floats(
+            min_value=0.01, max_value=100000, allow_nan=False, allow_infinity=False
+        ),
+        tax_collected_amount=st.floats(
+            min_value=0.0, max_value=10000, allow_nan=False, allow_infinity=False
+        ),
+        exchange_rate=st.floats(
+            min_value=0.1, max_value=10.0, allow_nan=False, allow_infinity=False
+        ),
+    )
+    def test_property_formula_uses_subtraction(
+        self, net_dividend, tax_collected_amount, exchange_rate
+    ) -> None:
+        """Property: formula must be (net*0.19 - tax_collected)*rate, not + or other ops.
+
+        For any valid inputs, the calculation must match the subtraction formula.
+        This catches mutations like - → + or different operator precedence.
+        """
+        # Arrange - ensure tax_collected < net*0.19 to avoid negative results
+        tax_collected_amount = min(tax_collected_amount, net_dividend * 0.19 * 0.99)
+        tax_collected_pct = (
+            tax_collected_amount / net_dividend if net_dividend > 0 else 0
+        )
+
+        df = pd.DataFrame(
+            {
+                "Date": ["2025-01-01"],
+                "Ticker": ["FORM.US"],
+                "Shares": [1.0],
+                "Net Dividend": [f"{net_dividend} USD"],
+                "Tax Collected": [tax_collected_pct],
+                "Tax Collected Amount": [f"{tax_collected_amount} USD"],
+                "Exchange Rate D-1": [f"{exchange_rate} PLN"],
+            }
+        )
+        calculator = TaxCalculator(df)
+
+        # Act
+        result_df = calculator.calculate_tax_for_pln_statement("PLN")
+        tax_result = result_df.loc[0, "Tax Amount PLN"]
+
+        # Assert - verify the formula result
+        # Expected: (net_dividend * 0.19 - tax_collected_amount) * exchange_rate
+        expected_raw = (net_dividend * 0.19 - tax_collected_amount) * exchange_rate
+        expected_rounded = round(expected_raw, 2)
+
+        if expected_rounded == 0.0:
+            assert tax_result == "-", (
+                f"Expected '-' when formula rounds to 0, got '{tax_result}' "
+                f"for inputs: net={net_dividend}, tax={tax_collected_amount}, rate={exchange_rate}"
+            )
+        else:
+            assert tax_result != "-"
+            amount_str = tax_result.split()[0]
+            amount_calc = float(amount_str)
+
+            assert amount_calc == expected_rounded, (
+                f"Expected {expected_rounded} (using subtraction), "
+                f"but got {amount_calc}. "
+                f"Inputs: net={net_dividend}, tax={tax_collected_amount}, rate={exchange_rate}"
+            )
+
+    @given(
+        net_dividend=st.floats(
+            min_value=1.0, max_value=10000, allow_nan=False, allow_infinity=False
+        ),
+        exchange_rate=st.floats(
+            min_value=0.5, max_value=5.0, allow_nan=False, allow_infinity=False
+        ),
+    )
+    def test_property_exchange_rate_is_multiplied(
+        self, net_dividend, exchange_rate
+    ) -> None:
+        """Property: result must be multiplied by exchange_rate, not added/divided.
+
+        For zero tax collected, result should be (net*0.19)*rate.
+        This catches mutations like * → /, * → +, or missing multiplication.
+        """
+        # Arrange
+        tax_collected_pct = 0.0
+
+        df = pd.DataFrame(
+            {
+                "Date": ["2025-01-01"],
+                "Ticker": ["RATE.US"],
+                "Shares": [1.0],
+                "Net Dividend": [f"{net_dividend} USD"],
+                "Tax Collected": [tax_collected_pct],
+                "Tax Collected Amount": ["-"],
+                "Exchange Rate D-1": [f"{exchange_rate} PLN"],
+            }
+        )
+        calculator = TaxCalculator(df)
+
+        # Act
+        result_df = calculator.calculate_tax_for_pln_statement("PLN")
+        tax_result = result_df.loc[0, "Tax Amount PLN"]
+
+        # Assert - verify multiplication is applied
+        expected_raw = net_dividend * 0.19 * exchange_rate
+        expected_rounded = round(expected_raw, 2)
+
+        if expected_rounded == 0.0:
+            assert tax_result == "-"
+        else:
+            assert tax_result != "-"
+            amount = float(tax_result.split()[0])
+            assert amount == expected_rounded, (
+                f"Expected {expected_rounded} (with rate multiplication), "
+                f"got {amount}. Inputs: net={net_dividend}, rate={exchange_rate}"
+            )
+
+    @given(
+        amount=st.floats(
+            min_value=0.001, max_value=1000, allow_nan=False, allow_infinity=False
+        )
+    )
+    def test_property_rounding_maintains_2_decimals(self, amount) -> None:
+        """Property: all non-dash results must have exactly 2 decimal places.
+
+        This catches mutations like round(..., 1) or round(..., 3).
+        """
+        # Arrange - design inputs so result approximately equals amount
+        net_dividend = amount / 0.19
+        tax_collected_pct = 0.0
+
+        df = pd.DataFrame(
+            {
+                "Date": ["2025-01-01"],
+                "Ticker": ["DEC.US"],
+                "Shares": [1.0],
+                "Net Dividend": [f"{net_dividend} USD"],
+                "Tax Collected": [tax_collected_pct],
+                "Tax Collected Amount": ["-"],
+                "Exchange Rate D-1": ["1.0 PLN"],
+            }
+        )
+        calculator = TaxCalculator(df)
+
+        # Act
+        result_df = calculator.calculate_tax_for_pln_statement("PLN")
+        tax_result = result_df.loc[0, "Tax Amount PLN"]
+
+        # Assert - check decimal places
+        if tax_result == "-":
+            # OK if it rounds to 0.00
+            assert amount < 0.005, (
+                f"Amount {amount} should not round to '-' if it's >= 0.005"
+            )
+        else:
+            amount_str = tax_result.split()[0]
+
+            # Verify string format: "X.YZ"
+            assert "." in amount_str, f"Expected decimal point in '{amount_str}'"
+
+            # Count decimal places
+            decimal_part = amount_str.split(".")[1]
+            assert len(decimal_part) == 2, (
+                f"Expected exactly 2 decimal places, found {len(decimal_part)} in '{amount_str}'. "
+                f"This indicates incorrect rounding precision."
+            )
