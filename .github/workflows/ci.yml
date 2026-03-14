@@ -321,8 +321,65 @@ jobs:
           path: test-results-performance.xml
 
   # ============================================================================
-  # STAGE 3: Coverage Report and Summary
+  # STAGE 3: Coverage Report and Mutation Testing
   # ============================================================================
+  mutation-test:
+    name: Mutation Testing
+    runs-on: ubuntu-latest
+    needs: test-unit
+    continue-on-error: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Run mutation testing on critical modules
+        run: poetry run mutmut run || true
+
+      - name: Display mutation results
+        if: always()
+        run: |
+          echo "## Mutation Testing Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          poetry run mutmut results 2>&1 | tail -30 >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate HTML report
+        if: always()
+        run: poetry run mutmut results > mutation-results.txt 2>&1 || true
+
+      - name: Upload mutation report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutation-report
+          path: mutation-results.txt
+          retention-days: 30
+
   coverage-report:
     name: Coverage Report
     runs-on: ubuntu-latest
@@ -402,7 +459,7 @@ jobs:
   ci-summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [lint, test-unit, test-integration, test-security, test-property, test-performance, coverage-report]
+    needs: [lint, test-unit, test-integration, test-security, test-property, test-performance, coverage-report, mutation-test]
     if: always()
 
     steps:
@@ -419,6 +476,7 @@ jobs:
           echo "| Property Tests | ${{ needs.test-property.result == 'success' && 'PASSED' || 'FAILED' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Performance Tests | ${{ needs.test-performance.result == 'success' && 'PASSED' || 'FAILED' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Coverage Report | ${{ needs.coverage-report.result == 'success' && 'PASSED' || 'FAILED' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Mutation Testing | ${{ needs.mutation-test.result == 'success' && 'PASSED' || 'SKIPPED' }} |" >> $GITHUB_STEP_SUMMARY
 
       - name: Fail if any job failed
         if: |

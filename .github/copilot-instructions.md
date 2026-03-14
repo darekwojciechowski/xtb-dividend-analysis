@@ -26,6 +26,9 @@ Run these before pushing. Always use the full command with flags, not just the t
 | `make lint` | `flake8` + `black --check` + `isort --check` + `mypy --ignore-missing-imports` |
 | `make security` | `safety scan` + `bandit -r` on all source dirs |
 | `make all` | format → lint → test-cov → security (full pre-push gate) |
+| `make mutmut` | `poetry run mutmut run` — mutation testing on `data_processing/` |
+| `make mutmut-results` | Show surviving/killed mutants summary |
+| `make mutmut-browse` | Browse mutation results interactively (TUI) |
 | `python main.py` | Run the full dividend analysis pipeline |
 
 ---

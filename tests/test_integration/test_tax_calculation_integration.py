@@ -17,7 +17,6 @@ import pytest
 
 from data_processing.tax_calculator import TaxCalculator
 
-
 # ---------------------------------------------------------------------------
 # Shared fixtures
 # ---------------------------------------------------------------------------

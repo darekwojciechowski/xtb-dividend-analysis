@@ -169,6 +169,10 @@ venv.bak/
 .dmypy.json
 dmypy.json
 
+# Mutation testing
+.mutmut-cache
+mutants/
+
 # Pyre type checker
 .pyre/
 

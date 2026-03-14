@@ -37,6 +37,7 @@ safety = "^3.7.0"
 bandit = "^1.9.4"
 tox = "^4.49.1"
 pre-commit = "^4.5.1"
+mutmut = "^3.5.0"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -86,6 +87,12 @@ ignore = ["E501"]
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.mutmut]
+paths_to_mutate = ["data_processing/"]
+tests_dir = ["tests/test_unit/"]
+also_copy = ["config/", "data_acquisition/", "visualization/", "main.py"]
+pytest_add_cli_args = ["-o", "addopts=--strict-markers", "-x", "--no-header", "-q", "--no-cov", "--tb=no", "-m", "not property_based and not slow"]
 
 [tool.coverage.run]
 branch = true

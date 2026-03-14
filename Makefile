@@ -1,4 +1,4 @@
-.PHONY: help install test test-fast test-cov lint format clean setup-dev
+.PHONY: help install test test-fast test-cov lint format clean setup-dev mutmut mutmut-results mutmut-browse
 
 help:  ## Show this help message
 	@echo "Available commands:"
@@ -49,6 +49,8 @@ clean:  ## Clean up cache files and test artifacts
 	rm -rf htmlcov
 	rm -rf .tox
 	rm -rf *.egg-info
+	rm -rf .mutmut-cache
+	rm -rf mutants
 
 setup-dev:  ## Set up development environment
 	pip install pre-commit
@@ -59,6 +61,15 @@ ci-local:  ## Run the same checks as CI locally
 	$(MAKE) lint
 	$(MAKE) test-cov
 	$(MAKE) security
+
+mutmut:  ## Run mutation testing on data_processing/
+	poetry run mutmut run
+
+mutmut-results:  ## Show mutation testing results
+	poetry run mutmut results
+
+mutmut-browse:  ## Browse mutation testing results interactively
+	poetry run mutmut browse
 
 all:  ## Run all checks (lint, test, security)
 	$(MAKE) format
