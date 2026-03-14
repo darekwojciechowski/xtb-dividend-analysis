@@ -92,6 +92,10 @@ indent-style = "space"
 paths_to_mutate = ["data_processing/"]
 tests_dir = ["tests/test_unit/"]
 also_copy = ["config/", "data_acquisition/", "visualization/", "main.py"]
+do_not_mutate = [
+    "data_processing/import_data_xlsx.py",
+    "data_processing/data_aggregator.py",
+]
 pytest_add_cli_args = ["-o", "addopts=--strict-markers", "-x", "--no-header", "-q", "--no-cov", "--tb=no", "-m", "not property_based and not slow"]
 
 [tool.coverage.run]

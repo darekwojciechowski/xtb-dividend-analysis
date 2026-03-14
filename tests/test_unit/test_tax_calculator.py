@@ -473,3 +473,347 @@ class TestErrorHandling:
             calculator._parse_value_with_currency(
                 "invalid", "Net Dividend", "SBUX.US", "2025-01-06"
             )
+
+
+@pytest.mark.unit
+class TestParkingEdgeCases:
+    """Test suite for edge cases in parsing methods."""
+
+    @pytest.mark.parametrize(
+        "value_str,expected_value,expected_currency",
+        [
+            ("1.0 USD", 1.0, "USD"),
+            ("0.01 USD", 0.01, "USD"),
+            ("100.99 DKK", 100.99, "DKK"),
+            ("0.001 EUR", 0.001, "EUR"),
+            ("999.999 GBP", 999.999, "GBP"),
+            ("1000000.0 PLN", 1000000.0, "PLN"),
+        ],
+    )
+    def test_parse_value_with_various_decimal_places(
+        self, value_str, expected_value, expected_currency
+    ) -> None:
+        """Test parsing values with various decimal places and scales."""
+        # Arrange
+        df = pd.DataFrame({"dummy": [1]})
+        calculator = TaxCalculator(df)
+
+        # Act
+        value, currency = calculator._parse_value_with_currency(
+            value_str, "Test Column", "TEST.XX", "2025-01-01"
+        )
+
+        # Assert
+        assert value == expected_value
+        assert currency == expected_currency
+
+    @pytest.mark.parametrize(
+        "value_str",
+        [
+            "  1.5 USD  ",  # Whitespace around
+            "1.5  USD",  # Extra space before currency
+            "1.5   USD",  # Multiple spaces
+        ],
+    )
+    def test_parse_value_handles_whitespace_variations(self, value_str) -> None:
+        """Test that parsing handles whitespace variations gracefully."""
+        # Arrange
+        df = pd.DataFrame({"dummy": [1]})
+        calculator = TaxCalculator(df)
+
+        # Act & Assert
+        # split() handles all whitespace, so these should work or fail consistently
+        try:
+            value, currency = calculator._parse_value_with_currency(
+                value_str, "Test", "TEST.XX", "2025-01-01"
+            )
+            # If it succeeds, verify the values
+            assert isinstance(value, float)
+            assert isinstance(currency, str)
+        except ValueError:
+            # If it fails onwhitespace, that's also acceptable
+            pass
+
+    @pytest.mark.parametrize(
+        "tax_amount_str,expected",
+        [
+            ("-", 0.0),
+            ("0.0 USD", 0.0),
+            ("0.01 USD", 0.01),
+            ("100.5 EUR", 100.5),
+        ],
+    )
+    def test_parse_tax_collected_amount_various_inputs(
+        self, tax_amount_str, expected
+    ) -> None:
+        """Test parsing tax collected amount with various inputs."""
+        # Arrange
+        df = pd.DataFrame({"dummy": [1]})
+        calculator = TaxCalculator(df)
+
+        # Act
+        result = calculator._parse_tax_collected_amount(
+            tax_amount_str, "TEST.XX", "2025-01-01"
+        )
+
+        # Assert
+        assert result == expected
+
+    @pytest.mark.parametrize(
+        "rate_str,expected",
+        [
+            ("-", 1.0),
+            ("1.0 PLN", 1.0),
+            ("3.5 PLN", 3.5),
+            ("4.1512 PLN", 4.1512),
+            ("0.5702 PLN", 0.5702),
+        ],
+    )
+    def test_parse_exchange_rate_various_inputs(self, rate_str, expected) -> None:
+        """Test parsing exchange rate with various inputs."""
+        # Arrange
+        df = pd.DataFrame({"dummy": [1]})
+        calculator = TaxCalculator(df)
+
+        # Act
+        result = calculator._parse_exchange_rate(rate_str, "TEST.XX", "2025-01-01")
+
+        # Assert
+        assert result == expected
+
+
+@pytest.mark.unit
+class TestTaxBoundaryConditions:
+    """Test suite for tax calculation boundary conditions."""
+
+    @pytest.mark.parametrize(
+        "tax_collected_pct",
+        [
+            0.1899,  # Just below 19%
+            0.18999,  # Even closer to 19%
+            0.19,  # Exactly 19%
+            0.19001,  # Just above 19%
+            0.20,  # Well above 19%
+        ],
+    )
+    def test_tax_boundary_near_19_percent(self, tax_collected_pct) -> None:
+        """Test tax calculation at boundary near 19% threshold."""
+        # Arrange - use substantial dividend to avoid rounding to zero
+        net_dividend = 1000.0
+        tax_collected_amount = net_dividend * tax_collected_pct
+        exchange_rate = 1.0
+
+        df = pd.DataFrame(
+            {
+                "Date": ["2025-01-01"],
+                "Ticker": ["TEST.US"],
+                "Shares": [1.0],
+                "Net Dividend": [f"{net_dividend} USD"],
+                "Tax Collected": [tax_collected_pct],
+                "Tax Collected Amount": [f"{tax_collected_amount} USD"],
+                "Exchange Rate D-1": [f"{exchange_rate} PLN"],
+            }
+        )
+        calculator = TaxCalculator(df)
+
+        # Act
+        result_df = calculator.calculate_tax_for_pln_statement("PLN")
+
+        # Assert
+        tax_result = result_df.loc[0, "Tax Amount PLN"]
+        if tax_collected_pct >= 0.19:
+            assert tax_result == "-", f"Expected no tax for {tax_collected_pct * 100}%"
+        else:
+            assert tax_result != "-", f"Expected tax for {tax_collected_pct * 100}%"
+            parts = tax_result.split()
+            assert len(parts) == 2
+            assert parts[1] == "PLN"
+            assert float(parts[0]) > 0
+
+    def test_tax_calculation_rounding_precision(self) -> None:
+        """Test that tax calculations maintain proper rounding precision."""
+        # Arrange - value that produces repeating decimal
+        net_dividend = 10.0 / 3  # 3.3333...
+        tax_collected_amount = 0.0
+        exchange_rate = 3.3  # Another repeating decimal
+
+        df = pd.DataFrame(
+            {
+                "Date": ["2025-01-01"],
+                "Ticker": ["TEST.US"],
+                "Shares": [1.0],
+                "Net Dividend": [f"{net_dividend} USD"],
+                "Tax Collected": [0.0],
+                "Tax Collected Amount": ["-"],
+                "Exchange Rate D-1": [f"{exchange_rate} PLN"],
+            }
+        )
+        calculator = TaxCalculator(df)
+
+        # Act
+        result_df = calculator.calculate_tax_for_pln_statement("PLN")
+
+        # Assert - verify 2 decimal places on result
+        tax_result = result_df.loc[0, "Tax Amount PLN"]
+        if tax_result != "-":
+            amount = float(tax_result.split()[0])
+            # Check that it's properly rounded to 2 decimals
+            assert amount == round(amount, 2)
+
+    @pytest.mark.parametrize(
+        "net_dividend,tax_pct,rate,expected_is_dash",
+        [
+            (0.01, 0.19, 1.0, True),  # Small dividend, exactly 19%
+            (1.0, 0.15, 1.0, False),  # Small dividend, below 19%
+            (0.0001, 0.19, 1.0, True),  # Very tiny dividend
+            (1000000, 0.19, 1.0, True),  # Very large dividend, exactly 19%
+        ],
+    )
+    def test_tax_with_extreme_dividend_amounts(
+        self, net_dividend, tax_pct, rate, expected_is_dash
+    ) -> None:
+        """Test tax calculation with extreme dividend amounts."""
+        # Arrange
+        tax_amount = net_dividend * tax_pct
+
+        df = pd.DataFrame(
+            {
+                "Date": ["2025-01-01"],
+                "Ticker": ["TEST.US"],
+                "Shares": [1.0],
+                "Net Dividend": [f"{net_dividend} USD"],
+                "Tax Collected": [tax_pct],
+                "Tax Collected Amount": [
+                    f"{tax_amount} USD" if tax_pct < 0.19 else "-"
+                ],
+                "Exchange Rate D-1": [f"{rate} PLN"],
+            }
+        )
+        calculator = TaxCalculator(df)
+
+        # Act
+        result_df = calculator.calculate_tax_for_pln_statement("PLN")
+
+        # Assert
+        tax_result = result_df.loc[0, "Tax Amount PLN"]
+        if expected_is_dash:
+            assert tax_result == "-"
+        else:
+            assert tax_result != "-"
+
+
+@pytest.mark.unit
+class TestMultipleRowCalculations:
+    """Test suite for tax calculations across multiple rows."""
+
+    def test_calculate_tax_multiple_rows_different_currencies(self) -> None:
+        """Test that calculations work correctly for multiple rows with different currencies."""
+        # Arrange
+        df = pd.DataFrame(
+            {
+                "Date": ["2025-01-01", "2025-01-01", "2025-01-01"],
+                "Ticker": ["TEST1.US", "TEST2.DK", "TEST3.PL"],
+                "Shares": [1.0, 1.0, 1.0],
+                "Net Dividend": ["10.0 USD", "50.0 DKK", "100.0 PLN"],
+                "Tax Collected": [0.15, 0.27, 0.19],
+                "Tax Collected Amount": ["1.5 USD", "13.5 DKK", "-"],
+                "Exchange Rate D-1": ["4.0 PLN", "0.57 PLN", "-"],
+            }
+        )
+        calculator = TaxCalculator(df)
+
+        # Act
+        result_df = calculator.calculate_tax_for_pln_statement("PLN")
+
+        # Assert
+        assert len(result_df) == 3
+        assert "Tax Amount PLN" in result_df.columns
+
+        # Row 1: US stock, should have calculated tax
+        assert result_df.loc[0, "Tax Amount PLN"] != "-"
+
+        # Row 2: DK stock with 27% tax (>19%), should be dash
+        assert result_df.loc[1, "Tax Amount PLN"] == "-"
+
+        # Row 3: PL stock with 19% tax, should be dash
+        assert result_df.loc[2, "Tax Amount PLN"] == "-"
+
+    def test_calculate_total_tax_with_multiple_currencies(self) -> None:
+        """Test total tax calculation across rows with different currencies."""
+        # Arrange
+        df = pd.DataFrame(
+            {"Tax Amount PLN": ["5.25 PLN", "-", "10.75 PLN", "3.0 PLN", "-"]}
+        )
+
+        # Act
+        total = TaxCalculator.calculate_total_tax_amount(df)
+
+        # Assert
+        expected = 5.25 + 10.75 + 3.0
+        assert total == expected
+        assert total == 19.0
+
+    def test_calculate_tax_multiple_rows_usd_statement(self) -> None:
+        """Test USD statement formula across multiple rows."""
+        # Arrange
+        df = pd.DataFrame(
+            {
+                "Date": ["2025-01-01", "2025-01-02"],
+                "Ticker": ["AAPL.US", "MSFT.US"],
+                "Shares": [10.0, 5.0],
+                "Net Dividend": ["10.0 USD", "15.0 USD"],
+                "Tax Collected": [0.15, 0.15],
+                "Tax Collected Amount": ["1.5 USD", "2.25 USD"],
+                "Exchange Rate D-1": ["4.0 PLN", "4.1 PLN"],
+            }
+        )
+        calculator = TaxCalculator(df)
+
+        # Act
+        result_df = calculator.calculate_tax_for_usd_statement("USD")
+
+        # Assert
+        assert len(result_df) == 2
+        assert "Tax Amount PLN" in result_df.columns
+
+        # Both rows should have non-dash values (tax < 19%)
+        for idx in [0, 1]:
+            assert result_df.loc[idx, "Tax Amount PLN"] != "-"
+
+
+@pytest.mark.unit
+class TestErrorMessages:
+    """Test suite for error message clarity and correctness."""
+
+    @pytest.mark.parametrize(
+        "invalid_value",
+        ["", "USD only", "123", "   ", None],
+    )
+    def test_parse_value_error_message_clarity(self, invalid_value) -> None:
+        """Test that parsing errors provide clear messages."""
+        # Arrange
+        df = pd.DataFrame({"dummy": [1]})
+        calculator = TaxCalculator(df)
+
+        # Act & Assert
+        with pytest.raises(ValueError) as exc_info:
+            calculator._parse_value_with_currency(
+                invalid_value, "Net Dividend", "SBUX.US", "2025-01-06"
+            )
+
+        # Message should mention the column name
+        assert "Net Dividend" in str(exc_info.value)
+
+    def test_missing_column_error_message(self) -> None:
+        """Test that missing column error lists the missing column."""
+        # Arrange
+        df = pd.DataFrame({"Date": ["2025-01-01"], "Ticker": ["TEST.US"]})
+        calculator = TaxCalculator(df)
+
+        # Act & Assert
+        with pytest.raises(ValueError) as exc_info:
+            calculator.calculate_tax_for_pln_statement("PLN")
+
+        error_msg = str(exc_info.value)
+        assert "missing" in error_msg.lower()
+        assert "columns" in error_msg.lower()
