@@ -86,7 +86,7 @@ def test_tax_19_percent_calculation() -> None:
     result = calculator.calculate_tax_for_pln_statement("PLN")
 
     # Assert
-    assert result["Tax Amount PLN"].iloc[0] == "19.0 PLN"
+    assert result["Tax Amount PLN"].iloc[0] == "19.00 PLN"
     assert TaxCalculator.calculate_total_tax_amount(result) == 19.0
 
 
@@ -112,7 +112,7 @@ def test_tax_from_usd_dividend() -> None:
     result = calculator.calculate_tax_for_usd_statement("USD")
 
     # Assert
-    assert result["Tax Amount PLN"].iloc[0] == "16.0 PLN"
+    assert result["Tax Amount PLN"].iloc[0] == "16.00 PLN"
     assert TaxCalculator.calculate_total_tax_amount(result) == 16.0
 
 
@@ -156,7 +156,8 @@ def test_tax_calculation_with_multiple_tickers() -> None:
         result.loc[result["Ticker"] == "CDPROJEKT.PL", "Tax Amount PLN"].iloc[0] == "-"
     )
     assert (
-        result.loc[result["Ticker"] == "NOVO.DK", "Tax Amount PLN"].iloc[0] == "0.3 PLN"
+        result.loc[result["Ticker"] == "NOVO.DK", "Tax Amount PLN"].iloc[0]
+        == "0.30 PLN"
     )
     assert TaxCalculator.calculate_total_tax_amount(result) == 3.98
 
@@ -237,7 +238,7 @@ def test_tax_rounding_consistency() -> None:
             0.0,
             "-",
             "-",
-            "19.0 PLN",
+            "19.00 PLN",
             id="0pct_wht_full_belka",
         ),
         pytest.param(
@@ -246,7 +247,7 @@ def test_tax_rounding_consistency() -> None:
             0.15,
             "15.0 PLN",
             "-",
-            "4.0 PLN",
+            "4.00 PLN",
             id="15pct_wht_partial_belka",
         ),
         pytest.param(
@@ -255,7 +256,7 @@ def test_tax_rounding_consistency() -> None:
             0.18,
             "18.0 PLN",
             "-",
-            "1.0 PLN",
+            "1.00 PLN",
             id="18pct_wht_near_boundary",
         ),
         pytest.param(
@@ -282,7 +283,7 @@ def test_tax_rounding_consistency() -> None:
             0.0,
             "-",
             "4.0 PLN",
-            "38.0 PLN",
+            "38.00 PLN",
             id="0pct_wht_with_fx_rate",
         ),
     ],
@@ -333,7 +334,7 @@ def test_tax_pln_statement_parametrized(
             0.0,
             "-",
             "4.0 PLN",
-            "76.0 PLN",
+            "76.00 PLN",
             id="0pct_wht_full_belka_usd",
         ),
         pytest.param(
@@ -341,7 +342,7 @@ def test_tax_pln_statement_parametrized(
             0.15,
             "15.0 USD",
             "4.0 PLN",
-            "16.0 PLN",
+            "16.00 PLN",
             id="15pct_wht_partial_belka_usd",
         ),
         pytest.param(
@@ -411,7 +412,7 @@ def test_tax_usd_statement_parametrized(
         pytest.param(
             "10.53 PLN",
             0.0,
-            "2.0 PLN",
+            "2.00 PLN",
             2.0,
             id="decimal_rounds_to_one_place",
         ),
@@ -425,7 +426,7 @@ def test_tax_usd_statement_parametrized(
         pytest.param(
             "1000.0 PLN",
             0.0,
-            "190.0 PLN",
+            "190.00 PLN",
             190.0,
             id="large_dividend_exact",
         ),
