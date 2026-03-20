@@ -61,7 +61,7 @@ jobs:
           poetry run python scripts/bandit_to_sarif.py bandit.json bandit.sarif
 
       - name: Upload Bandit SARIF report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: bandit-sarif
@@ -116,7 +116,7 @@ jobs:
             -v
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-unit
           path: |
@@ -125,7 +125,7 @@ jobs:
             htmlcov/
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: test-results-unit
@@ -172,7 +172,7 @@ jobs:
             -v
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: test-results-integration
@@ -219,7 +219,7 @@ jobs:
             -v
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: test-results-security
@@ -266,7 +266,7 @@ jobs:
             -v
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: test-results-property
@@ -314,7 +314,7 @@ jobs:
             -v
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: test-results-performance
@@ -373,7 +373,7 @@ jobs:
         run: poetry run mutmut results > mutation-results.txt 2>&1 || true
 
       - name: Upload mutation report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: mutation-report
@@ -435,7 +435,7 @@ jobs:
           fi
 
       - name: Upload final coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report-final
           path: |
