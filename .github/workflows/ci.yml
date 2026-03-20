@@ -450,8 +450,7 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add coverage.json
-          git diff --staged --quiet || git commit -m "chore(ci): update coverage.json [skip ci]"
-          git push
+          git diff --staged --quiet || (git commit -m "chore(ci): update coverage.json [skip ci]" && git pull --rebase && git push)
 
   # ============================================================================
   # STAGE 4: CI Summary
