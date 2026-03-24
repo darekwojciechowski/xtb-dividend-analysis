@@ -22,7 +22,9 @@ from __future__ import annotations
 
 import pandas as pd
 import pytest
+from hypothesis import HealthCheck
 from hypothesis import given
+from hypothesis import settings
 from hypothesis import strategies as st
 
 from data_processing.tax_calculator import TaxCalculator
@@ -1117,6 +1119,7 @@ class TestPropertyBased:
             min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False
         )
     )
+    @settings(suppress_health_check=[HealthCheck.differing_executors])
     def test_property_tax_rate_boundary_is_19_percent(self, tax_collected_pct) -> None:
         """Property: tax >= 19% should always return '-', tax < 19% should calculate.
 
@@ -1168,6 +1171,7 @@ class TestPropertyBased:
             min_value=0.1, max_value=10.0, allow_nan=False, allow_infinity=False
         ),
     )
+    @settings(suppress_health_check=[HealthCheck.differing_executors])
     def test_property_formula_uses_subtraction(
         self, net_dividend, tax_collected_amount, exchange_rate
     ) -> None:
@@ -1228,6 +1232,7 @@ class TestPropertyBased:
             min_value=0.5, max_value=5.0, allow_nan=False, allow_infinity=False
         ),
     )
+    @settings(suppress_health_check=[HealthCheck.differing_executors])
     def test_property_exchange_rate_is_multiplied(
         self, net_dividend, exchange_rate
     ) -> None:
@@ -1275,6 +1280,7 @@ class TestPropertyBased:
             min_value=0.001, max_value=1000, allow_nan=False, allow_infinity=False
         )
     )
+    @settings(suppress_health_check=[HealthCheck.differing_executors])
     def test_property_rounding_maintains_2_decimals(self, amount) -> None:
         """Property: all non-dash results must have exactly 2 decimal places.
 
