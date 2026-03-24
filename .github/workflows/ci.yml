@@ -357,7 +357,7 @@ jobs:
         run: poetry install --no-interaction
 
       - name: Run mutation testing on critical modules
-        run: poetry run mutmut run || true
+        run: poetry run mutmut run 2>&1 | tee mutmut-run-output.txt || true
 
       - name: Display mutation results
         if: always()
@@ -365,7 +365,10 @@ jobs:
           echo "## Mutation Testing Report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          poetry run mutmut results 2>&1 | grep -E '^(KILLED|SURVIVED|UNCHECKED|data_processing.tax_calculator)' >> $GITHUB_STEP_SUMMARY || true
+          if [ -f mutmut-run-output.txt ]; then
+            grep -E '[0-9]+/[0-9]+' mutmut-run-output.txt | tail -1 >> $GITHUB_STEP_SUMMARY || true
+          fi
+          poetry run mutmut results 2>&1 | head -100 >> $GITHUB_STEP_SUMMARY || true
           echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Generate HTML report
