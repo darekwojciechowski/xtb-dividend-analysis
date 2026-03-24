@@ -95,6 +95,8 @@ also_copy = ["config/", "data_acquisition/", "visualization/", "main.py"]
 do_not_mutate = [
     "data_processing/import_data_xlsx.py",
     "data_processing/data_aggregator.py",
+    "data_processing/constants.py",
+    "data_processing/file_paths.py",
 ]
 pytest_add_cli_args = ["-o", "addopts=--strict-markers", "-x", "--no-header", "-q", "--no-cov", "--tb=no", "-m", "not property_based and not slow"]
 

@@ -17,6 +17,33 @@ class TestAnsiRemoval:
     ansi_text = "\x1b[31mMSFT\x1b[0m"
     expected_clean_text = "MSFT"
 
+    def test_remove_ansi_when_plain_text_then_returns_unchanged(
+        self, sample_dataframe_with_ansi: pd.DataFrame
+    ) -> None:
+        """Tests that plain text without ANSI codes passes through unchanged."""
+        # Arrange
+        exporter = GoogleSpreadsheetExporter(sample_dataframe_with_ansi)
+        plain_text = "MSFT"
+
+        # Act
+        result = exporter.remove_ansi(plain_text)
+
+        # Assert
+        assert result == plain_text
+
+    def test_remove_ansi_when_empty_string_then_returns_empty(
+        self, sample_dataframe_with_ansi: pd.DataFrame
+    ) -> None:
+        """Tests that empty string input returns empty string."""
+        # Arrange
+        exporter = GoogleSpreadsheetExporter(sample_dataframe_with_ansi)
+
+        # Act
+        result = exporter.remove_ansi("")
+
+        # Assert
+        assert result == ""
+
     def test_remove_ansi_when_text_contains_escape_codes_then_returns_clean_text(
         self, sample_dataframe_with_ansi: pd.DataFrame
     ) -> None:
@@ -114,3 +141,92 @@ class TestExportValidation:
         # Act & Assert
         with pytest.raises(ValueError, match=self.expected_error_message):
             exporter.export_to_google(filename=str(output_file))
+
+
+@pytest.mark.unit
+class TestTaxColumnDrop:
+    """Test suite for the conditional Tax Collected column removal."""
+
+    def test_export_when_both_tax_columns_present_then_drops_tax_collected(
+        self, tmp_path: Path
+    ) -> None:
+        """Tests that 'Tax Collected' is dropped when 'Tax Collected %' also present."""
+        # Arrange
+        df = pd.DataFrame(
+            {
+                "Ticker": ["AAPL"],
+                "Tax Collected": [2.5],
+                "Tax Collected %": [0.15],
+            }
+        )
+        exporter = GoogleSpreadsheetExporter(df)
+        output_file = tmp_path / "output.csv"
+
+        # Act
+        exporter.export_to_google(filename=str(output_file))
+        exported_df = pd.read_csv(output_file, sep="\t")
+
+        # Assert
+        assert "Tax Collected" not in exported_df.columns
+        assert "Tax Collected %" in exported_df.columns
+
+    def test_export_when_only_tax_collected_no_pct_column_then_kept(
+        self, tmp_path: Path
+    ) -> None:
+        """Tests that 'Tax Collected' is kept when 'Tax Collected %' is absent."""
+        # Arrange
+        df = pd.DataFrame(
+            {
+                "Ticker": ["AAPL"],
+                "Tax Collected": [2.5],
+            }
+        )
+        exporter = GoogleSpreadsheetExporter(df)
+        output_file = tmp_path / "output.csv"
+
+        # Act
+        exporter.export_to_google(filename=str(output_file))
+        exported_df = pd.read_csv(output_file, sep="\t")
+
+        # Assert
+        assert "Tax Collected" in exported_df.columns
+
+
+@pytest.mark.unit
+class TestExportFileFormat:
+    """Test suite for output file format correctness."""
+
+    def test_export_when_written_then_file_is_tab_separated(
+        self, sample_dataframe_with_ansi: pd.DataFrame, tmp_path: Path
+    ) -> None:
+        """Tests that the output file uses tab as the field separator."""
+        # Arrange
+        exporter = GoogleSpreadsheetExporter(sample_dataframe_with_ansi)
+        output_file = tmp_path / "output.csv"
+
+        # Act
+        exporter.export_to_google(filename=str(output_file))
+        raw_content = output_file.read_text()
+
+        # Assert: header contains tabs between column names
+        header_line = raw_content.splitlines()[0]
+        expected_columns = len(sample_dataframe_with_ansi.columns)
+        assert header_line.count("\t") == expected_columns - 1
+        assert "," not in header_line
+
+    def test_export_creates_output_directory_if_missing(
+        self,
+        sample_dataframe_with_ansi: pd.DataFrame,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Tests that the output directory is created when it does not exist."""
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+        exporter = GoogleSpreadsheetExporter(sample_dataframe_with_ansi)
+
+        # Act
+        exporter.export_to_google(filename="result.csv")
+
+        # Assert
+        assert (tmp_path / "output" / "result.csv").exists()

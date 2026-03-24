@@ -22,9 +22,7 @@ from __future__ import annotations
 
 import pandas as pd
 import pytest
-from hypothesis import HealthCheck
-from hypothesis import given
-from hypothesis import settings
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from data_processing.tax_calculator import TaxCalculator
@@ -1325,3 +1323,75 @@ class TestPropertyBased:
                 f"Expected exactly 2 decimal places, found {len(decimal_part)} in '{amount_str}'. "
                 f"This indicates incorrect rounding precision."
             )
+
+
+@pytest.mark.unit
+class TestParsingNullHandling:
+    """Test suite for NaN/None/sentinel inputs in parsing helper methods.
+
+    These tests specifically exercise the ``pd.isna()`` and ``== "nan"``
+    code paths that are not covered by the regular value tests.
+    """
+
+    @pytest.mark.parametrize(
+        "null_value",
+        [None, float("nan"), "nan"],
+    )
+    def test_parse_tax_collected_amount_when_null_then_returns_zero(
+        self, null_value: object
+    ) -> None:
+        """Tests that None, NaN float, and string 'nan' all return 0.0."""
+        # Arrange
+        df = pd.DataFrame({"dummy": [1]})
+        calculator = TaxCalculator(df)
+
+        # Act
+        result = calculator._parse_tax_collected_amount(
+            null_value, "TEST.US", "2025-01-01"
+        )
+
+        # Assert
+        assert result == 0.0
+
+    @pytest.mark.parametrize(
+        "null_value",
+        [None, float("nan"), "nan"],
+    )
+    def test_parse_exchange_rate_when_null_then_returns_one(
+        self, null_value: object
+    ) -> None:
+        """Tests that None, NaN float, and string 'nan' all return 1.0 (PLN base)."""
+        # Arrange
+        df = pd.DataFrame({"dummy": [1]})
+        calculator = TaxCalculator(df)
+
+        # Act
+        result = calculator._parse_exchange_rate(null_value, "TEST.US", "2025-01-01")
+
+        # Assert
+        assert result == 1.0
+
+    def test_validate_required_columns_when_single_column_missing_then_raises_with_name(
+        self,
+    ) -> None:
+        """Tests that _validate_required_columns names the missing column in the error."""
+        # Arrange
+        df = pd.DataFrame({"Date": ["2025-01-01"], "Ticker": ["TEST.US"]})
+        calculator = TaxCalculator(df)
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="Net Dividend"):
+            calculator._validate_required_columns(
+                ["Date", "Ticker", "Net Dividend", "Tax Collected"]
+            )
+
+    def test_validate_required_columns_when_all_present_then_no_error(self) -> None:
+        """Tests that _validate_required_columns passes silently when all columns exist."""
+        # Arrange
+        df = pd.DataFrame(
+            {"Date": ["2025-01-01"], "Ticker": ["TEST.US"], "Amount": [10.0]}
+        )
+        calculator = TaxCalculator(df)
+
+        # Act & Assert — no exception raised
+        calculator._validate_required_columns(["Date", "Ticker", "Amount"])
