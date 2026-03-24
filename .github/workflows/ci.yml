@@ -366,7 +366,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           if [ -f mutmut-run-output.txt ]; then
-            grep -E '[0-9]+/[0-9]+' mutmut-run-output.txt | tail -1 >> $GITHUB_STEP_SUMMARY || true
+            tr '\r' '\n' < mutmut-run-output.txt | grep -E '[0-9]+/[0-9]+' | tail -1 >> $GITHUB_STEP_SUMMARY || true
           fi
           poetry run mutmut results 2>&1 | head -100 >> $GITHUB_STEP_SUMMARY || true
           echo '```' >> $GITHUB_STEP_SUMMARY
