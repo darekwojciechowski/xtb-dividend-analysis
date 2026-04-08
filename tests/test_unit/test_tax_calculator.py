@@ -25,6 +25,7 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
+from data_processing.constants import ColumnName
 from data_processing.tax_calculator import TaxCalculator
 
 
@@ -1395,3 +1396,39 @@ class TestParsingNullHandling:
 
         # Act & Assert — no exception raised
         calculator._validate_required_columns(["Date", "Ticker", "Amount"])
+
+
+@pytest.mark.unit
+class TestTaxCalculatorCorrectness:
+    """Correctness tests complementing the main TaxCalculation suite."""
+
+    def test_calculate_tax_for_pln_statement_no_null_tax_amount(self) -> None:
+        """All rows in output have a Tax Amount PLN value (no silent NaN).
+
+        Uses a small multi-row DataFrame covering PLN, USD, and zero-WHT
+        cases to verify the output column is fully populated.
+        """
+        # Arrange
+        df = pd.DataFrame(
+            {
+                "Date": ["2024-01-15", "2024-02-10", "2024-03-05"],
+                "Ticker": ["XTB.PL", "AAPL.US", "AIR.FR"],
+                "Net Dividend": ["100.0 PLN", "50.0 USD", "30.0 EUR"],
+                "Tax Collected": [0.19, 0.15, 0.0],
+                "Tax Collected Amount": ["19.0 PLN", "7.5 USD", "-"],
+                "Exchange Rate D-1": ["-", "4.0 PLN", "4.3 PLN"],
+            }
+        )
+
+        # Act
+        result = TaxCalculator(df).calculate_tax_for_pln_statement(
+            statement_currency="PLN"
+        )
+
+        # Assert
+        tax_col = ColumnName.TAX_AMOUNT_PLN.value
+        assert tax_col in result.columns, (
+            f"Column '{tax_col}' missing from TaxCalculator output"
+        )
+        null_count = result[tax_col].isna().sum()
+        assert null_count == 0, f"{null_count} rows have null {tax_col}"

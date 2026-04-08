@@ -176,6 +176,13 @@ analyze_incompetent_mutations.py
 detailed_incompetent_analysis.py
 mutmut-run.log
 
+# Claude Code
+.claude/
+
+# GitHub Copilot
+.github/prompts/
+.github/skills/
+
 # Pyre type checker
 .pyre/
 

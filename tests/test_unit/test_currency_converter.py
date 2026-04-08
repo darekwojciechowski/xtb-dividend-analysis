@@ -160,6 +160,22 @@ class TestDetermineCurrency:
         assert isinstance(result, str)
         assert len(result) > 0
 
+    def test_determine_currency_repeated_calls_are_idempotent(self) -> None:
+        """determine_currency returns the same result on repeated calls.
+
+        Verifies there is no side-effect that could cause drift under load.
+        """
+        # Arrange
+        converter = _converter()
+        ticker = "AAPL.US"
+
+        # Act
+        results = [converter.determine_currency(ticker, None) for _ in range(10)]
+
+        # Assert
+        assert len(set(results)) == 1, "determine_currency is not deterministic"
+        assert results[0] == "USD"
+
 
 # ---------------------------------------------------------------------------
 # TestExtractDividendFromComment

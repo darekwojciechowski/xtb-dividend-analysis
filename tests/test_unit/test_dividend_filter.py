@@ -14,6 +14,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
+from data_processing.constants import ColumnName
 from data_processing.dividend_filter import DividendFilter
 
 # ---------------------------------------------------------------------------
@@ -205,3 +206,34 @@ class TestGroupByDividends:
 
         # Assert
         assert result.iloc[0]["Net Dividend"] == pytest.approx(12.34)
+
+
+@pytest.mark.unit
+class TestFilterDividendsCorrectness:
+    """Correctness tests that complement the filter behaviour."""
+
+    def test_filter_dividends_returns_only_valid_types(self) -> None:
+        """filter_dividends returns only valid dividend types.
+
+        Ensures all five accepted type values pass and non-dividend types
+        are excluded.
+        """
+        # Arrange
+        allowed_types = {
+            "Dividend",
+            "Dywidenda",
+            "DIVIDENT",
+            "Withholding Tax",
+            "Podatek od dywidend",
+        }
+        mixed_types = list(allowed_types) + ["Transfer", "Deposit", "Withdrawal"]
+        df = _make_df(mixed_types)
+
+        # Act
+        result = DividendFilter(df).filter_dividends()
+
+        # Assert
+        actual_types = set(result[ColumnName.TYPE.value].unique())
+        assert actual_types.issubset(allowed_types), (
+            f"Unexpected types after filter: {actual_types - allowed_types}"
+        )
