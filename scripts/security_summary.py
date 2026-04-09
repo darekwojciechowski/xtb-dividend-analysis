@@ -59,7 +59,7 @@ def generate_security_summary(bandit_json_path: str) -> None:
         return
 
     try:
-        with report_path.open() as f:
+        with report_path.open(encoding="utf-8") as f:
             data = json.load(f)
 
         metrics = data.get("metrics", {}).get("_totals", {})

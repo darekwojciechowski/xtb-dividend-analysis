@@ -295,9 +295,7 @@ class TaxCalculator:
             self.df["Tax Amount PLN"] = 0.0
 
         self.df["Tax Amount PLN"] = self.df.apply(
-            lambda row: self._calculate_tax_pln_row(
-                row, lambda net, tax: net + tax
-            ),
+            lambda row: self._calculate_tax_pln_row(row, lambda net, tax: net + tax),
             axis=1,
         )
 

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import Any
 
 import pytest
 from bandit_to_sarif import (
@@ -27,12 +27,9 @@ from bandit_to_sarif import (
     convert_bandit_to_sarif,
 )
 
-if TYPE_CHECKING:
-    pass
-
 
 @pytest.fixture
-def sample_bandit_result() -> dict:
+def sample_bandit_result() -> dict[str, Any]:
     """Provide a sample Bandit result for testing.
 
     Returns:
@@ -48,7 +45,7 @@ def sample_bandit_result() -> dict:
 
 
 @pytest.fixture
-def sample_bandit_report() -> dict:
+def sample_bandit_report() -> dict[str, Any]:
     """Provide a complete sample Bandit JSON report.
 
     Returns:
@@ -299,22 +296,16 @@ class TestErrorHandling:
         with pytest.raises(json.JSONDecodeError):
             convert_bandit_to_sarif(str(invalid_json), str(output))
 
-    def test_convert_creates_minimal_sarif_on_error(self, tmp_path: Path) -> None:
-        """Test that minimal valid SARIF is created even on error."""
+    def test_convert_does_not_create_output_file_on_error(self, tmp_path: Path) -> None:
+        """Test that no output file is created when conversion fails."""
         invalid_json = tmp_path / "invalid.json"
         invalid_json.write_text("{ invalid }")
         output = tmp_path / "output.sarif"
 
-        try:
+        with pytest.raises(json.JSONDecodeError):
             convert_bandit_to_sarif(str(invalid_json), str(output))
-        except json.JSONDecodeError:
-            pass
 
-        # Should still create valid minimal SARIF
-        assert output.exists()
-        sarif_data = json.loads(output.read_text())
-        assert sarif_data["version"] == "2.1.0"
-        assert sarif_data["runs"][0]["results"] == []
+        assert not output.exists()
 
     def test_convert_handles_empty_results(self, tmp_path: Path) -> None:
         """Test conversion with empty results array."""

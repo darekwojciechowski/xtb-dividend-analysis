@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import Any
 
 import pytest
 from security_summary import (
@@ -25,12 +25,9 @@ from security_summary import (
     generate_security_summary,
 )
 
-if TYPE_CHECKING:
-    pass
-
 
 @pytest.fixture
-def sample_bandit_metrics() -> dict:
+def sample_bandit_metrics() -> dict[str, Any]:
     """Provide sample Bandit metrics for testing.
 
     Returns:
@@ -45,7 +42,7 @@ def sample_bandit_metrics() -> dict:
 
 
 @pytest.fixture
-def sample_bandit_results() -> list[dict]:
+def sample_bandit_results() -> list[dict[str, Any]]:
     """Provide sample Bandit results for testing.
 
     Returns:
@@ -63,8 +60,8 @@ def sample_bandit_results() -> list[dict]:
 
 @pytest.fixture
 def complete_bandit_report(
-    sample_bandit_metrics: dict, sample_bandit_results: list[dict]
-) -> dict:
+    sample_bandit_metrics: dict[str, Any], sample_bandit_results: list[dict[str, Any]]
+) -> dict[str, Any]:
     """Provide a complete Bandit report.
 
     Args:

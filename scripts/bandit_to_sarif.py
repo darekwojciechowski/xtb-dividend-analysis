@@ -10,6 +10,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+BANDIT_VERSION = "1.9.1"
+
 
 def _map_severity(severity: str) -> str:
     """Map bandit severity to SARIF level.
@@ -38,7 +40,7 @@ def _create_sarif_structure() -> dict[str, Any]:
                 "tool": {
                     "driver": {
                         "name": "bandit",
-                        "version": "1.9.1",
+                        "version": BANDIT_VERSION,
                         "informationUri": "https://bandit.readthedocs.io/",
                         "shortDescription": {"text": "Security linter for Python"},
                         "fullDescription": {
@@ -93,7 +95,7 @@ def convert_bandit_to_sarif(bandit_json_path: str, sarif_output_path: str) -> No
         json.JSONDecodeError: If bandit JSON is malformed
     """
     try:
-        with Path(bandit_json_path).open() as f:
+        with Path(bandit_json_path).open(encoding="utf-8") as f:
             bandit_data = json.load(f)
 
         sarif = _create_sarif_structure()
@@ -103,7 +105,7 @@ def convert_bandit_to_sarif(bandit_json_path: str, sarif_output_path: str) -> No
             sarif["runs"][0]["results"].append(_convert_result(result))
 
         # Write SARIF file
-        with Path(sarif_output_path).open("w") as f:
+        with Path(sarif_output_path).open("w", encoding="utf-8") as f:
             json.dump(sarif, f, indent=2)
 
         issue_count = len(sarif["runs"][0]["results"])
@@ -113,10 +115,6 @@ def convert_bandit_to_sarif(bandit_json_path: str, sarif_output_path: str) -> No
 
     except (FileNotFoundError, json.JSONDecodeError) as e:
         print(f"Error converting bandit to SARIF: {e}", file=sys.stderr)
-        # Create minimal valid SARIF file
-        minimal_sarif = _create_sarif_structure()
-        with Path(sarif_output_path).open("w") as f:
-            json.dump(minimal_sarif, f, indent=2)
         raise
 
 
