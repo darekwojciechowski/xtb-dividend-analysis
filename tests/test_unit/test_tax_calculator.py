@@ -29,113 +29,82 @@ from data_processing.constants import ColumnName
 from data_processing.tax_calculator import TaxCalculator
 
 
+def create_test_dataframe(
+    date: str,
+    ticker: str,
+    shares: float,
+    net_dividend: float,
+    currency: str,
+    tax_collected_pct: float,
+    tax_collected_amount: float | str,
+    exchange_rate: float | str,
+) -> pd.DataFrame:
+    """Helper to create test DataFrame with consistent structure."""
+    tax_collected_str = (
+        "-"
+        if tax_collected_amount == 0 or tax_collected_amount == "-"
+        else f"{tax_collected_amount} {currency}"
+    )
+    exchange_rate_str = (
+        "-" if exchange_rate == "-" or exchange_rate == 1.0 else f"{exchange_rate} PLN"
+    )
+
+    return pd.DataFrame(
+        {
+            "Date": [date],
+            "Ticker": [ticker],
+            "Shares": [shares],
+            "Net Dividend": [f"{net_dividend} {currency}"],
+            "Tax Collected": [tax_collected_pct],
+            "Tax Collected Amount": [tax_collected_str],
+            "Exchange Rate D-1": [exchange_rate_str],
+        }
+    )
+
+
+def calculate_expected_tax_pln_statement(
+    net_dividend: float,
+    tax_collected_amount: float,
+    exchange_rate: float,
+    tax_collected_pct: float,
+) -> str:
+    """Calculate expected tax for PLN statement: (net * 19% - tax_collected) * rate."""
+    if tax_collected_pct >= 0.19:
+        return "-"
+
+    tax_to_collect = (net_dividend * 0.19) - tax_collected_amount
+    tax_in_pln = tax_to_collect * exchange_rate
+    rounded_tax = round(tax_in_pln, 2)
+    if rounded_tax == 0.0:
+        return "-"
+    return f"{rounded_tax:.2f} PLN"
+
+
+def calculate_expected_tax_usd_statement(
+    net_dividend: float,
+    tax_collected_amount: float,
+    exchange_rate: float,
+    tax_collected_pct: float,
+) -> str:
+    """Calculate expected tax for USD statement: ((net + tax) * 19% - tax) * rate."""
+    if tax_collected_pct >= 0.19:
+        return "-"
+
+    gross_dividend = net_dividend + tax_collected_amount
+    tax_to_collect = (gross_dividend * 0.19) - tax_collected_amount
+    tax_in_pln = tax_to_collect * exchange_rate
+    rounded_tax = round(tax_in_pln, 2)
+    if rounded_tax == 0.0:
+        return "-"
+    return f"{rounded_tax:.2f} PLN"
+
+
 @pytest.mark.unit
 class TestTaxCalculation:
     """Test suite for tax calculation logic."""
 
     # Polish tax rate constant
     POLISH_TAX_RATE = 0.19
-
-    @staticmethod
-    def create_test_dataframe(
-        date: str,
-        ticker: str,
-        shares: float,
-        net_dividend: float,
-        currency: str,
-        tax_collected_pct: float,
-        tax_collected_amount: float | str,
-        exchange_rate: float | str,
-    ) -> pd.DataFrame:
-        """
-        Helper method to create test DataFrame with consistent structure.
-
-        Args:
-            date: Transaction date
-            ticker: Stock ticker symbol
-            shares: Number of shares
-            net_dividend: Net dividend amount
-            currency: Currency code (USD, PLN, DKK, etc.)
-            tax_collected_pct: Tax percentage collected at source (0.15 = 15%)
-            tax_collected_amount: Tax amount collected (or "-" for zero)
-            exchange_rate: Exchange rate to PLN (or "-" for PLN dividends)
-
-        Returns:
-            pd.DataFrame: Test data in expected format
-        """
-        tax_collected_str = (
-            "-"
-            if tax_collected_amount == 0 or tax_collected_amount == "-"
-            else f"{tax_collected_amount} {currency}"
-        )
-        exchange_rate_str = (
-            "-"
-            if exchange_rate == "-" or exchange_rate == 1.0
-            else f"{exchange_rate} PLN"
-        )
-
-        return pd.DataFrame(
-            {
-                "Date": [date],
-                "Ticker": [ticker],
-                "Shares": [shares],
-                "Net Dividend": [f"{net_dividend} {currency}"],
-                "Tax Collected": [tax_collected_pct],
-                "Tax Collected Amount": [tax_collected_str],
-                "Exchange Rate D-1": [exchange_rate_str],
-            }
-        )
-
-    @staticmethod
-    def calculate_expected_tax_pln_statement(
-        net_dividend: float,
-        tax_collected_amount: float,
-        exchange_rate: float,
-        tax_collected_pct: float,
-    ) -> str:
-        """
-        Calculate expected tax for PLN statement using the same formula as TaxCalculator.
-
-        Formula: (net_dividend * 19% - tax_collected_amount) * exchange_rate
-
-        Returns:
-            str: Expected tax amount formatted as "X.XX PLN" or "-" if no additional tax is due
-        """
-        if tax_collected_pct >= 0.19:
-            return "-"
-
-        tax_to_collect = (net_dividend * 0.19) - tax_collected_amount
-        tax_in_pln = tax_to_collect * exchange_rate
-        rounded_tax = round(tax_in_pln, 2)
-        if rounded_tax == 0.0:
-            return "-"
-        return f"{rounded_tax:.2f} PLN"
-
-    @staticmethod
-    def calculate_expected_tax_usd_statement(
-        net_dividend: float,
-        tax_collected_amount: float,
-        exchange_rate: float,
-        tax_collected_pct: float,
-    ) -> str:
-        """
-        Calculate expected tax for USD statement using the same formula as TaxCalculator.
-
-        Formula: ((net_dividend + tax_collected_amount) * 19% - tax_collected_amount) * exchange_rate
-
-        Returns:
-            str: Expected tax amount formatted as "X.XX PLN" or "-" if no additional tax is due
-        """
-        if tax_collected_pct >= 0.19:
-            return "-"
-
-        gross_dividend = net_dividend + tax_collected_amount
-        tax_to_collect = (gross_dividend * 0.19) - tax_collected_amount
-        tax_in_pln = tax_to_collect * exchange_rate
-        rounded_tax = round(tax_in_pln, 2)
-        if rounded_tax == 0.0:
-            return "-"
-        return f"{rounded_tax:.2f} PLN"
 
     @pytest.mark.parametrize(
         "net_dividend,tax_collected_amount,tax_collected_pct,exchange_rate,ticker,date",
@@ -165,7 +134,7 @@ class TestTaxCalculation:
     ) -> None:
         """Test tax calculation for PLN statement when tax collected is below 19%."""
         # Arrange
-        df = self.create_test_dataframe(
+        df = create_test_dataframe(
             date=date,
             ticker=ticker,
             shares=1.0,
@@ -178,7 +147,7 @@ class TestTaxCalculation:
         calculator = TaxCalculator(df)
 
         # Calculate expected result using the formula
-        expected_tax = self.calculate_expected_tax_pln_statement(
+        expected_tax = calculate_expected_tax_pln_statement(
             net_dividend, tax_collected_amount, exchange_rate, tax_collected_pct
         )
 
@@ -208,7 +177,7 @@ class TestTaxCalculation:
         """Test that when tax >= 19%, no additional tax is due in Poland."""
         # Arrange - tax amount doesn't matter when percentage >= 19%
         tax_collected_amount = net_dividend * tax_collected_pct
-        df = self.create_test_dataframe(
+        df = create_test_dataframe(
             date=date,
             ticker=ticker,
             shares=1.0,
@@ -237,7 +206,7 @@ class TestTaxCalculation:
         tax_collected_pct = 0.0
         exchange_rate = 3.7456
 
-        df = self.create_test_dataframe(
+        df = create_test_dataframe(
             date="2025-05-29",
             ticker="ASB.PL",
             shares=85.0,
@@ -250,7 +219,7 @@ class TestTaxCalculation:
         calculator = TaxCalculator(df)
 
         # Calculate expected: full 19% of net dividend converted to PLN
-        expected_tax = self.calculate_expected_tax_pln_statement(
+        expected_tax = calculate_expected_tax_pln_statement(
             net_dividend, tax_collected_amount, exchange_rate, tax_collected_pct
         )
 
@@ -285,7 +254,7 @@ class TestTaxCalculation:
     ) -> None:
         """Test tax calculation for USD statement - uses gross dividend formula."""
         # Arrange
-        df = self.create_test_dataframe(
+        df = create_test_dataframe(
             date=date,
             ticker=ticker,
             shares=1.0,
@@ -298,7 +267,7 @@ class TestTaxCalculation:
         calculator = TaxCalculator(df)
 
         # Calculate expected result using USD statement formula
-        expected_tax = self.calculate_expected_tax_usd_statement(
+        expected_tax = calculate_expected_tax_usd_statement(
             net_dividend, tax_collected_amount, exchange_rate, tax_collected_pct
         )
 
@@ -332,7 +301,7 @@ class TestTaxCalculation:
 
         # Assert - verify summation logic
         assert total == expected_total
-        assert total == 23.85  # Verification of manual calculation
+        assert total == pytest.approx(23.85)  # Verification of manual calculation
 
     def test_pln_vs_usd_statement_different_formulas(self) -> None:
         """Verify that PLN and USD statements use different calculation formulas."""
@@ -342,7 +311,7 @@ class TestTaxCalculation:
         tax_collected_pct = 0.10
         exchange_rate = 4.0
 
-        df_pln = self.create_test_dataframe(
+        df_pln = create_test_dataframe(
             date="2025-01-01",
             ticker="TEST.US",
             shares=1.0,
@@ -400,7 +369,7 @@ class TestTaxCalculation:
         tax_collected_amount = net_dividend * tax_collected_pct
         exchange_rate = 1.0
 
-        df = self.create_test_dataframe(
+        df = create_test_dataframe(
             date="2025-01-15",
             ticker="PRECISION.US",
             shares=1.0,
@@ -461,7 +430,7 @@ class TestTaxCalculation:
         tax_collected_pct = (
             tax_collected_amount / net_dividend if net_dividend != 0 else 0
         )
-        df = self.create_test_dataframe(
+        df = create_test_dataframe(
             date="2025-02-10",
             ticker="ROUNDING.US",
             shares=1.0,
@@ -527,7 +496,7 @@ class TestTaxCalculation:
         exchange_rate = 1.0
         tax_collected_pct = 0.0
 
-        df = self.create_test_dataframe(
+        df = create_test_dataframe(
             date="2025-03-15",
             ticker="DECIMAL.US",
             shares=1.0,
@@ -581,7 +550,7 @@ class TestTaxCalculation:
         tax_collected_pct = 0.10
         exchange_rate = 1.0
 
-        df = self.create_test_dataframe(
+        df = create_test_dataframe(
             date="2025-04-01",
             ticker="FORMULA.US",
             shares=1.0,
@@ -631,7 +600,7 @@ class TestTaxCalculation:
         tax_collected_pct = 0.0
         exchange_rate = 2.5  # Use 2.5 to make multiplication obvious
 
-        df = self.create_test_dataframe(
+        df = create_test_dataframe(
             date="2025-04-15",
             ticker="EXRATE.US",
             shares=1.0,
@@ -676,7 +645,7 @@ class TestValueParsing:
         )
 
         # Assert
-        assert value == 1.71
+        assert value == pytest.approx(1.71)
         assert currency == "USD"
 
     def test_parse_value_with_currency_for_pln(self) -> None:
@@ -691,7 +660,7 @@ class TestValueParsing:
         )
 
         # Assert
-        assert value == 92.65
+        assert value == pytest.approx(92.65)
         assert currency == "PLN"
 
     def test_parse_tax_collected_amount_with_dash(self) -> None:
@@ -728,7 +697,7 @@ class TestValueParsing:
         rate = calculator._parse_exchange_rate("4.1512 PLN", "SBUX.US", "2025-01-06")
 
         # Assert
-        assert rate == 4.1512
+        assert rate == pytest.approx(4.1512)
 
 
 class TestErrorHandling:
@@ -1041,7 +1010,7 @@ class TestMultipleRowCalculations:
         # Assert
         expected = 5.25 + 10.75 + 3.0
         assert total == expected
-        assert total == 19.0
+        assert total == pytest.approx(19.0)
 
     def test_calculate_tax_multiple_rows_usd_statement(self) -> None:
         """Test USD statement formula across multiple rows."""

@@ -17,6 +17,7 @@ that removes all handlers added during the test.
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from pathlib import Path
 
 import pytest
@@ -26,7 +27,7 @@ from config.logging_config import setup_logging
 
 
 @pytest.fixture(autouse=True)
-def _reset_loguru():
+def _reset_loguru() -> Generator[None, None, None]:
     """Remove all loguru handlers added during the test.
 
     Uses ``logger.remove()`` before *and* after each test so the global
@@ -117,28 +118,15 @@ class TestSetupLogging:
     def test_setup_logging_when_called_then_adds_exactly_two_handlers(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """setup_logging should register exactly two handlers: stderr + file.
-
-        Loguru exposes handler IDs starting from 0 and incrementing; after
-        ``logger.remove()`` (in fixture) and one ``setup_logging`` call the
-        next two ``logger.add`` calls return consecutive IDs. We verify that
-        exactly two IDs are allocated.
-        """
+        """setup_logging should register exactly two handlers: stderr + file."""
         # Arrange
         monkeypatch.chdir(tmp_path)
 
         # Act
-        first_id = logger.add(lambda _: None)  # baseline handler to get next ID
-        logger.remove(first_id)
         setup_logging()
-        # The two handlers added by setup_logging occupy the next two IDs
-        # (first_id+1 and first_id+2). Attempting to remove them confirms they exist.
-        handler_a = first_id + 1
-        handler_b = first_id + 2
 
-        # Assert — neither remove should raise, meaning both handlers were registered
-        logger.remove(handler_a)
-        logger.remove(handler_b)
+        # Assert
+        assert len(logger._core.handlers) == 2
 
     def test_setup_logging_when_message_logged_then_file_contains_message(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

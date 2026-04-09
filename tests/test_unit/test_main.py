@@ -65,7 +65,7 @@ class TestProcessDataFunction:
     @patch("main.DataFrameProcessor")
     def test_process_data_when_pln_statement_then_processes_correctly(
         self, mock_processor_class, mock_import, sample_processed_df, mock_courses_paths
-    ):
+    ) -> None:
         """Tests that PLN statement is processed with correct tax calculation method.
 
         Args:
@@ -100,7 +100,7 @@ class TestProcessDataFunction:
     @patch("main.DataFrameProcessor")
     def test_process_data_when_usd_statement_then_uses_usd_tax_calculation(
         self, mock_processor_class, mock_import, sample_processed_df, mock_courses_paths
-    ):
+    ) -> None:
         """Tests that USD statement uses USD-specific tax calculation method.
 
         Args:
@@ -133,7 +133,7 @@ class TestProcessDataFunction:
     @patch("main.DataFrameProcessor")
     def test_process_data_when_called_then_executes_full_pipeline(
         self, mock_processor_class, mock_import, sample_processed_df, mock_courses_paths
-    ):
+    ) -> None:
         """Tests that all required processing steps are executed in order.
 
         Args:
@@ -188,7 +188,7 @@ class TestMainFunction:
         mock_process,
         mock_exporter_class,
         sample_processed_df,
-    ):
+    ) -> None:
         """Tests that main() successfully processes and exports data.
 
         Args:
@@ -228,7 +228,7 @@ class TestMainFunction:
     @patch("main.setup_logging")
     def test_main_when_value_error_then_logs_error_and_exits_gracefully(
         self, mock_logging, mock_get_paths, mock_process, mock_logger
-    ):
+    ) -> None:
         """Tests that main() handles ValueError gracefully with proper logging.
 
         Args:
@@ -265,7 +265,7 @@ class TestMainFunction:
         mock_process,
         mock_exporter_class,
         sample_processed_df,
-    ):
+    ) -> None:
         """Tests that main() uses settings.default_input_file.
 
         Args:
@@ -306,7 +306,7 @@ class TestMainErrorHandling:
     @patch("main.setup_logging")
     def test_main_when_missing_exchange_rates_then_provides_helpful_message(
         self, mock_logging, mock_get_paths, mock_process, mock_logger
-    ):
+    ) -> None:
         """Tests that missing exchange rate error provides actionable guidance.
 
         Args:

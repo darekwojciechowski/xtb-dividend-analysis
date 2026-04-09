@@ -100,7 +100,7 @@ class TestValidateTaxRateInvalid:
             -1.0,
         ],
     )
-    def test_validate_tax_rate_raises_for_out_of_range_value(
+    def test_validate_tax_rate_when_out_of_range_value_then_raises_validation_error(
         self, invalid_rate: float
     ) -> None:
         """Tax rate outside [0, 1] must raise ValidationError."""
@@ -264,7 +264,7 @@ class TestGetDataDirectoryPath:
             "tmp/nbp",
         ],
     )
-    def test_get_data_directory_path_reflects_custom_value(
+    def test_get_data_directory_path_when_custom_value_then_reflects_it(
         self, custom_dir: str
     ) -> None:
         """Returned path reflects a custom DATA_DIRECTORY value."""
@@ -287,7 +287,7 @@ class TestGetDataDirectoryPath:
 class TestSettingsEnvOverrides:
     """Settings fields are overridden by environment variables."""
 
-    def test_polish_tax_rate_overridden_by_env_var(
+    def test_polish_tax_rate_when_env_var_set_then_overrides_default(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """POLISH_TAX_RATE env var overrides the default tax rate."""
@@ -300,7 +300,7 @@ class TestSettingsEnvOverrides:
         # Assert
         assert s.polish_tax_rate == pytest.approx(0.25)
 
-    def test_data_directory_overridden_by_env_var(
+    def test_data_directory_when_env_var_set_then_overrides_default(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """DATA_DIRECTORY env var overrides the default directory name."""
@@ -313,7 +313,7 @@ class TestSettingsEnvOverrides:
         # Assert
         assert s.data_directory == "overridden_data"
 
-    def test_nbp_archive_url_overridden_by_env_var(
+    def test_nbp_archive_url_when_env_var_set_then_overrides_default(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """NBP_ARCHIVE_URL env var overrides the default URL."""
@@ -327,7 +327,7 @@ class TestSettingsEnvOverrides:
         # Assert
         assert s.nbp_archive_url == custom_url
 
-    def test_default_output_file_overridden_by_env_var(
+    def test_default_output_file_when_env_var_set_then_overrides_default(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """DEFAULT_OUTPUT_FILE env var overrides the default output filename."""

@@ -110,24 +110,18 @@ class TestDataTransformation:
         exported_df = pd.read_csv(output_file, sep="\t")
 
         # Assert
-        assert all(
-            exported_df["Amount"].apply(
-                lambda x: len(str(x).split(".")[1]) <= self.decimal_places
+        for idx, val in enumerate(exported_df["Amount"]):
+            decimal_str = str(val).split(".")[1] if "." in str(val) else ""
+            assert len(decimal_str) <= self.decimal_places, (
+                f"Row {idx}: {val!r} has {len(decimal_str)} decimal places, expected ≤{self.decimal_places}"
             )
-        )
 
 
 @pytest.mark.unit
 class TestExportValidation:
     """Test suite for export validation and error handling."""
 
-    def setup_method(self) -> None:
-        """Setup test fixtures before each test method."""
-        self.expected_error_message = "The DataFrame must contain a 'Ticker' column."
-
-    def teardown_method(self) -> None:
-        """Cleanup after each test method."""
-        pass
+    EXPECTED_ERROR_MESSAGE = "The DataFrame must contain a 'Ticker' column."
 
     def test_export_when_ticker_column_missing_then_raises_value_error(
         self, tmp_path: Path
@@ -139,7 +133,7 @@ class TestExportValidation:
         output_file = tmp_path / "test_output.csv"
 
         # Act & Assert
-        with pytest.raises(ValueError, match=self.expected_error_message):
+        with pytest.raises(ValueError, match=self.EXPECTED_ERROR_MESSAGE):
             exporter.export_to_google(filename=str(output_file))
 
 

@@ -181,11 +181,11 @@ class TestDataTransformation:
         processor.move_negative_values()
 
         # Assert — negative value moved to Tax Collected
-        assert processor.df.loc[1, "Tax Collected"] == -1.5
+        assert processor.df.loc[1, "Tax Collected"] == pytest.approx(-1.5)
         assert pd.isna(processor.df.loc[1, "Net Dividend"])
         # Positive values unchanged
-        assert processor.df.loc[0, "Net Dividend"] == 10.0
-        assert processor.df.loc[2, "Net Dividend"] == 20.0
+        assert processor.df.loc[0, "Net Dividend"] == pytest.approx(10.0)
+        assert processor.df.loc[2, "Net Dividend"] == pytest.approx(20.0)
 
     def test_move_negative_when_no_negatives_then_dataframe_unchanged(
         self, processor: DataFrameProcessor
@@ -430,8 +430,8 @@ class TestTaxProcessing:
         result = processor.replace_tax_with_percentage()
 
         # Assert — data preserved, 30% detection works
-        assert result.loc[0, "Tax Collected"] == 0.30
-        assert result.loc[1, "Tax Collected"] == 0.15
+        assert result.loc[0, "Tax Collected"] == pytest.approx(0.30)
+        assert result.loc[1, "Tax Collected"] == pytest.approx(0.15)
 
 
 @pytest.mark.unit

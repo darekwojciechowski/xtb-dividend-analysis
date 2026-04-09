@@ -368,7 +368,6 @@ jobs:
           if [ -f mutmut-run-output.txt ]; then
             tr '\r' '\n' < mutmut-run-output.txt | grep -E '[0-9]+/[0-9]+' | tail -1 >> $GITHUB_STEP_SUMMARY || true
           fi
-          poetry run mutmut results 2>&1 | head -100 >> $GITHUB_STEP_SUMMARY || true
           echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Generate HTML report

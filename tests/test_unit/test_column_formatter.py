@@ -20,6 +20,10 @@ from data_processing.column_formatter import ColumnFormatter
 _FAKE_D_MINUS_1 = pd.Timestamp("2025-05-28")
 
 
+def _stub_get_previous_business_day(_date):
+    return _FAKE_D_MINUS_1
+
+
 def _make_df(tax_collected: float | None, include_tax_col: bool = True) -> pd.DataFrame:
     """Build a minimal single-row DataFrame for testing.
 
@@ -49,9 +53,9 @@ class TestCreateDateDMinus1Column:
 
     @patch(
         "data_processing.column_formatter.CurrencyConverter.get_previous_business_day",
-        new=lambda _: _FAKE_D_MINUS_1,
+        new=_stub_get_previous_business_day,
     )
-    def test_date_d_minus_1_no_tax_col_returns_real_date(self):
+    def test_date_d_minus_1_no_tax_col_returns_real_date(self) -> None:
         """When 'Tax Collected' column is absent the mask is skipped and a real date is returned.
 
         Covers the early step-'4a' call before tax extraction has run.
@@ -65,9 +69,9 @@ class TestCreateDateDMinus1Column:
 
     @patch(
         "data_processing.column_formatter.CurrencyConverter.get_previous_business_day",
-        new=lambda _: _FAKE_D_MINUS_1,
+        new=_stub_get_previous_business_day,
     )
-    def test_date_d_minus_1_tax_below_threshold_returns_real_date(self):
+    def test_date_d_minus_1_tax_below_threshold_returns_real_date(self) -> None:
         """When Tax Collected < polish_tax_rate the real D-1 date is kept."""
         df = _make_df(tax_collected=0.15)
         formatter = ColumnFormatter(df)
@@ -78,9 +82,9 @@ class TestCreateDateDMinus1Column:
 
     @patch(
         "data_processing.column_formatter.CurrencyConverter.get_previous_business_day",
-        new=lambda _: _FAKE_D_MINUS_1,
+        new=_stub_get_previous_business_day,
     )
-    def test_date_d_minus_1_tax_equal_to_threshold_returns_dash(self):
+    def test_date_d_minus_1_tax_equal_to_threshold_returns_dash(self) -> None:
         """When Tax Collected == polish_tax_rate (>= boundary) 'Date D-1' must show '-'."""
         df = _make_df(tax_collected=0.19)
         formatter = ColumnFormatter(df)
@@ -91,9 +95,9 @@ class TestCreateDateDMinus1Column:
 
     @patch(
         "data_processing.column_formatter.CurrencyConverter.get_previous_business_day",
-        new=lambda _: _FAKE_D_MINUS_1,
+        new=_stub_get_previous_business_day,
     )
-    def test_date_d_minus_1_tax_above_threshold_returns_dash(self):
+    def test_date_d_minus_1_tax_above_threshold_returns_dash(self) -> None:
         """When Tax Collected > polish_tax_rate (e.g. ASB.PL 25.5% WHT) 'Date D-1' must show '-'."""
         df = _make_df(tax_collected=0.255)
         formatter = ColumnFormatter(df)
@@ -104,9 +108,9 @@ class TestCreateDateDMinus1Column:
 
     @patch(
         "data_processing.column_formatter.CurrencyConverter.get_previous_business_day",
-        new=lambda _: _FAKE_D_MINUS_1,
+        new=_stub_get_previous_business_day,
     )
-    def test_date_d_minus_1_tax_nan_returns_real_date(self):
+    def test_date_d_minus_1_tax_nan_returns_real_date(self) -> None:
         """When Tax Collected is NaN (no WHT row merged) the real D-1 date is kept."""
         df = _make_df(tax_collected=None)
         formatter = ColumnFormatter(df)
