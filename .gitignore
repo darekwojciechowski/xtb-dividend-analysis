@@ -178,6 +178,7 @@ mutmut-run.log
 
 # Claude Code
 .claude/
+plans/
 
 # GitHub Copilot
 .github/prompts/

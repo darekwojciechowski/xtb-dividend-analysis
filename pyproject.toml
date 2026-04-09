@@ -38,6 +38,7 @@ bandit = "^1.9.4"
 tox = "^4.49.1"
 pre-commit = "^4.5.1"
 mutmut = "^3.5.0"
+pytest-randomly = ">=3.15"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -56,6 +57,7 @@ addopts = [
     "--cov-report=xml",
     "--strict-markers"
 ]
+asyncio_mode = "strict"
 filterwarnings = [
     # Escalate deprecations only from our own source modules so we never
     # silently ship deprecated APIs. Third-party libraries have their own
