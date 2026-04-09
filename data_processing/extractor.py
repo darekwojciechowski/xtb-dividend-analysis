@@ -49,3 +49,24 @@ class MultiConditionExtractor:
 
         # Return the original input string if no keywords are matched
         return self.input_string
+
+
+def extract_condition(input_string: str) -> str:
+    """Extract a structured condition from a free-text comment string.
+
+    Args:
+        input_string: The string from which to extract a condition.
+
+    Returns:
+        The canonical condition label matching a keyword, or the original
+        input string if no keyword is found.
+    """
+    keyword_map: dict[str, str] = {
+        "Blik": "Blik(Payu) deposit",  # pragma: no mutate
+        "Pekao": "Pekao S.A. deposit",  # pragma: no mutate
+    }
+    lower = input_string.lower()
+    for keyword, condition in keyword_map.items():
+        if re.compile(r"\b" + re.escape(keyword.lower()) + r"\b").search(lower):
+            return condition
+    return input_string

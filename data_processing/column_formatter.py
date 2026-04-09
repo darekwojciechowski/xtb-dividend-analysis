@@ -6,8 +6,6 @@ including tax percentage display, currency annotations, and date calculations.
 
 from __future__ import annotations
 
-from datetime import datetime
-
 import pandas as pd
 from loguru import logger
 
@@ -16,8 +14,8 @@ from visualization.ticker_colors import get_random_color
 
 from .constants import ColumnName
 from .currency_converter import CurrencyConverter
-from .date_converter import DateConverter
-from .extractor import MultiConditionExtractor
+from .date_converter import convert_date, to_date
+from .extractor import extract_condition
 
 
 class ColumnFormatter:
@@ -58,12 +56,7 @@ class ColumnFormatter:
         Returns:
             DataFrame with processed comments.
         """
-
-        def apply_extractor_func(text: str) -> str:
-            extractor = MultiConditionExtractor(text)
-            return extractor.extract_condition()
-
-        self.df["Comment"] = self.df["Comment"].apply(apply_extractor_func)
+        self.df["Comment"] = self.df["Comment"].apply(extract_condition)
         return self.df
 
     def apply_date_converter(self) -> pd.DataFrame:
@@ -72,13 +65,7 @@ class ColumnFormatter:
         Returns:
             DataFrame with converted dates.
         """
-
-        def apply_converter(date_string: str) -> pd.Timestamp | None:
-            converter = DateConverter(date_string)
-            converter.convert_to_date()
-            return converter.get_date()
-
-        self.df["Date"] = self.df["Date"].apply(apply_converter)
+        self.df["Date"] = self.df["Date"].apply(convert_date)
         return self.df
 
     def add_tax_percentage_display(self) -> pd.DataFrame:
@@ -191,12 +178,7 @@ class ColumnFormatter:
                 return "-"
 
             # Convert date to YYYY-MM-DD format
-            if isinstance(date_d_minus_1, pd.Timestamp):
-                date_str = date_d_minus_1.strftime("%Y-%m-%d")
-            elif isinstance(date_d_minus_1, datetime):
-                date_str = date_d_minus_1.strftime("%Y-%m-%d")
-            else:
-                date_str = date_d_minus_1.strftime("%Y-%m-%d")
+            date_str = to_date(date_d_minus_1).strftime("%Y-%m-%d")
 
             # Get exchange rate
             rate = converter.get_exchange_rate(courses_paths, date_str, currency)

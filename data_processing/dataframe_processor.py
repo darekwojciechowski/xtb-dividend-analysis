@@ -79,8 +79,7 @@ class DataFrameProcessor:
         Returns:
             The column name present in the DataFrame.
         """
-        normalizer = ColumnNormalizer(self.df)
-        return normalizer.get_column_name(english_name, polish_name)
+        return self._get_column_normalizer().get_column_name(english_name, polish_name)
 
     def drop_columns(self, columns: list[str]) -> None:
         """Drop specified columns from the DataFrame.
@@ -91,8 +90,7 @@ class DataFrameProcessor:
         Raises:
             ValueError: If DataFrame is empty or columns are missing.
         """
-        normalizer = ColumnNormalizer(self.df)
-        self.df = normalizer.drop_columns(columns)
+        self.df = self._get_column_normalizer().drop_columns(columns)
 
     def rename_columns(self, columns_dict: dict[str, str]) -> None:
         """Rename columns in the DataFrame based on a dictionary mapping.
@@ -118,8 +116,7 @@ class DataFrameProcessor:
 
         Maps Polish or English column names to standardized English names.
         """
-        normalizer = ColumnNormalizer(self.df)
-        self.df = normalizer.normalize_column_names()
+        self.df = self._get_column_normalizer().normalize_column_names()
 
     def convert_dates(self, date_col: str | None = None) -> None:
         """Convert date strings in the specified column to datetime objects.
@@ -138,28 +135,23 @@ class DataFrameProcessor:
 
         Creates a new 'Colored Ticker' column without modifying the original 'Ticker' column.
         """
-        formatter = ColumnFormatter(self.df)
-        self.df = formatter.apply_colorize_ticker()
+        self.df = self._get_column_formatter().apply_colorize_ticker()
 
     def apply_extractor(self) -> None:
         """Apply the MultiConditionExtractor to the 'Comment' column."""
-        formatter = ColumnFormatter(self.df)
-        self.df = formatter.apply_extractor()
+        self.df = self._get_column_formatter().apply_extractor()
 
     def apply_date_converter(self) -> None:
         """Convert date strings in the 'Date' column to datetime objects."""
-        formatter = ColumnFormatter(self.df)
-        self.df = formatter.apply_date_converter()
+        self.df = self._get_column_formatter().apply_date_converter()
 
     def filter_dividends(self) -> None:
         """Filter the DataFrame to include only dividend-related transactions."""
-        dividend_filter = DividendFilter(self.df)
-        self.df = dividend_filter.filter_dividends()
+        self.df = self._get_dividend_filter().filter_dividends()
 
     def group_by_dividends(self) -> None:
         """Group the DataFrame by Date, Ticker, and Type, aggregating Amount."""
-        dividend_filter = DividendFilter(self.df)
-        self.df = dividend_filter.group_by_dividends()
+        self.df = self._get_dividend_filter().group_by_dividends()
 
     def add_empty_column(
         self, col_name: str = "Tax Collected", position: int = 4
@@ -170,23 +162,19 @@ class DataFrameProcessor:
             col_name: The name of the column to be added. Defaults to 'Tax Collected'.
             position: The position to insert the column. Defaults to 4.
         """
-        aggregator = DataAggregator(self.df)
-        self.df = aggregator.add_empty_column(col_name, position)
+        self.df = self._get_data_aggregator().add_empty_column(col_name, position)
 
     def prepare_columns(self) -> None:
         """Ensure that 'Tax Collected' and 'Net Dividend' columns exist in the DataFrame."""
-        aggregator = DataAggregator(self.df)
-        self.df = aggregator.prepare_columns()
+        self.df = self._get_data_aggregator().prepare_columns()
 
     def convert_columns_to_numeric(self) -> None:
         """Convert 'Net Dividend' and 'Tax Collected' columns to numeric types."""
-        aggregator = DataAggregator(self.df)
-        self.df = aggregator.convert_columns_to_numeric()
+        self.df = self._get_data_aggregator().convert_columns_to_numeric()
 
     def move_negative_values(self) -> None:
         """Move negative values from 'Net Dividend' to 'Tax Collected'."""
-        aggregator = DataAggregator(self.df)
-        self.df = aggregator.move_negative_values()
+        self.df = self._get_data_aggregator().move_negative_values()
 
     def merge_and_sum(self) -> None:
         """Merge rows with the same 'Date' and 'Ticker', summing amounts.
@@ -203,8 +191,9 @@ class DataFrameProcessor:
         Args:
             statement_currency: Currency of the statement ('USD' or 'PLN')
         """
-        tax_extractor = TaxExtractor(self.df)
-        self.df = tax_extractor.extract_tax_percentage_from_comment(statement_currency)
+        self.df = self._get_tax_extractor().extract_tax_percentage_from_comment(
+            statement_currency
+        )
 
     def merge_rows_and_reorder(
         self, drop_columns: list[str] = ["Type", "Comment"]
@@ -214,50 +203,53 @@ class DataFrameProcessor:
         Args:
             drop_columns: A list of columns to drop after merging.
         """
-        aggregator = DataAggregator(self.df)
-        self.df = aggregator.merge_rows_and_reorder(drop_columns)
+        self.df = self._get_data_aggregator().merge_rows_and_reorder(drop_columns)
 
     # ------------------------------------------------------------------
     # Lazy specialist cache helpers
     # ------------------------------------------------------------------
 
-    def _get_currency_converter(self) -> CurrencyConverter:
-        """Return a CurrencyConverter bound to the current DataFrame.
+    def _get_specialist(self, attr: str, cls):
+        """Return a specialist, re-creating it only when self.df identity changes.
 
-        The instance is reused as long as ``self.df`` has not been replaced
-        by a new object, avoiding repeated instantiation inside per-row loops.
+        Args:
+            attr: Logical name of the specialist (used to build cache attribute names).
+            cls: Specialist class to instantiate with the current DataFrame.
 
         Returns:
-            Cached ``CurrencyConverter`` for the current ``self.df``.
+            Cached specialist instance for the current ``self.df``.
         """
+        instance_attr = f"_cached_{attr}"
+        df_attr = f"_cached_{attr}_df"
         current_df = self.df
         if (
-            getattr(self, "_cached_currency_converter", None) is None
-            or getattr(self, "_cached_currency_converter_df", None) is not current_df
+            getattr(self, instance_attr, None) is None
+            or getattr(self, df_attr, None) is not current_df
         ):
-            self._cached_currency_converter: CurrencyConverter = CurrencyConverter(
-                current_df
-            )
-            self._cached_currency_converter_df = current_df
-        return self._cached_currency_converter
+            setattr(self, instance_attr, cls(current_df))
+            setattr(self, df_attr, current_df)
+        return getattr(self, instance_attr)
+
+    def _get_column_normalizer(self) -> ColumnNormalizer:
+        return self._get_specialist("column_normalizer", ColumnNormalizer)
+
+    def _get_column_formatter(self) -> ColumnFormatter:
+        return self._get_specialist("column_formatter", ColumnFormatter)
+
+    def _get_dividend_filter(self) -> DividendFilter:
+        return self._get_specialist("dividend_filter", DividendFilter)
+
+    def _get_data_aggregator(self) -> DataAggregator:
+        return self._get_specialist("data_aggregator", DataAggregator)
+
+    def _get_currency_converter(self) -> CurrencyConverter:
+        return self._get_specialist("currency_converter", CurrencyConverter)
 
     def _get_tax_extractor(self) -> TaxExtractor:
-        """Return a TaxExtractor bound to the current DataFrame.
+        return self._get_specialist("tax_extractor", TaxExtractor)
 
-        The instance is reused as long as ``self.df`` has not been replaced
-        by a new object, avoiding repeated instantiation inside per-row loops.
-
-        Returns:
-            Cached ``TaxExtractor`` for the current ``self.df``.
-        """
-        current_df = self.df
-        if (
-            getattr(self, "_cached_tax_extractor", None) is None
-            or getattr(self, "_cached_tax_extractor_df", None) is not current_df
-        ):
-            self._cached_tax_extractor: TaxExtractor = TaxExtractor(current_df)
-            self._cached_tax_extractor_df = current_df
-        return self._cached_tax_extractor
+    def _get_tax_calculator(self) -> TaxCalculator:
+        return self._get_specialist("tax_calculator", TaxCalculator)
 
     # ------------------------------------------------------------------
     # Private forwarding delegates (use cached specialists)
@@ -331,8 +323,7 @@ class DataFrameProcessor:
 
     def add_currency_to_dividends(self) -> None:
         """Append currency symbols to the 'Net Dividend' column based on the ticker."""
-        converter = CurrencyConverter(self.df)
-        self.df = converter.add_currency_to_dividends()
+        self.df = self._get_currency_converter().add_currency_to_dividends()
 
     def calculate_dividend(
         self,
@@ -360,8 +351,7 @@ class DataFrameProcessor:
         """
         comment_col = comment_col or self.get_column_name("Comment", "Komentarz")
         amount_col = amount_col or ColumnName.NET_DIVIDEND.value
-        converter = CurrencyConverter(self.df)
-        self.df = converter.calculate_dividend(
+        self.df = self._get_currency_converter().calculate_dividend(
             courses_paths, statement_currency, comment_col, amount_col
         )
         return self.df
@@ -387,7 +377,7 @@ class DataFrameProcessor:
         ticker_col = ticker_col or self.get_column_name("Ticker", "Symbol")
         amount_col = amount_col or ColumnName.NET_DIVIDEND.value
 
-        tax_extractor = TaxExtractor(self.df)
+        tax_extractor = self._get_tax_extractor()
 
         def calculate_tax(row):
             """Calculate tax for a single row."""
@@ -420,8 +410,7 @@ class DataFrameProcessor:
         Returns:
             DataFrame with validated tax data.
         """
-        tax_extractor = TaxExtractor(self.df)
-        self.df = tax_extractor.validate_tax_collected()
+        self.df = self._get_tax_extractor().validate_tax_collected()
         return self.df
 
     def calculate_tax_in_pln_for_detected_usd(
@@ -436,8 +425,9 @@ class DataFrameProcessor:
         Returns:
             DataFrame with added 'Tax Amount PLN' column.
         """
-        calculator = TaxCalculator(self.df)
-        self.df = calculator.calculate_tax_for_usd_statement(statement_currency)
+        self.df = self._get_tax_calculator().calculate_tax_for_usd_statement(
+            statement_currency
+        )
         return self.df
 
     def calculate_tax_in_pln_for_detected_pln(
@@ -451,8 +441,9 @@ class DataFrameProcessor:
         Returns:
             DataFrame with added 'Tax Amount PLN' column.
         """
-        calculator = TaxCalculator(self.df)
-        self.df = calculator.calculate_tax_for_pln_statement(statement_currency)
+        self.df = self._get_tax_calculator().calculate_tax_for_pln_statement(
+            statement_currency
+        )
         return self.df
 
     def add_tax_percentage_display(self) -> pd.DataFrame:
@@ -461,8 +452,7 @@ class DataFrameProcessor:
         Returns:
             DataFrame with added 'Tax Collected %' column.
         """
-        formatter = ColumnFormatter(self.df)
-        self.df = formatter.add_tax_percentage_display()
+        self.df = self._get_column_formatter().add_tax_percentage_display()
         return self.df
 
     @staticmethod
@@ -486,8 +476,7 @@ class DataFrameProcessor:
         Returns:
             DataFrame with added 'Date D-1' column.
         """
-        formatter = ColumnFormatter(self.df)
-        self.df = formatter.create_date_d_minus_1_column(step_number)
+        self.df = self._get_column_formatter().create_date_d_minus_1_column(step_number)
         return self.df
 
     def create_exchange_rate_d_minus_1_column(
@@ -501,8 +490,9 @@ class DataFrameProcessor:
         Returns:
             DataFrame with added 'Exchange Rate D-1' column.
         """
-        formatter = ColumnFormatter(self.df)
-        self.df = formatter.create_exchange_rate_d_minus_1_column(courses_paths)
+        self.df = self._get_column_formatter().create_exchange_rate_d_minus_1_column(
+            courses_paths
+        )
         return self.df
 
     def add_tax_collected_amount(self, statement_currency: str = "PLN") -> pd.DataFrame:
@@ -514,8 +504,9 @@ class DataFrameProcessor:
         Returns:
             DataFrame with added 'Tax Collected Amount' column.
         """
-        formatter = ColumnFormatter(self.df)
-        self.df = formatter.add_tax_collected_amount(statement_currency)
+        self.df = self._get_column_formatter().add_tax_collected_amount(
+            statement_currency
+        )
         return self.df
 
     def reorder_columns(self) -> pd.DataFrame:
@@ -524,8 +515,7 @@ class DataFrameProcessor:
         Returns:
             DataFrame with reordered columns.
         """
-        aggregator = DataAggregator(self.df)
-        self.df = aggregator.reorder_columns()
+        self.df = self._get_data_aggregator().reorder_columns()
         return self.df
 
     def get_processed_df(self) -> pd.DataFrame:

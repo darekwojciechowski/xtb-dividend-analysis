@@ -14,6 +14,7 @@ import pandas as pd
 from loguru import logger
 
 from .constants import ColumnName, Currency, TickerSuffix
+from .date_converter import to_date
 
 
 class CurrencyConverter:
@@ -31,6 +32,31 @@ class CurrencyConverter:
         """
         self.df = df
 
+    def _currency_for_ticker(self, ticker: str) -> str:
+        """Infer currency from ticker suffix (single source of truth).
+
+        Args:
+            ticker: The stock ticker.
+
+        Returns:
+            Inferred currency code.
+        """
+        if "ASB.PL" in ticker:  # pragma: no mutate
+            return Currency.USD.value  # pragma: no mutate
+        if TickerSuffix.US.value in ticker:  # pragma: no mutate
+            return Currency.USD.value  # pragma: no mutate
+        elif TickerSuffix.PL.value in ticker:  # pragma: no mutate
+            return Currency.PLN.value  # pragma: no mutate
+        elif TickerSuffix.DK.value in ticker:  # pragma: no mutate
+            return Currency.DKK.value  # pragma: no mutate
+        elif TickerSuffix.UK.value in ticker:  # pragma: no mutate
+            return Currency.GBP.value  # pragma: no mutate
+        elif any(  # pragma: no mutate
+            suffix.value in ticker for suffix in TickerSuffix.eurozone_suffixes()
+        ):
+            return Currency.EUR.value  # pragma: no mutate
+        return Currency.USD.value  # pragma: no mutate
+
     def determine_currency(self, ticker: str, extracted_currency: str | None) -> str:
         """Determine the currency based on ticker and extracted currency.
 
@@ -43,27 +69,7 @@ class CurrencyConverter:
         """
         if extracted_currency:
             return extracted_currency
-
-        # Special case: ASB.PL is a US company listed in Poland
-        if "ASB.PL" in ticker:  # pragma: no mutate
-            return Currency.USD.value  # pragma: no mutate
-
-        # If no currency in comment, infer from ticker suffix
-        if TickerSuffix.US.value in ticker:  # pragma: no mutate
-            return Currency.USD.value  # pragma: no mutate
-        elif TickerSuffix.PL.value in ticker:  # pragma: no mutate
-            return Currency.PLN.value  # pragma: no mutate
-        elif TickerSuffix.DK.value in ticker:  # pragma: no mutate
-            return Currency.DKK.value  # pragma: no mutate
-        elif TickerSuffix.UK.value in ticker:  # pragma: no mutate
-            return Currency.GBP.value  # pragma: no mutate
-        elif any(
-            suffix.value in ticker for suffix in TickerSuffix.eurozone_suffixes()
-        ):  # pragma: no mutate
-            return Currency.EUR.value  # pragma: no mutate
-
-        # Default to USD if can't determine
-        return Currency.USD.value  # pragma: no mutate
+        return self._currency_for_ticker(ticker)
 
     def extract_dividend_from_comment(
         self, comment: str
@@ -320,33 +326,8 @@ class CurrencyConverter:
         def append_currency(row):
             ticker = row["Ticker"]
             dividend = row["Net Dividend"]
-
-            # Special case: ASB.PL uses USD
-            if "ASB.PL" in ticker:
-                currency_code = Currency.USD.value
-                return f"{dividend} {currency_code}"
-
-            # Determine currency based on ticker suffix
-            if TickerSuffix.US.value in ticker:
-                currency_code = Currency.USD.value
-                return f"{dividend} {currency_code}"
-            elif TickerSuffix.PL.value in ticker:
-                currency_code = Currency.PLN.value
-                return f"{dividend} {currency_code}"
-            elif TickerSuffix.DK.value in ticker:
-                currency_code = Currency.DKK.value
-                return f"{dividend} {currency_code}"
-            elif TickerSuffix.UK.value in ticker:
-                currency_code = Currency.GBP.value
-                return f"{dividend} {currency_code}"
-            elif any(
-                suffix.value in ticker for suffix in TickerSuffix.eurozone_suffixes()
-            ):
-                currency_code = Currency.EUR.value
-                return f"{dividend} {currency_code}"
-
-            # No change if the condition doesn't match
-            return dividend
+            currency_code = self._currency_for_ticker(ticker)
+            return f"{dividend} {currency_code}"
 
         # Apply the currency formatting
         self.df["Net Dividend"] = self.df.apply(append_currency, axis=1)
@@ -364,11 +345,7 @@ class CurrencyConverter:
         Returns:
             The previous business day.
         """
-        # Convert to datetime.date if needed
-        if isinstance(date_value, pd.Timestamp):
-            date_value = date_value.date()
-        elif isinstance(date_value, datetime):
-            date_value = date_value.date()
+        date_value = to_date(date_value)
 
         # Start with D-1 (previous day)
         previous_day = date_value - timedelta(days=1)
