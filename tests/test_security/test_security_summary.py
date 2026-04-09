@@ -100,7 +100,7 @@ def temp_bandit_report(tmp_path: Path, complete_bandit_report: dict) -> Path:
 class TestSeverityFormatting:
     """Test severity statistics formatting."""
 
-    def test_format_severity_stats_prints_all_levels(
+    def test_format_severity_stats_outputs_all_severity_levels_to_stdout(
         self, sample_bandit_metrics: dict, capsys
     ) -> None:
         """Test that all severity levels are printed.
@@ -221,7 +221,7 @@ class TestCommonIssuesFormatting:
 class TestSecuritySummaryGeneration:
     """Test complete security summary generation."""
 
-    def test_generate_security_summary_shows_lines_scanned(
+    def test_generate_security_summary_includes_lines_scanned_count_in_stdout(
         self, temp_bandit_report: Path, capsys
     ) -> None:
         """Test that LOC scanned is displayed.
@@ -319,7 +319,7 @@ class TestEdgeCases:
         generate_security_summary(str(invalid_json))
 
         captured = capsys.readouterr()
-        assert "Error" in captured.err or "Could not parse" in captured.out
+        assert "Could not parse" in captured.err
 
     def test_generate_security_summary_handles_empty_results(
         self, tmp_path: Path, capsys
@@ -340,7 +340,7 @@ class TestEdgeCases:
         captured = capsys.readouterr()
         assert "Total Security Issues" in captured.out
         assert "0" in captured.out
-        assert "No security issues found" in captured.out or "🎉" in captured.out
+        assert "No security issues found" in captured.out
 
     def test_generate_security_summary_handles_missing_metrics(
         self, tmp_path: Path, capsys
@@ -383,7 +383,7 @@ class TestIntegrationWithBandit:
 
         # Verify metrics are correctly extracted
         expected_loc = report_data["metrics"]["_totals"]["loc"]
-        assert str(expected_loc) in captured.out.replace(",", "")
+        assert f"{expected_loc:,}" in captured.out
 
         # Verify results count
         expected_issues = len(report_data["results"])

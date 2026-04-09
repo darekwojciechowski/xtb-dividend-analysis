@@ -37,6 +37,7 @@ _EXPECTED_ROW_COUNT = 44
 
 
 @pytest.mark.integration
+@pytest.mark.slow
 def test_import_and_column_normalization(
     pln_statement: tuple[pd.DataFrame, str],
 ) -> None:
@@ -67,6 +68,7 @@ def test_import_and_column_normalization(
 
 
 @pytest.mark.integration
+@pytest.mark.slow
 def test_import_duplicate_removal(
     pln_statement: tuple[pd.DataFrame, str],
 ) -> None:
@@ -88,6 +90,7 @@ def test_import_duplicate_removal(
 
 
 @pytest.mark.integration
+@pytest.mark.slow
 def test_import_data_type_consistency(
     pln_statement: tuple[pd.DataFrame, str],
 ) -> None:
@@ -122,6 +125,7 @@ def test_import_data_type_consistency(
 
 
 @pytest.mark.integration
+@pytest.mark.slow
 def test_import_with_special_characters(
     pln_statement: tuple[pd.DataFrame, str],
 ) -> None:
@@ -149,6 +153,7 @@ def test_import_with_special_characters(
 
 
 @pytest.mark.integration
+@pytest.mark.slow
 def test_import_missing_dates(
     pln_statement: tuple[pd.DataFrame, str],
 ) -> None:
@@ -173,6 +178,7 @@ def test_import_missing_dates(
 
 
 @pytest.mark.integration
+@pytest.mark.slow
 def test_import_detects_pln_currency(
     pln_statement: tuple[pd.DataFrame, str],
 ) -> None:

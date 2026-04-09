@@ -18,6 +18,7 @@ Test Coverage:
 
 from __future__ import annotations
 
+import pandas as pd
 import pytest
 
 from data_processing.constants import Currency
@@ -29,8 +30,9 @@ from data_processing.currency_converter import CurrencyConverter
 
 
 @pytest.mark.integration
+@pytest.mark.slow
 def test_currency_detection_and_conversion(
-    pln_statement: tuple,
+    pln_statement: tuple[pd.DataFrame, str],
 ) -> None:
     """Test that F6 of the PLN statement is detected as PLN.
 
@@ -46,6 +48,7 @@ def test_currency_detection_and_conversion(
 
 
 @pytest.mark.integration
+@pytest.mark.slow
 def test_nbp_exchange_rate_loading(
     currency_converter: CurrencyConverter,
     nbp_courses: list[str],
@@ -70,6 +73,7 @@ def test_nbp_exchange_rate_loading(
 
 
 @pytest.mark.integration
+@pytest.mark.slow
 def test_currency_conversion_accuracy(
     currency_converter: CurrencyConverter,
     nbp_courses: list[str],
@@ -93,8 +97,9 @@ def test_currency_conversion_accuracy(
 
 
 @pytest.mark.integration
+@pytest.mark.slow
 def test_multiple_currencies_same_statement(
-    pln_statement: tuple,
+    pln_statement: tuple[pd.DataFrame, str],
 ) -> None:
     """Test that all three dividend currencies appear in the PLN statement.
 
@@ -128,6 +133,7 @@ def test_multiple_currencies_same_statement(
 
 
 @pytest.mark.integration
+@pytest.mark.slow
 def test_missing_exchange_rate_handling(
     currency_converter: CurrencyConverter,
     nbp_courses: list[str],

@@ -44,7 +44,7 @@ def _make_tax_row(
     tax_collected_amount_str: str,
     exchange_rate_str: str,
     date: str,
-) -> dict:
+) -> dict[str, str | float]:
     """Build a single row dict in the format TaxCalculator expects.
 
     Args:

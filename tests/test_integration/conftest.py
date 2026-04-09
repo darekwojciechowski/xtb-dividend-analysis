@@ -51,7 +51,7 @@ def pln_statement(pln_statement_path: Path) -> tuple[pd.DataFrame, str]:
         pln_statement_path: Module-scoped fixture providing the XLSX path.
     """
     df, currency = import_and_process_data(pln_statement_path)
-    if df is None:
+    if df is None or currency is None:
         pytest.fail(
             f"Failed to import PLN demo statement from {pln_statement_path}. "
             "Check that the file exists and is a valid XTB XLSX export."

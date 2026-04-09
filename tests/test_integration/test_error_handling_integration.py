@@ -14,6 +14,7 @@ Test Coverage:
 
 from __future__ import annotations
 
+import tempfile
 import textwrap
 from io import StringIO
 from pathlib import Path
@@ -35,7 +36,7 @@ if TYPE_CHECKING:
 # Module-level constants
 # ---------------------------------------------------------------------------
 
-_NONEXISTENT_PATH = "/tmp/does_not_exist_ever_12345.xlsx"
+_NONEXISTENT_PATH = str(Path(tempfile.gettempdir()) / "does_not_exist_ever_12345.xlsx")
 _FUTURE_DATE_WITH_NO_RATE = "2099-01-01"
 _USD = "USD"
 
@@ -300,7 +301,7 @@ def test_error_logging_missing_exchange_rate_file_writes_to_sink(
         currency_converter: Module-scoped CurrencyConverter fixture.
     """
     # Arrange
-    ghost_csv = "/tmp/ghost_nbp_archive_99999.csv"
+    ghost_csv = str(Path(tempfile.gettempdir()) / "ghost_nbp_archive_99999.csv")
 
     # Act — get_exchange_rate will eventually raise ValueError after exhausting
     # all look-back attempts; we suppress it here because the assertion target
