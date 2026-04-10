@@ -266,7 +266,7 @@ class TestExtractTaxPercentageFromComment:
         assert result["Tax Collected"].tolist() == pytest.approx([0.19])
 
     def test_extract_percentage_returns_dataframe(self) -> None:
-        """Method always returns a DataFrame."""
+        """Method returns a DataFrame with 'Tax Collected' column and unchanged row count."""
         # Arrange
         df = _make_group_df()
         extractor = TaxExtractor(df)
@@ -276,6 +276,8 @@ class TestExtractTaxPercentageFromComment:
 
         # Assert
         assert isinstance(result, pd.DataFrame)
+        assert "Tax Collected" in result.columns
+        assert len(result) == len(df)
 
     def test_extract_percentage_when_usd_statement_saves_raw_column(self) -> None:
         """For USD statements, original Tax Collected is copied to Tax Collected Raw."""

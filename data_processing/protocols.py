@@ -13,13 +13,13 @@ import pandas as pd
 
 
 @runtime_checkable
-class DataTransformer(Protocol):
+class DataTransformer(Protocol):  # pragma: no cover
     """Base protocol for specialists that own and mutate a DataFrame."""
 
     df: pd.DataFrame
 
 
-class CurrencyConverterProtocol(DataTransformer, Protocol):
+class CurrencyConverterProtocol(DataTransformer, Protocol):  # pragma: no cover
     def determine_currency(
         self, ticker: str, extracted_currency: str | None
     ) -> str: ...
@@ -33,18 +33,18 @@ class CurrencyConverterProtocol(DataTransformer, Protocol):
     ) -> pd.DataFrame: ...
 
 
-class ColumnNormalizerProtocol(DataTransformer, Protocol):
+class ColumnNormalizerProtocol(DataTransformer, Protocol):  # pragma: no cover
     def get_column_name(self, english_name: str, polish_name: str) -> str: ...
     def drop_columns(self, columns: list[str]) -> pd.DataFrame: ...
     def normalize_column_names(self) -> pd.DataFrame: ...
 
 
-class DividendFilterProtocol(DataTransformer, Protocol):
+class DividendFilterProtocol(DataTransformer, Protocol):  # pragma: no cover
     def filter_dividends(self) -> pd.DataFrame: ...
     def group_by_dividends(self) -> pd.DataFrame: ...
 
 
-class TaxCalculatorProtocol(Protocol):
+class TaxCalculatorProtocol(Protocol):  # pragma: no cover
     def calculate_tax_for_pln_statement(
         self, statement_currency: str
     ) -> pd.DataFrame: ...

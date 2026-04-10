@@ -149,7 +149,7 @@ class TestDetermineCurrency:
         assert result == "USD"
 
     def test_determine_currency_never_returns_empty_string(self) -> None:
-        """Result is always a non-empty string regardless of ticker."""
+        """Unknown ticker falls back to USD (non-empty, concrete value)."""
         # Arrange
         converter = _converter()
 
@@ -157,8 +157,7 @@ class TestDetermineCurrency:
         result = converter.determine_currency("ANYTHING.ZZ", None)
 
         # Assert
-        assert isinstance(result, str)
-        assert len(result) > 0
+        assert result == "USD"
 
     def test_determine_currency_repeated_calls_are_idempotent(self) -> None:
         """determine_currency returns the same result on repeated calls.
@@ -331,16 +330,16 @@ class TestExtractDividendFromComment:
         assert amount == pytest.approx(1.2)
 
     def test_extract_always_returns_tuple(self) -> None:
-        """Return value is always a 2-tuple regardless of input."""
+        """Numeric fallback: 'random input 99' → (99.0, None)."""
         # Arrange
         converter = _converter()
 
         # Act
-        result = converter.extract_dividend_from_comment("random input 99")
+        value, currency = converter.extract_dividend_from_comment("random input 99")
 
         # Assert
-        assert isinstance(result, tuple)
-        assert len(result) == 2
+        assert value == pytest.approx(99.0)
+        assert currency is None
 
 
 # ---------------------------------------------------------------------------

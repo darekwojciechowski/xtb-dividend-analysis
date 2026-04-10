@@ -177,15 +177,22 @@ class TestNormalizeColumnNames:
             normalizer.normalize_column_names()
 
     def test_normalize_returns_dataframe(self) -> None:
-        """Return value is always a DataFrame."""
+        """Return value is a DataFrame with the expected standard columns and row count."""
         # Arrange
-        normalizer = ColumnNormalizer(_english_df())
+        df = _english_df()
+        normalizer = ColumnNormalizer(df)
 
         # Act
         result = normalizer.normalize_column_names()
 
         # Assert
         assert isinstance(result, pd.DataFrame)
+        assert ColumnName.DATE.value in result.columns
+        assert ColumnName.TICKER.value in result.columns
+        assert ColumnName.COMMENT.value in result.columns
+        assert ColumnName.AMOUNT.value in result.columns
+        assert ColumnName.TYPE.value in result.columns
+        assert len(result) == len(df)
 
     def test_normalize_preserves_row_count(self) -> None:
         """Number of rows is unchanged after normalization."""

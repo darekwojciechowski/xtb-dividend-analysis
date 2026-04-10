@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import date, datetime
+
 import pytest
 
-from data_processing.date_converter import DateConverter
+from data_processing.date_converter import DateConverter, convert_date, to_date
 
 
 @pytest.mark.unit
@@ -178,3 +180,66 @@ class TestLeapYearHandling:
 
         # Assert
         assert result.strftime("%Y-%m-%d") == self.expected_result
+
+
+@pytest.mark.unit
+class TestConvertDateFunction:
+    """Tests for the module-level convert_date function."""
+
+    def test_convert_date_when_valid_string_then_returns_date(self) -> None:
+        result = convert_date("01.03.2024 10:00:00")
+
+        assert result.strftime("%Y-%m-%d") == "2024-03-01"
+
+    def test_convert_date_when_none_then_returns_none(self) -> None:
+        assert convert_date(None) is None
+
+    def test_convert_date_when_empty_string_then_returns_none(self) -> None:
+        assert convert_date("") is None
+
+    def test_convert_date_when_whitespace_only_then_returns_none(self) -> None:
+        # Covers line 71: the strip() branch of the guard
+        assert convert_date("   ") is None
+
+    def test_convert_date_when_invalid_format_then_returns_none(self) -> None:
+        # Covers lines 74-76: ValueError → logger.error → return None
+        assert convert_date("not-a-date") is None
+
+    def test_convert_date_when_custom_format_provided_then_parses_correctly(
+        self,
+    ) -> None:
+        result = convert_date("2024/06/15", format="%Y/%m/%d")
+
+        assert result.strftime("%Y-%m-%d") == "2024-06-15"
+
+
+@pytest.mark.unit
+class TestToDateFunction:
+    """Tests for to_date normalisation helper."""
+
+    def test_to_date_when_timestamp_then_returns_date(self) -> None:
+        import pandas as pd
+
+        ts = pd.Timestamp("2024-05-20")
+
+        result = to_date(ts)
+
+        assert result == date(2024, 5, 20)
+        assert type(result) is date
+
+    def test_to_date_when_datetime_then_returns_date(self) -> None:
+        # Covers line 91: isinstance(value, datetime) branch
+        dt = datetime(2024, 7, 4, 12, 0, 0)
+
+        result = to_date(dt)
+
+        assert result == date(2024, 7, 4)
+        assert type(result) is date
+
+    def test_to_date_when_date_then_returns_same_date(self) -> None:
+        # Covers line 92: passthrough for already-date objects
+        d = date(2024, 8, 1)
+
+        result = to_date(d)
+
+        assert result is d
