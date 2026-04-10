@@ -16,6 +16,7 @@ from .constants import ColumnName
 from .currency_converter import CurrencyConverter
 from .date_converter import convert_date, to_date
 from .extractor import extract_condition
+from .tax_calculator import TaxCalculator
 
 
 class ColumnFormatter:
@@ -25,13 +26,16 @@ class ColumnFormatter:
     display-oriented column transformations.
     """
 
-    def __init__(self, df: pd.DataFrame):
+    def __init__(self, df: pd.DataFrame, converter: CurrencyConverter | None = None):
         """Initialize ColumnFormatter with a DataFrame.
 
         Args:
             df: DataFrame to format.
+            converter: Optional pre-built CurrencyConverter. If None, one is
+                created on demand inside ``create_exchange_rate_d_minus_1_column``.
         """
         self.df = df
+        self._converter = converter
 
     def apply_colorize_ticker(self) -> pd.DataFrame:
         """Apply random color formatting to the 'Ticker' column.
@@ -149,7 +153,7 @@ class ColumnFormatter:
         Returns:
             DataFrame with added 'Exchange Rate D-1' column.
         """
-        converter = CurrencyConverter(self.df)
+        converter = self._converter or CurrencyConverter(self.df)
 
         def get_exchange_rate_for_row(row):
             """Extract currency from Net Dividend and get exchange rate for D-1 date.
@@ -165,13 +169,16 @@ class ColumnFormatter:
 
             net_dividend_str = str(row.get("Net Dividend", ""))
             date_d_minus_1 = row.get("Date D-1")
+            ticker = row.get(ColumnName.TICKER.value, "Unknown")
+            date = str(row.get(ColumnName.DATE.value, "Unknown"))
 
             # Extract currency from Net Dividend (format: "6.84 USD" or "28.22 PLN")
-            parts = net_dividend_str.split()
-            if len(parts) != 2:
+            try:
+                _, currency = TaxCalculator._parse_value_with_currency(
+                    net_dividend_str, "Net Dividend", ticker, date
+                )
+            except ValueError:
                 return "-"
-
-            currency = parts[1]
 
             # Convert date to string format for lookup
             if pd.isna(date_d_minus_1):
@@ -219,17 +226,16 @@ class ColumnFormatter:
             """Calculate actual tax amount collected with currency."""
             net_dividend_str = str(row.get("Net Dividend", ""))
             tax_percentage = row.get("Tax Collected", 0)
+            ticker = row.get(ColumnName.TICKER.value, "Unknown")
+            date = str(row.get(ColumnName.DATE.value, "Unknown"))
 
             # Extract numeric value and currency from Net Dividend
             # Format: "6.84 USD" or "28.22 PLN"
-            parts = net_dividend_str.split()
-            if len(parts) != 2:
-                return "-"
-
             try:
-                dividend_amount = float(parts[0])
-                currency = parts[1]
-            except (ValueError, IndexError):
+                dividend_amount, currency = TaxCalculator._parse_value_with_currency(
+                    net_dividend_str, "Net Dividend", ticker, date
+                )
+            except ValueError:
                 return "-"
 
             # Check if tax percentage is valid

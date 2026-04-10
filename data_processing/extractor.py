@@ -8,6 +8,11 @@ from __future__ import annotations
 
 import re
 
+_KEYWORD_MAP: dict[str, str] = {
+    "Blik": "Blik(Payu) deposit",  # pragma: no mutate
+    "Pekao": "Pekao S.A. deposit",  # pragma: no mutate
+}
+
 
 class MultiConditionExtractor:
     """Extracts structured conditions from free-text comment strings.
@@ -32,23 +37,7 @@ class MultiConditionExtractor:
             The canonical condition label matching a keyword, or the
             original input string if no keyword is found.
         """
-        # Define a mapping of keywords to their corresponding conditions
-        keyword_map: dict[str, str] = {
-            "Blik": "Blik(Payu) deposit",  # pragma: no mutate
-            "Pekao": "Pekao S.A. deposit",  # pragma: no mutate
-        }
-
-        # Convert the input string to lowercase for case-insensitive matching
-        lower_input_string = self.input_string.lower()
-
-        # Search for each keyword in the lowercase input string
-        for keyword, condition in keyword_map.items():
-            pattern = re.compile(r"\b" + re.escape(keyword.lower()) + r"\b")
-            if pattern.search(lower_input_string):
-                return condition
-
-        # Return the original input string if no keywords are matched
-        return self.input_string
+        return extract_condition(self.input_string)
 
 
 def extract_condition(input_string: str) -> str:
@@ -61,12 +50,8 @@ def extract_condition(input_string: str) -> str:
         The canonical condition label matching a keyword, or the original
         input string if no keyword is found.
     """
-    keyword_map: dict[str, str] = {
-        "Blik": "Blik(Payu) deposit",  # pragma: no mutate
-        "Pekao": "Pekao S.A. deposit",  # pragma: no mutate
-    }
     lower = input_string.lower()
-    for keyword, condition in keyword_map.items():
+    for keyword, condition in _KEYWORD_MAP.items():
         if re.compile(r"\b" + re.escape(keyword.lower()) + r"\b").search(lower):
             return condition
     return input_string

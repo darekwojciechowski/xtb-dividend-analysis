@@ -54,8 +54,9 @@ class TaxCalculator:
                 f"Please ensure all helper columns are created before calling this method."
             )
 
+    @staticmethod
     def _parse_value_with_currency(
-        self, value_str: str, column_name: str, ticker: str, date: str
+        value_str: str, column_name: str, ticker: str, date: str
     ) -> tuple[float, str]:
         """Parse a numeric value and currency from a formatted string.
 

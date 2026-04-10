@@ -234,7 +234,20 @@ class DataFrameProcessor:
         return self._get_specialist("column_normalizer", ColumnNormalizer)
 
     def _get_column_formatter(self) -> ColumnFormatter:
-        return self._get_specialist("column_formatter", ColumnFormatter)
+        current_df = self.df
+        instance_attr = "_cached_column_formatter"
+        df_attr = "_cached_column_formatter_df"
+        if (
+            getattr(self, instance_attr, None) is None
+            or getattr(self, df_attr, None) is not current_df
+        ):
+            setattr(
+                self,
+                instance_attr,
+                ColumnFormatter(current_df, self._get_currency_converter()),
+            )
+            setattr(self, df_attr, current_df)
+        return getattr(self, instance_attr)
 
     def _get_dividend_filter(self) -> DividendFilter:
         return self._get_specialist("dividend_filter", DividendFilter)
@@ -539,14 +552,18 @@ class DataFrameProcessor:
         try:
             # Extract numeric value from "Net Dividend" (e.g., "5.05 USD" -> 5.05)
             net_div_str = str(row[ColumnName.NET_DIVIDEND.value])
-            net_div_value = float(net_div_str.split()[0])
+            net_div_value, _ = TaxCalculator._parse_value_with_currency(
+                net_div_str, "Net Dividend", "Unknown", "Unknown"
+            )
 
             # Get exchange rate (handle "-" for PLN)
             exchange_rate_str = str(row[ColumnName.EXCHANGE_RATE_D_MINUS_1.value])
             if exchange_rate_str == "-":
                 exchange_rate = 1.0
             else:
-                exchange_rate = float(exchange_rate_str.split()[0])
+                exchange_rate, _ = TaxCalculator._parse_value_with_currency(
+                    exchange_rate_str, "Exchange Rate D-1", "Unknown", "Unknown"
+                )
 
             return net_div_value * exchange_rate
         except (ValueError, IndexError, KeyError):

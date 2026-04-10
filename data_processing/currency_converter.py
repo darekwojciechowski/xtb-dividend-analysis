@@ -13,7 +13,13 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
-from .constants import ColumnName, Currency, TickerSuffix
+from .constants import (
+    MAX_EXCHANGE_RATE_LOOKBACK_DAYS,
+    WEEKEND_DAYS,
+    ColumnName,
+    Currency,
+    TickerSuffix,
+)
 from .date_converter import to_date
 
 
@@ -162,10 +168,9 @@ class CurrencyConverter:
             return 1.0
 
         # Try to find exchange rate for target date or previous business days
-        max_attempts = 10  # Maximum number of days to search backwards
         current_date = target_date
 
-        for attempt in range(max_attempts):
+        for attempt in range(MAX_EXCHANGE_RATE_LOOKBACK_DAYS):
             current_date_str_formatted = current_date.strftime("%Y%m%d")
 
             for csv_file in courses_paths:
@@ -198,12 +203,12 @@ class CurrencyConverter:
             # Move to previous day
             current_date = current_date - timedelta(days=1)
 
-            # Skip weekends (Saturday=5, Sunday=6)
-            while current_date.weekday() in [5, 6]:
+            # Skip weekends
+            while current_date.weekday() in WEEKEND_DAYS:
                 current_date = current_date - timedelta(days=1)
 
         error_msg = (
-            f"No exchange rate data found for {currency} on date '{target_date_str}' or previous {max_attempts} business days. "
+            f"No exchange rate data found for {currency} on date '{target_date_str}' or previous {MAX_EXCHANGE_RATE_LOOKBACK_DAYS} business days. "
             f"Check if you have downloaded the file 'archiwum_tab_a_XXXX.csv' for the date '{target_date_str}'."
         )
         logger.error(error_msg)
@@ -350,8 +355,8 @@ class CurrencyConverter:
         # Start with D-1 (previous day)
         previous_day = date_value - timedelta(days=1)
 
-        # Skip backwards while it's a weekend (Saturday=5, Sunday=6)
-        while previous_day.weekday() in [5, 6]:
+        # Skip backwards while it's a weekend
+        while previous_day.weekday() in WEEKEND_DAYS:
             previous_day -= timedelta(days=1)
 
         return previous_day

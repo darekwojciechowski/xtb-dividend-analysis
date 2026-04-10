@@ -699,6 +699,24 @@ class TestValueParsing:
         # Assert
         assert rate == pytest.approx(4.1512)
 
+    @pytest.mark.unit
+    def test_parse_value_with_currency_valid_format_returns_tuple(self) -> None:
+        """_parse_value_with_currency returns (float, str) for well-formed input."""
+        value, currency = TaxCalculator._parse_value_with_currency(
+            "6.84 USD", "Net Dividend", "AAPL.US", "2025-03-01"
+        )
+
+        assert value == pytest.approx(6.84)
+        assert currency == "USD"
+
+    @pytest.mark.unit
+    def test_parse_value_with_currency_single_token_raises_value_error(self) -> None:
+        """_parse_value_with_currency raises ValueError when format has only one token."""
+        with pytest.raises(ValueError, match="Invalid 'Net Dividend' format"):
+            TaxCalculator._parse_value_with_currency(
+                "6.84", "Net Dividend", "AAPL.US", "2025-03-01"
+            )
+
 
 class TestErrorHandling:
     """Test suite for error handling in tax calculations."""

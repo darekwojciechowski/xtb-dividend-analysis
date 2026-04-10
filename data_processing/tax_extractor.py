@@ -11,7 +11,7 @@ import re
 import pandas as pd
 from loguru import logger
 
-from .constants import TickerSuffix
+from .constants import ColumnName, TickerSuffix
 
 
 class TaxExtractor:
@@ -117,11 +117,15 @@ class TaxExtractor:
             DataFrame with tax percentages extracted.
         """
         # For USD statement, save the actual tax amount before converting to percentage
-        if statement_currency == "USD" and "Tax Collected" in self.df.columns:
-            self.df["Tax Collected Raw"] = self.df["Tax Collected"].copy()
+        tax_col = ColumnName.TAX_COLLECTED.value
+        tax_raw_col = ColumnName.TAX_COLLECTED_RAW.value
+        if statement_currency == "USD" and tax_col in self.df.columns:
+            self.df[tax_raw_col] = self.df[tax_col].copy()
 
         # Group by Date and Ticker, then extract tax percentage for each group
-        grouped = self.df.groupby(["Date", "Ticker"], group_keys=False)
+        grouped = self.df.groupby(
+            [ColumnName.DATE.value, ColumnName.TICKER.value], group_keys=False
+        )
 
         # Process each group to extract tax percentage
         results = []
@@ -130,18 +134,18 @@ class TaxExtractor:
 
             # Try to extract tax percentage from each row in the group
             tax_found = False
-            for comment in group_copy["Comment"]:
+            for comment in group_copy[ColumnName.COMMENT.value]:
                 tax_percentage = self.extract_tax_rate_from_comment(comment)
                 if tax_percentage is not None:
                     # Found a valid tax percentage, apply to all rows in group
-                    group_copy["Tax Collected"] = round(tax_percentage, 2)
+                    group_copy[tax_col] = round(tax_percentage, 2)
                     tax_found = True
                     break
 
             if not tax_found:
                 # If no tax percentage found, use default rate for ticker
                 default_rate = self.get_default_tax_rate(ticker)
-                group_copy["Tax Collected"] = round(default_rate, 2)
+                group_copy[tax_col] = round(default_rate, 2)
 
                 if default_rate == 0.0:
                     logger.info(
@@ -174,7 +178,8 @@ class TaxExtractor:
         Raises:
             ValueError: If Tax Collected column is not found.
         """
-        tax_col = "Tax Collected"
+        tax_col = ColumnName.TAX_COLLECTED.value
+        ticker_col = ColumnName.TICKER.value
 
         # Validate that Tax Collected column exists and has values
         if tax_col not in self.df.columns:
@@ -188,19 +193,19 @@ class TaxExtractor:
         if not invalid_rows.empty:
             logger.warning(
                 f"Found {len(invalid_rows)} rows with missing or zero tax percentages. "
-                f"Tickers: {invalid_rows['Ticker'].tolist()}"
+                f"Tickers: {invalid_rows[ticker_col].tolist()}"
             )
 
         logger.info("Tax Collected column validated.")
 
         # Check for US tickers with 30% tax rate
         us_tickers_with_30_tax = self.df[
-            (self.df["Ticker"].str.contains("US", na=False))
+            (self.df[ticker_col].str.contains("US", na=False))
             & (abs(self.df[tax_col] - 0.30) < 0.01)
         ]
 
         if not us_tickers_with_30_tax.empty:
-            ticker_examples = us_tickers_with_30_tax["Ticker"].head(3).tolist()
+            ticker_examples = us_tickers_with_30_tax[ticker_col].head(3).tolist()
             logger.warning(
                 f"⚠️  WARNING: 30% tax rate detected for US dividend(s): {', '.join(ticker_examples)}. "
                 f"In Poland, you can file a W8BEN form with your broker, "

@@ -8,6 +8,11 @@ from __future__ import annotations
 
 from enum import Enum
 
+WEEKEND_DAYS: frozenset[int] = frozenset(
+    {5, 6}
+)  # Saturday=5, Sunday=6 (Python weekday)
+MAX_EXCHANGE_RATE_LOOKBACK_DAYS: int = 10
+
 
 class Currency(str, Enum):
     """Currency codes used in the application.
@@ -89,3 +94,18 @@ class ColumnName(str, Enum):
     AMOUNT = "Amount"
     COLORED_TICKER = "Colored Ticker"
     CURRENCY = "Currency"
+
+
+class TransactionType(str, Enum):
+    """Transaction type labels used to filter dividend-related rows."""
+
+    DIVIDEND_EN = "Dividend"
+    DIVIDEND_PL = "Dywidenda"
+    DIVIDEND_ALT = "DIVIDENT"
+    WITHHOLDING_TAX = "Withholding Tax"
+    WITHHOLDING_TAX_PL = "Podatek od dywidend"
+
+    @classmethod
+    def dividend_types(cls) -> list[str]:
+        """Return all dividend-related transaction type values."""
+        return [t.value for t in cls]

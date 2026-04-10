@@ -9,7 +9,7 @@ from __future__ import annotations
 import pandas as pd
 from loguru import logger
 
-from .constants import ColumnName
+from .constants import ColumnName, TransactionType
 
 
 class DividendFilter:
@@ -39,17 +39,7 @@ class DividendFilter:
         type_col = ColumnName.TYPE.value
 
         self.df = self.df[self.df[type_col].notna()]
-        self.df = self.df[
-            self.df[type_col].isin(
-                [
-                    "Dividend",
-                    "Dywidenda",
-                    "DIVIDENT",
-                    "Withholding Tax",
-                    "Podatek od dywidend",
-                ]
-            )
-        ]
+        self.df = self.df[self.df[type_col].isin(TransactionType.dividend_types())]
         logger.info("Step 3 - Filtered rows to include only dividend-related data.")
 
         return self.df
