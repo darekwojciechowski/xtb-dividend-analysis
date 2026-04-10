@@ -433,3 +433,91 @@ class TestGetExchangeRate:
 
         # Assert
         assert rate == pytest.approx(3.98)
+
+
+# ---------------------------------------------------------------------------
+# TestCalculateDividend
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestCalculateDividend:
+    """Tests for CurrencyConverter.calculate_dividend to kill survived mutations."""
+
+    def test_calculate_dividend_when_extracted_value_zero_then_row_unchanged(
+        self, tmp_path: Path
+    ) -> None:
+        """Row with zero extracted dividend_per_share is skipped (no Shares update)."""
+        # Arrange — comment that produces extracted_value=0 (bare '0' numeric fallback)
+        df = pd.DataFrame(
+            {
+                "Date": [pd.Timestamp("2024-01-15")],
+                "Ticker": ["SBUX.US"],
+                "Net Dividend": [10.0],
+                "Comment": ["0"],  # numeric fallback → 0.0
+                "Date D-1": [pd.Timestamp("2024-01-12")],
+            }
+        )
+        converter = CurrencyConverter(df)
+
+        # Act
+        result = converter.calculate_dividend([], "PLN", "Comment", "Net Dividend")
+
+        # Assert — Shares column should still be NaN (row skipped)
+        assert pd.isna(result.loc[0, "Shares"])
+
+    def test_calculate_dividend_when_date_d1_nan_on_valid_row_then_raises(self) -> None:
+        """Raises ValueError when Date D-1 is NaN on a row with valid Date and amount."""
+        # Arrange
+        df = pd.DataFrame(
+            {
+                "Date": [pd.Timestamp("2024-01-15")],
+                "Ticker": ["SBUX.US"],
+                "Net Dividend": [10.0],
+                "Comment": ["SBUX.US USD 0.5700/ SHR"],
+                "Date D-1": [pd.NaT],  # missing D-1 on an otherwise valid row
+            }
+        )
+        converter = CurrencyConverter(df)
+
+        # Act / Assert
+        with pytest.raises(ValueError, match="Date D-1"):
+            converter.calculate_dividend([], "PLN", "Comment", "Net Dividend")
+
+
+# ---------------------------------------------------------------------------
+# TestAddCurrencyToDividends
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestAddCurrencyToDividends:
+    """Tests for CurrencyConverter.add_currency_to_dividends."""
+
+    @pytest.mark.parametrize(
+        "ticker, expected_suffix",
+        [
+            ("HSBA.UK", "GBP"),
+            ("NOVOB.DK", "DKK"),
+            ("AAPL.US", "USD"),
+            ("AIR.FR", "EUR"),
+        ],
+    )
+    def test_add_currency_appends_correct_suffix(
+        self, ticker: str, expected_suffix: str
+    ) -> None:
+        """Currency code matching the ticker suffix is appended to Net Dividend."""
+        # Arrange
+        df = pd.DataFrame(
+            {
+                "Ticker": [ticker],
+                "Net Dividend": [1.23],
+            }
+        )
+        converter = CurrencyConverter(df)
+
+        # Act
+        result = converter.add_currency_to_dividends()
+
+        # Assert
+        assert result.loc[0, "Net Dividend"].endswith(f" {expected_suffix}")

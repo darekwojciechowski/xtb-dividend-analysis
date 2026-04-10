@@ -57,7 +57,6 @@ addopts = [
     "--cov-report=xml",
     "--strict-markers"
 ]
-asyncio_mode = "strict"
 filterwarnings = [
     # Escalate deprecations only from our own source modules so we never
     # silently ship deprecated APIs. Third-party libraries have their own

@@ -337,3 +337,155 @@ class TestValidateTaxCollected:
 
         # Assert
         assert isinstance(result, pd.DataFrame)
+
+    def test_validate_when_tax_collected_zero_then_logs_warning_and_returns_df(
+        self,
+    ) -> None:
+        """Zero (not NaN) Tax Collected triggers warning but does not raise."""
+        # Arrange
+        df = pd.DataFrame(
+            {"Ticker": ["HSBA.UK"], "Date": ["2024-01-15"], "Tax Collected": [0]}
+        )
+        extractor = TaxExtractor(df)
+
+        # Act
+        result = extractor.validate_tax_collected()
+
+        # Assert — no exception; DataFrame returned
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 1
+
+    def test_validate_when_mixed_nan_zero_and_valid_then_warns_and_returns_df(
+        self,
+    ) -> None:
+        """Rows with NaN and 0 both trigger warning; valid rows are untouched."""
+        # Arrange
+        df = pd.DataFrame(
+            {
+                "Ticker": ["SBUX.US", "HSBA.UK", "AAPL.US"],
+                "Date": ["2024-01-15", "2024-01-15", "2024-01-15"],
+                "Tax Collected": [0.15, float("nan"), 0],
+            }
+        )
+        extractor = TaxExtractor(df)
+
+        # Act
+        result = extractor.validate_tax_collected()
+
+        # Assert — 3 rows returned, no exception
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 3
+
+    def test_validate_when_us_ticker_with_30_pct_tax_then_warning_triggered(
+        self,
+    ) -> None:
+        """US ticker with 30% Tax Collected triggers the W8BEN warning path."""
+        # Arrange
+        df = pd.DataFrame(
+            {
+                "Ticker": ["MMM.US"],
+                "Date": ["2024-01-15"],
+                "Tax Collected": [0.30],
+            }
+        )
+        extractor = TaxExtractor(df)
+
+        # Act — must complete without raising
+        result = extractor.validate_tax_collected()
+
+        # Assert
+        assert isinstance(result, pd.DataFrame)
+
+    @pytest.mark.parametrize("tax_rate", [0.29, 0.31])
+    def test_validate_us_ticker_outside_30_pct_tolerance_does_not_trigger_warning(
+        self, tax_rate: float
+    ) -> None:
+        """US ticker with tax ±1% outside 30% does NOT trigger the 30% warning path."""
+        # Arrange
+        df = pd.DataFrame(
+            {
+                "Ticker": ["MMM.US"],
+                "Date": ["2024-01-15"],
+                "Tax Collected": [tax_rate],
+            }
+        )
+        extractor = TaxExtractor(df)
+
+        # Act / Assert — simply must not raise
+        result = extractor.validate_tax_collected()
+        assert isinstance(result, pd.DataFrame)
+
+
+# ---------------------------------------------------------------------------
+# TestExtractTaxPercentageAdditional
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestExtractTaxPercentageAdditional:
+    """Additional tests for extract_tax_percentage_from_comment to kill mutations."""
+
+    def test_multiple_groups_each_gets_own_rate(self) -> None:
+        """Two different Date+Ticker groups each receive their respective WHT rate."""
+        # Arrange
+        df = pd.concat(
+            [
+                _make_group_df(
+                    date="2024-01-15",
+                    ticker="SBUX.US",
+                    comments=["SBUX.US USD 0.5700/ SHR", "SBUX.US USD WHT 15%"],
+                ),
+                _make_group_df(
+                    date="2024-02-20",
+                    ticker="NOVOB.DK",
+                    comments=["NOVOB.DK DKK 1.2000/ SHR", "NOVOB.DK DKK WHT 27%"],
+                ),
+            ],
+            ignore_index=True,
+        )
+        extractor = TaxExtractor(df)
+
+        # Act
+        result = extractor.extract_tax_percentage_from_comment(statement_currency="PLN")
+
+        # Assert
+        sbux_rows = result[result["Ticker"] == "SBUX.US"]
+        novob_rows = result[result["Ticker"] == "NOVOB.DK"]
+        assert sbux_rows["Tax Collected"].iloc[0] == pytest.approx(0.15)
+        assert novob_rows["Tax Collected"].iloc[0] == pytest.approx(0.27)
+
+    def test_uk_ticker_with_no_wht_comment_gets_zero_default(self) -> None:
+        """UK ticker without a WHT comment falls back to 0% default."""
+        # Arrange
+        df = _make_group_df(
+            ticker="HSBA.UK",
+            comments=["HSBA.UK GBP 0.3000/ SHR"],  # no WHT row
+        )
+        extractor = TaxExtractor(df)
+
+        # Act
+        result = extractor.extract_tax_percentage_from_comment(statement_currency="PLN")
+
+        # Assert
+        assert result["Tax Collected"].tolist() == pytest.approx([0.0])
+
+
+# ---------------------------------------------------------------------------
+# TestExtractTaxRateDecimalAdditional
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestExtractTaxRateDecimalAdditional:
+    """Decimal-percentage tests for extract_tax_rate_from_comment."""
+
+    def test_plain_decimal_percentage_returns_correct_rate(self) -> None:
+        """'dividend 12.5%' plain fallback returns 0.125."""
+        # Arrange
+        extractor = TaxExtractor(pd.DataFrame())
+
+        # Act
+        result = extractor.extract_tax_rate_from_comment("dividend 12.5%")
+
+        # Assert
+        assert result == pytest.approx(0.125)

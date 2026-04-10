@@ -997,6 +997,171 @@ class TestMultipleRowCalculations:
         # Row 3: PL stock with 19% tax, should be dash
         assert result_df.loc[2, "Tax Amount PLN"] == "-"
 
+
+@pytest.mark.unit
+class TestParsingEdgeCasesAdditional:
+    """Additional edge-case tests for parsing helpers to kill survived mutations."""
+
+    def test_parse_value_with_currency_when_nan_string_then_raises(self) -> None:
+        """String 'nan' is treated as missing and raises ValueError."""
+        # Arrange
+        calculator = TaxCalculator(pd.DataFrame({"dummy": [1]}))
+
+        # Act / Assert
+        with pytest.raises(ValueError, match="Missing 'Net Dividend'"):
+            calculator._parse_value_with_currency(
+                "nan", "Net Dividend", "TEST.US", "2025-01-01"
+            )
+
+    def test_parse_value_with_currency_when_three_parts_then_raises(self) -> None:
+        """A string with 3 whitespace-separated parts is an invalid format."""
+        # Arrange
+        calculator = TaxCalculator(pd.DataFrame({"dummy": [1]}))
+
+        # Act / Assert
+        with pytest.raises(ValueError, match="Invalid 'Net Dividend' format"):
+            calculator._parse_value_with_currency(
+                "6.84 6.84 USD", "Net Dividend", "TEST.US", "2025-01-01"
+            )
+
+    def test_parse_tax_collected_amount_when_nan_string_then_returns_zero(self) -> None:
+        """String 'nan' is treated as missing and returns 0.0."""
+        # Arrange
+        calculator = TaxCalculator(pd.DataFrame({"dummy": [1]}))
+
+        # Act
+        result = calculator._parse_tax_collected_amount("nan", "TEST.US", "2025-01-01")
+
+        # Assert
+        assert result == pytest.approx(0.0)
+
+    def test_parse_tax_collected_amount_when_pd_na_then_returns_zero(self) -> None:
+        """pd.NA is treated as missing and returns 0.0."""
+        # Arrange
+        calculator = TaxCalculator(pd.DataFrame({"dummy": [1]}))
+
+        # Act
+        result = calculator._parse_tax_collected_amount(pd.NA, "TEST.US", "2025-01-01")
+
+        # Assert
+        assert result == pytest.approx(0.0)
+
+    def test_parse_exchange_rate_when_nan_string_then_returns_one(self) -> None:
+        """String 'nan' is treated as missing and returns 1.0."""
+        # Arrange
+        calculator = TaxCalculator(pd.DataFrame({"dummy": [1]}))
+
+        # Act
+        result = calculator._parse_exchange_rate("nan", "TEST.US", "2025-01-01")
+
+        # Assert
+        assert result == pytest.approx(1.0)
+
+    def test_parse_exchange_rate_when_single_part_then_raises(self) -> None:
+        """A numeric string without a currency suffix is an invalid format."""
+        # Arrange
+        calculator = TaxCalculator(pd.DataFrame({"dummy": [1]}))
+
+        # Act / Assert
+        with pytest.raises(ValueError, match="Invalid 'Exchange Rate D-1' format"):
+            calculator._parse_exchange_rate("4.15", "TEST.US", "2025-01-01")
+
+
+@pytest.mark.unit
+class TestCalculateTotalTaxAmountEdgeCases:
+    """Edge-case tests for calculate_total_tax_amount to kill survived mutations."""
+
+    def test_calculate_total_when_column_missing_then_returns_zero(self) -> None:
+        """Returns 0.0 when Tax Amount PLN column is absent."""
+        # Arrange
+        df = pd.DataFrame({"Other Column": [1, 2, 3]})
+
+        # Act
+        result = TaxCalculator.calculate_total_tax_amount(df)
+
+        # Assert
+        assert result == pytest.approx(0.0)
+
+    def test_calculate_total_skips_integer_zero(self) -> None:
+        """Integer 0 in Tax Amount PLN is skipped, not added to total."""
+        # Arrange
+        df = pd.DataFrame({"Tax Amount PLN": ["5.00 PLN", 0, "3.00 PLN"]})
+
+        # Act
+        result = TaxCalculator.calculate_total_tax_amount(df)
+
+        # Assert
+        assert result == pytest.approx(8.0)
+
+    def test_calculate_total_skips_float_zero(self) -> None:
+        """Float 0.0 in Tax Amount PLN is skipped, not added to total."""
+        # Arrange
+        df = pd.DataFrame({"Tax Amount PLN": ["5.00 PLN", 0.0, "3.00 PLN"]})
+
+        # Act
+        result = TaxCalculator.calculate_total_tax_amount(df)
+
+        # Assert
+        assert result == pytest.approx(8.0)
+
+    def test_calculate_total_mixed_dashes_zeros_and_values(self) -> None:
+        """Only non-zero, non-dash values are summed."""
+        # Arrange
+        df = pd.DataFrame(
+            {"Tax Amount PLN": ["-", 0, 0.0, "10.50 PLN", "-", "2.25 PLN"]}
+        )
+
+        # Act
+        result = TaxCalculator.calculate_total_tax_amount(df)
+
+        # Assert
+        assert result == pytest.approx(12.75)
+
+
+@pytest.mark.unit
+class TestValidateRequiredColumnsSpecific:
+    """Tests for _validate_required_columns to kill survived mutations."""
+
+    def test_validate_names_specific_missing_column(self) -> None:
+        """Error message includes the exact name of the missing column."""
+        # Arrange
+        df = pd.DataFrame(
+            {
+                "Date": ["2025-01-01"],
+                "Ticker": ["TEST.US"],
+                "Net Dividend": ["10.0 USD"],
+                "Tax Collected": [0.15],
+                # Missing: "Tax Collected Amount" and "Exchange Rate D-1"
+            }
+        )
+        calculator = TaxCalculator(df)
+
+        # Act / Assert
+        with pytest.raises(ValueError, match="Tax Collected Amount"):
+            calculator.calculate_tax_for_pln_statement("PLN")
+
+    def test_calculate_overwrites_preexisting_tax_amount_pln_column(self) -> None:
+        """Pre-existing Tax Amount PLN is overwritten by the calculation."""
+        # Arrange
+        df = create_test_dataframe(
+            date="2025-01-01",
+            ticker="TEST.US",
+            shares=1.0,
+            net_dividend=10.0,
+            currency="USD",
+            tax_collected_pct=0.10,
+            tax_collected_amount=1.0,
+            exchange_rate=4.0,
+        )
+        df[ColumnName.TAX_AMOUNT_PLN.value] = "STALE_VALUE"
+        calculator = TaxCalculator(df)
+
+        # Act
+        result_df = calculator.calculate_tax_for_pln_statement("PLN")
+
+        # Assert — old sentinel value must be gone
+        assert result_df.loc[0, ColumnName.TAX_AMOUNT_PLN.value] != "STALE_VALUE"
+
     def test_calculate_total_tax_with_multiple_currencies(self) -> None:
         """Test total tax calculation across rows with different currencies."""
         # Arrange
@@ -1401,3 +1566,90 @@ class TestTaxCalculatorCorrectness:
         )
         null_count = result[tax_col].isna().sum()
         assert null_count == 0, f"{null_count} rows have null {tax_col}"
+
+
+@pytest.mark.unit
+class TestUncoveredBranches:
+    """Tests targeting specific uncovered lines in tax_calculator.py."""
+
+    def test_parse_tax_collected_amount_when_non_numeric_string_then_raises(
+        self,
+    ) -> None:
+        """Lines 122-124: ValueError when numeric part of tax amount is not a number."""
+        # Arrange
+        calculator = TaxCalculator(pd.DataFrame({"dummy": [1]}))
+
+        # Act & Assert
+        with pytest.raises(
+            ValueError, match="Invalid numeric value in 'Tax Collected Amount'"
+        ):
+            calculator._parse_tax_collected_amount("abc USD", "TEST.US", "2025-01-01")
+
+    def test_parse_exchange_rate_when_non_numeric_string_then_raises(self) -> None:
+        """Lines 152-154: ValueError when numeric part of exchange rate is not a number."""
+        # Arrange
+        calculator = TaxCalculator(pd.DataFrame({"dummy": [1]}))
+
+        # Act & Assert
+        with pytest.raises(
+            ValueError, match="Invalid numeric value in 'Exchange Rate D-1'"
+        ):
+            calculator._parse_exchange_rate("abc PLN", "TEST.US", "2025-01-01")
+
+    def test_calculate_tax_pln_row_when_tax_collected_not_castable_then_raises(
+        self,
+    ) -> None:
+        """Lines 186-189: ValueError when Tax Collected is present but cannot be cast to float."""
+        # Arrange — row dict simulates a DataFrame row with a non-numeric Tax Collected value
+        df = pd.DataFrame(
+            {
+                "Date": ["2025-01-01"],
+                "Ticker": ["TEST.US"],
+                "Net Dividend": ["10.0 USD"],
+                "Tax Collected": ["not-a-number"],
+                "Tax Collected Amount": ["1.0 USD"],
+                "Exchange Rate D-1": ["4.0 PLN"],
+            }
+        )
+        calculator = TaxCalculator(df)
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="Invalid 'Tax Collected' value"):
+            calculator.calculate_tax_for_pln_statement("PLN")
+
+    def test_calculate_tax_for_usd_statement_when_column_already_exists_overwrites(
+        self,
+    ) -> None:
+        """Branch 294->297: when Tax Amount PLN already exists, the column is overwritten."""
+        # Arrange
+        df = create_test_dataframe(
+            date="2025-01-01",
+            ticker="TEST.US",
+            shares=1.0,
+            net_dividend=10.0,
+            currency="USD",
+            tax_collected_pct=0.10,
+            tax_collected_amount=1.0,
+            exchange_rate=4.0,
+        )
+        df["Tax Amount PLN"] = "STALE_VALUE"
+        calculator = TaxCalculator(df)
+
+        # Act
+        result_df = calculator.calculate_tax_for_usd_statement("USD")
+
+        # Assert — stale value must be replaced with a calculated result
+        assert result_df.loc[0, "Tax Amount PLN"] != "STALE_VALUE"
+
+    def test_calculate_total_tax_amount_when_unparseable_value_then_skips_it(
+        self,
+    ) -> None:
+        """Lines 331-333: unparseable non-zero, non-dash values are silently skipped."""
+        # Arrange — "INVALID" is not "-", not 0, and not a valid float/PLN string
+        df = pd.DataFrame({"Tax Amount PLN": ["5.00 PLN", "INVALID", "3.00 PLN"]})
+
+        # Act
+        result = TaxCalculator.calculate_total_tax_amount(df)
+
+        # Assert — only the two valid entries are summed; INVALID is skipped
+        assert result == pytest.approx(8.0)

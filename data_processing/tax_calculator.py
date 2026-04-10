@@ -109,7 +109,7 @@ class TaxCalculator:
             ValueError: If the format is invalid or the value cannot be
                 parsed.
         """
-        if value_str == "-" or pd.isna(value_str) or value_str == "nan":
+        if pd.isna(value_str) or value_str == "-" or value_str == "nan":
             return 0.0
 
         parts = value_str.split()
@@ -139,7 +139,7 @@ class TaxCalculator:
             ValueError: If the format is invalid or the value cannot be
                 parsed.
         """
-        if value_str == "-" or pd.isna(value_str) or value_str == "nan":
+        if pd.isna(value_str) or value_str == "-" or value_str == "nan":
             return 1.0
 
         parts = value_str.split()

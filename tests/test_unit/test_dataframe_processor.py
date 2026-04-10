@@ -473,6 +473,363 @@ class TestEdgeCases:
         assert empty_processor.df.empty
 
 
+@pytest.mark.unit
+class TestInitialization:
+    """Test suite for DataFrameProcessor initialization."""
+
+    def test_init_when_none_then_raises_value_error(self) -> None:
+        """Tests that passing None raises ValueError."""
+        with pytest.raises(ValueError, match="cannot be None"):
+            DataFrameProcessor(None)
+
+
+@pytest.mark.unit
+class TestConvertDates:
+    """Test suite for convert_dates with auto-detection."""
+
+    def test_convert_dates_when_no_col_given_then_auto_detects_date_column(
+        self,
+    ) -> None:
+        """Tests that convert_dates resolves 'Date' column automatically."""
+        df = pd.DataFrame(
+            {
+                "Date": ["2024-01-01", "2024-06-15"],
+                "Ticker": ["A", "B"],
+                "Amount": [10.0, 20.0],
+            }
+        )
+        processor = DataFrameProcessor(df)
+
+        processor.convert_dates()
+
+        assert pd.api.types.is_datetime64_any_dtype(processor.df["Date"])
+
+
+@pytest.mark.unit
+class TestPrepareAndConvert:
+    """Test suite for prepare_columns and convert_columns_to_numeric."""
+
+    def test_prepare_columns_when_missing_then_creates_them(self) -> None:
+        """Tests that prepare_columns adds Tax Collected and Net Dividend if absent."""
+        df = pd.DataFrame(
+            {"Date": ["2024-01-01"], "Ticker": ["AAPL"], "Amount": [10.0]}
+        )
+        processor = DataFrameProcessor(df)
+
+        processor.prepare_columns()
+
+        assert "Tax Collected" in processor.df.columns
+        assert "Net Dividend" in processor.df.columns
+
+    def test_convert_columns_to_numeric_when_called_then_columns_are_numeric(
+        self,
+    ) -> None:
+        """Tests that Net Dividend and Tax Collected become numeric."""
+        df = pd.DataFrame(
+            {
+                "Net Dividend": ["5.5", "3.2"],
+                "Tax Collected": ["1.1", "0.9"],
+                "Ticker": ["A", "B"],
+            }
+        )
+        processor = DataFrameProcessor(df)
+
+        processor.convert_columns_to_numeric()
+
+        assert pd.api.types.is_numeric_dtype(processor.df["Net Dividend"])
+        assert pd.api.types.is_numeric_dtype(processor.df["Tax Collected"])
+
+
+@pytest.mark.unit
+class TestDeprecatedMethods:
+    """Test suite for deprecated/forwarding methods."""
+
+    def test_merge_and_sum_when_called_then_delegates_to_merge_rows_and_reorder(
+        self,
+    ) -> None:
+        """Tests that merge_and_sum calls merge_rows_and_reorder."""
+        df = pd.DataFrame(
+            {
+                "Date": pd.to_datetime(["2024-01-01", "2024-01-01"]),
+                "Ticker": ["AAPL", "AAPL"],
+                "Net Dividend": [5.0, 3.0],
+                "Tax Collected": [1.0, 0.5],
+                "Shares": [1, 1],
+                "Currency": ["USD", "USD"],
+                "Type": ["Dividend", "Withholding Tax"],
+                "Comment": ["div", "tax"],
+            }
+        )
+        processor = DataFrameProcessor(df)
+
+        processor.merge_and_sum()
+
+        assert "Type" not in processor.df.columns
+        assert "Comment" not in processor.df.columns
+
+
+@pytest.mark.unit
+class TestPrivateDelegates:
+    """Test suite for private forwarding delegate methods."""
+
+    def test_extract_dividend_from_comment_when_valid_comment_then_returns_values(
+        self,
+    ) -> None:
+        """Tests that _extract_dividend_from_comment returns dividend and currency."""
+        df = pd.DataFrame({"Ticker": ["SBUX.US"], "Net Dividend": [5.7]})
+        processor = DataFrameProcessor(df)
+
+        result = processor._extract_dividend_from_comment("SBUX.US USD 0.5700/ SHR")
+
+        assert result[0] == pytest.approx(0.57)
+        assert result[1] == "USD"
+
+    def test_determine_currency_when_us_ticker_then_returns_usd(self) -> None:
+        """Tests that _determine_currency returns USD for .US tickers."""
+        df = pd.DataFrame({"Ticker": ["AAPL.US"], "Net Dividend": [10.0]})
+        processor = DataFrameProcessor(df)
+
+        result = processor._determine_currency("AAPL.US", None)
+
+        assert result == "USD"
+
+    def test_extract_tax_rate_from_comment_when_wht_present_then_returns_rate(
+        self,
+    ) -> None:
+        """Tests that _extract_tax_rate_from_comment parses WHT percentage."""
+        df = pd.DataFrame({"Ticker": ["AAPL.US"], "Net Dividend": [10.0]})
+        processor = DataFrameProcessor(df)
+
+        result = processor._extract_tax_rate_from_comment("WHT 15%")
+
+        assert result == pytest.approx(0.15)
+
+    def test_get_default_tax_rate_when_us_ticker_then_returns_015(self) -> None:
+        """Tests that _get_default_tax_rate returns 0.15 for US tickers."""
+        df = pd.DataFrame({"Ticker": ["AAPL.US"], "Net Dividend": [10.0]})
+        processor = DataFrameProcessor(df)
+
+        result = processor._get_default_tax_rate("AAPL.US")
+
+        assert result == pytest.approx(0.15)
+
+    def test_get_exchange_rate_when_called_then_delegates_to_currency_converter(
+        self,
+    ) -> None:
+        """Tests that _get_exchange_rate delegates to CurrencyConverter."""
+        df = pd.DataFrame({"Ticker": ["AAPL.US"], "Net Dividend": [10.0]})
+        processor = DataFrameProcessor(df)
+
+        with patch(
+            "data_processing.currency_converter.CurrencyConverter.get_exchange_rate",
+            return_value=4.2,
+        ):
+            result = processor._get_exchange_rate(["dummy.csv"], "2024-01-01", "USD")
+
+        assert result == pytest.approx(4.2)
+
+
+@pytest.mark.unit
+class TestReplaceTaxValues:
+    """Test suite for the deprecated replace_tax_values method."""
+
+    def test_replace_tax_values_when_called_then_computes_tax_from_rate(self) -> None:
+        """Tests that replace_tax_values fills Tax Collected based on comment rate."""
+        df = pd.DataFrame(
+            {
+                "Date": ["2024-01-01"],
+                "Ticker": ["AAPL.US"],
+                "Net Dividend": [100.0],
+                "Tax Collected": [0.0],
+                "Comment": ["WHT 15%"],
+            }
+        )
+        processor = DataFrameProcessor(df)
+
+        result = processor.replace_tax_values()
+
+        assert result.loc[0, "Tax Collected"] == pytest.approx(15.0)
+
+    def test_replace_tax_values_when_no_comment_rate_then_uses_default(self) -> None:
+        """Tests that replace_tax_values falls back to default rate when comment has no rate."""
+        df = pd.DataFrame(
+            {
+                "Date": ["2024-01-01"],
+                "Ticker": ["AAPL.US"],
+                "Net Dividend": [100.0],
+                "Tax Collected": [0.0],
+                "Comment": ["Dividend payment"],
+            }
+        )
+        processor = DataFrameProcessor(df)
+
+        result = processor.replace_tax_values()
+
+        assert result.loc[0, "Tax Collected"] == pytest.approx(15.0)
+
+
+@pytest.mark.unit
+class TestCalculateTaxInPln:
+    """Test suite for USD and PLN statement tax calculation."""
+
+    def test_calculate_tax_usd_when_called_then_adds_tax_amount_pln_column(
+        self,
+    ) -> None:
+        """Tests that calculate_tax_in_pln_for_detected_usd adds Tax Amount PLN."""
+        df = pd.DataFrame(
+            {
+                "Date": pd.to_datetime(["2024-01-02"]),
+                "Ticker": ["AAPL.US"],
+                "Net Dividend": ["5.7 USD"],
+                "Tax Collected": [0.15],
+                "Tax Collected Amount": ["0.855 USD"],
+                "Exchange Rate D-1": ["4.0 PLN"],
+            }
+        )
+        processor = DataFrameProcessor(df)
+
+        result = processor.calculate_tax_in_pln_for_detected_usd(
+            courses_paths=[], statement_currency="USD"
+        )
+
+        assert "Tax Amount PLN" in result.columns
+
+
+@pytest.mark.unit
+class TestGetPreviousBusinessDay:
+    """Test suite for _get_previous_business_day static method."""
+
+    def test_get_previous_business_day_when_monday_then_returns_friday(self) -> None:
+        """Tests that Monday returns the previous Friday."""
+        import datetime
+
+        monday = datetime.date(2024, 1, 8)  # Monday
+        result = DataFrameProcessor._get_previous_business_day(monday)
+
+        assert result == datetime.date(2024, 1, 5)  # Friday
+
+    def test_get_previous_business_day_when_tuesday_then_returns_monday(self) -> None:
+        """Tests that a regular Tuesday returns the previous Monday."""
+        import datetime
+
+        tuesday = datetime.date(2024, 1, 9)
+        result = DataFrameProcessor._get_previous_business_day(tuesday)
+
+        assert result == datetime.date(2024, 1, 8)
+
+
+@pytest.mark.unit
+class TestParseDividendToPln:
+    """Test suite for parse_dividend_to_pln static method."""
+
+    def test_parse_when_pln_then_uses_exchange_rate_1(self) -> None:
+        """Tests that exchange rate '-' (PLN) results in factor of 1.0."""
+        row = pd.Series({"Net Dividend": "10.0 PLN", "Exchange Rate D-1": "-"})
+
+        result = DataFrameProcessor.parse_dividend_to_pln(row)
+
+        assert result == pytest.approx(10.0)
+
+    def test_parse_when_usd_then_multiplies_by_rate(self) -> None:
+        """Tests that USD net dividend is multiplied by exchange rate."""
+        row = pd.Series({"Net Dividend": "5.0 USD", "Exchange Rate D-1": "4.0 PLN"})
+
+        result = DataFrameProcessor.parse_dividend_to_pln(row)
+
+        assert result == pytest.approx(20.0)
+
+    def test_parse_when_invalid_values_then_returns_zero(self) -> None:
+        """Tests that malformed data returns 0.0 without raising."""
+        row = pd.Series({"Net Dividend": "N/A", "Exchange Rate D-1": "bad"})
+
+        result = DataFrameProcessor.parse_dividend_to_pln(row)
+
+        assert result == pytest.approx(0.0)
+
+
+@pytest.mark.unit
+class TestLogTableWithTaxSummary:
+    """Test suite for log_table_with_tax_summary."""
+
+    def test_log_table_when_tax_collected_present_then_drops_for_display(
+        self,
+    ) -> None:
+        """Tests that Tax Collected column is dropped from display without raising."""
+        df = pd.DataFrame(
+            {
+                "Date": pd.to_datetime(["2024-01-01"]),
+                "Ticker": ["AAPL.US"],
+                "Net Dividend": ["10.0 USD"],
+                "Tax Collected": [0.15],
+                "Exchange Rate D-1": ["4.0 PLN"],
+            }
+        )
+        processor = DataFrameProcessor(df)
+
+        # Should not raise
+        processor.log_table_with_tax_summary(statement_currency="USD")
+
+    def test_log_table_when_no_tax_collected_then_no_error(self) -> None:
+        """Tests that missing Tax Collected column is handled gracefully."""
+        df = pd.DataFrame(
+            {
+                "Date": pd.to_datetime(["2024-01-01"]),
+                "Ticker": ["AAPL.US"],
+                "Net Dividend": ["10.0 USD"],
+                "Exchange Rate D-1": ["4.0 PLN"],
+            }
+        )
+        processor = DataFrameProcessor(df)
+
+        processor.log_table_with_tax_summary(statement_currency="USD")
+
+
+@pytest.mark.unit
+class TestProcess:
+    """Test suite for the process() orchestration method."""
+
+    def test_process_when_called_then_executes_all_pipeline_steps(self) -> None:
+        """Tests that process() calls each pipeline step and returns a DataFrame."""
+        df = pd.DataFrame(
+            {
+                "Date": ["2024-01-01"],
+                "Ticker": ["AAPL"],
+                "Amount": [10.0],
+                "Type": ["Dividend"],
+                "Comment": ["div"],
+                "Tax Collected": [0.15],
+                "Shares": [1],
+                "Currency": ["USD"],
+            }
+        )
+        processor = DataFrameProcessor(df)
+
+        with patch.object(processor, "merge_and_sum"):
+            result = processor.process()
+
+        assert isinstance(result, pd.DataFrame)
+
+    def test_process_when_no_tax_collected_column_then_adds_it(self) -> None:
+        """Tests that process() adds Tax Collected column when it is absent."""
+        df = pd.DataFrame(
+            {
+                "Date": ["2024-01-01"],
+                "Ticker": ["AAPL"],
+                "Amount": [10.0],
+                "Type": ["Dividend"],
+                "Comment": ["div"],
+                "Shares": [1],
+                "Currency": ["USD"],
+            }
+        )
+        processor = DataFrameProcessor(df)
+
+        with patch.object(processor, "merge_and_sum"):
+            result = processor.process()
+
+        assert isinstance(result, pd.DataFrame)
+
+
 @pytest.mark.performance
 class TestPerformance:
     """Test suite for performance with large datasets."""
