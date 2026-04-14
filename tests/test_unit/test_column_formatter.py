@@ -56,9 +56,9 @@ class TestCreateDateDMinus1Column:
         new=_stub_get_previous_business_day,
     )
     def test_date_d_minus_1_no_tax_col_returns_real_date(self) -> None:
-        """When 'Tax Collected' column is absent the mask is skipped and a real date is returned.
-
-        Covers the early step-'4a' call before tax extraction has run.
+        """Arrange: 'Tax Collected' column is absent.
+        Act: create the Date D-1 column at step '4a'.
+        Assert: Date D-1 holds the real previous business day date.
         """
         df = _make_df(tax_collected=None, include_tax_col=False)
         formatter = ColumnFormatter(df)
@@ -72,7 +72,10 @@ class TestCreateDateDMinus1Column:
         new=_stub_get_previous_business_day,
     )
     def test_date_d_minus_1_tax_below_threshold_returns_real_date(self) -> None:
-        """When Tax Collected < polish_tax_rate the real D-1 date is kept."""
+        """Arrange: Tax Collected is 0.15, below the Polish 19% threshold.
+        Act: create the Date D-1 column at step '8'.
+        Assert: Date D-1 holds the real previous business day date.
+        """
         df = _make_df(tax_collected=0.15)
         formatter = ColumnFormatter(df)
 
@@ -85,7 +88,10 @@ class TestCreateDateDMinus1Column:
         new=_stub_get_previous_business_day,
     )
     def test_date_d_minus_1_tax_equal_to_threshold_returns_dash(self) -> None:
-        """When Tax Collected == polish_tax_rate (>= boundary) 'Date D-1' must show '-'."""
+        """Arrange: Tax Collected is 0.19, at the Polish tax threshold.
+        Act: create the Date D-1 column at step '8'.
+        Assert: Date D-1 is '-'.
+        """
         df = _make_df(tax_collected=0.19)
         formatter = ColumnFormatter(df)
 
@@ -98,7 +104,10 @@ class TestCreateDateDMinus1Column:
         new=_stub_get_previous_business_day,
     )
     def test_date_d_minus_1_tax_above_threshold_returns_dash(self) -> None:
-        """When Tax Collected > polish_tax_rate (e.g. ASB.PL 25.5% WHT) 'Date D-1' must show '-'."""
+        """Arrange: Tax Collected is 0.255, above the Polish tax threshold (ASB.PL case).
+        Act: create the Date D-1 column at step '8'.
+        Assert: Date D-1 is '-'.
+        """
         df = _make_df(tax_collected=0.255)
         formatter = ColumnFormatter(df)
 
@@ -111,7 +120,10 @@ class TestCreateDateDMinus1Column:
         new=_stub_get_previous_business_day,
     )
     def test_date_d_minus_1_tax_nan_returns_real_date(self) -> None:
-        """When Tax Collected is NaN (no WHT row merged) the real D-1 date is kept."""
+        """Arrange: Tax Collected is NaN, indicating no WHT row was merged.
+        Act: create the Date D-1 column at step '8'.
+        Assert: Date D-1 holds the real previous business day date.
+        """
         df = _make_df(tax_collected=None)
         formatter = ColumnFormatter(df)
 
@@ -145,7 +157,10 @@ class TestCreateExchangeRateDMinus1Column:
     """Tests for ColumnFormatter.create_exchange_rate_d_minus_1_column branches."""
 
     def test_exchange_rate_tax_above_threshold_returns_dash(self) -> None:
-        """When Tax Collected >= polish_tax_rate the row returns '-' immediately (lines 162-166)."""
+        """Arrange: Tax Collected is 0.19, at the Polish tax threshold.
+        Act: create the Exchange Rate D-1 column.
+        Assert: Exchange Rate D-1 is '-'.
+        """
         df = _make_exchange_rate_df("6.84 USD", tax_collected=0.19)
         formatter = ColumnFormatter(df)
 
@@ -156,7 +171,10 @@ class TestCreateExchangeRateDMinus1Column:
         assert result["Exchange Rate D-1"].iloc[0] == "-"
 
     def test_exchange_rate_invalid_net_dividend_format_returns_dash(self) -> None:
-        """When Net Dividend cannot be split into exactly 2 parts returns '-' (line 172)."""
+        """Arrange: Net Dividend cannot be split into exactly 2 parts.
+        Act: create the Exchange Rate D-1 column.
+        Assert: Exchange Rate D-1 is '-'.
+        """
         df = _make_exchange_rate_df("INVALID", tax_collected=0.10)
         formatter = ColumnFormatter(df)
 
@@ -167,7 +185,10 @@ class TestCreateExchangeRateDMinus1Column:
         assert result["Exchange Rate D-1"].iloc[0] == "-"
 
     def test_exchange_rate_nan_date_d_minus_1_returns_dash(self) -> None:
-        """When Date D-1 is NaN/None returns '-' (line 178)."""
+        """Arrange: Date D-1 is NaN/None.
+        Act: create the Exchange Rate D-1 column.
+        Assert: Exchange Rate D-1 is '-'.
+        """
         df = _make_exchange_rate_df("6.84 USD", tax_collected=0.10, date_d_minus_1=None)
         formatter = ColumnFormatter(df)
 
@@ -178,7 +199,10 @@ class TestCreateExchangeRateDMinus1Column:
         assert result["Exchange Rate D-1"].iloc[0] == "-"
 
     def test_exchange_rate_zero_rate_returns_dash(self) -> None:
-        """When the looked-up exchange rate is 0.0 returns '-' (line 188)."""
+        """Arrange: Exchange rate lookup returns 0.0.
+        Act: create the Exchange Rate D-1 column.
+        Assert: Exchange Rate D-1 is '-'.
+        """
         df = _make_exchange_rate_df("6.84 USD", tax_collected=0.10)
         formatter = ColumnFormatter(df)
 
@@ -189,7 +213,10 @@ class TestCreateExchangeRateDMinus1Column:
         assert result["Exchange Rate D-1"].iloc[0] == "-"
 
     def test_exchange_rate_pln_currency_returns_dash(self) -> None:
-        """When currency is PLN and rate is 1.0 returns '-' (line 190)."""
+        """Arrange: Currency is PLN and rate is 1.0.
+        Act: create the Exchange Rate D-1 column.
+        Assert: Exchange Rate D-1 is '-'.
+        """
         df = _make_exchange_rate_df("28.22 PLN", tax_collected=0.10)
         formatter = ColumnFormatter(df)
 
@@ -211,7 +238,10 @@ class TestCreateExchangeRateDMinus1Column:
         assert result["Exchange Rate D-1"].iloc[0] == "3.8512 PLN"
 
     def test_exchange_rate_converter_created_with_df(self) -> None:
-        """CurrencyConverter is constructed with self.df, not None (kills mutmut_3)."""
+        """Arrange: Exchange Rate D-1 column creation is requested.
+        Act: create the Exchange Rate D-1 column.
+        Assert: CurrencyConverter is instantiated with self.df.
+        """
         df = _make_exchange_rate_df("6.84 USD", tax_collected=0.10)
         formatter = ColumnFormatter(df)
 
@@ -222,7 +252,10 @@ class TestCreateExchangeRateDMinus1Column:
         MockCC.assert_called_once_with(df)
 
     def test_exchange_rate_injected_converter_is_reused(self) -> None:
-        """When _converter is pre-injected it is used directly; no new CurrencyConverter (kills mutmut_3 via injection path)."""
+        """Arrange: CurrencyConverter is pre-injected via the converter parameter.
+        Act: create the Exchange Rate D-1 column.
+        Assert: The injected converter is used; no new CurrencyConverter is instantiated.
+        """
         from unittest.mock import MagicMock
 
         df = _make_exchange_rate_df("6.84 USD", tax_collected=0.10)
@@ -237,7 +270,10 @@ class TestCreateExchangeRateDMinus1Column:
         assert result["Exchange Rate D-1"].iloc[0] == "4.2000 PLN"
 
     def test_exchange_rate_rate_one_non_pln_returns_formatted_rate(self) -> None:
-        """rate == 1.0 with non-PLN currency must return a formatted rate, not '-' (kills mutmut_80)."""
+        """Arrange: Exchange rate is 1.0 but currency is non-PLN (USD).
+        Act: create the Exchange Rate D-1 column.
+        Assert: Exchange Rate D-1 is formatted rate, not '-'.
+        """
         df = _make_exchange_rate_df("6.84 USD", tax_collected=0.10)
         formatter = ColumnFormatter(df)
 
@@ -248,7 +284,10 @@ class TestCreateExchangeRateDMinus1Column:
         assert result["Exchange Rate D-1"].iloc[0] == "1.0000 PLN"
 
     def test_exchange_rate_get_exchange_rate_receives_correct_date_format(self) -> None:
-        """get_exchange_rate must be called with a YYYY-MM-DD date string (kills mutmut_64, 67-69)."""
+        """Arrange: Date D-1 is a pandas Timestamp.
+        Act: create the Exchange Rate D-1 column.
+        Assert: get_exchange_rate receives the date as a 'YYYY-MM-DD' string.
+        """
         d_minus_1 = pd.Timestamp("2025-05-28")
         df = _make_exchange_rate_df(
             "6.84 USD", tax_collected=0.10, date_d_minus_1=d_minus_1
@@ -266,7 +305,10 @@ class TestCreateExchangeRateDMinus1Column:
     def test_exchange_rate_get_exchange_rate_receives_courses_paths_and_currency(
         self,
     ) -> None:
-        """get_exchange_rate must receive courses_paths[0] and extracted currency (kills mutmut_71-76)."""
+        """Arrange: courses_paths list and currency code are provided.
+        Act: create the Exchange Rate D-1 column.
+        Assert: get_exchange_rate receives courses_paths and extracted currency.
+        """
         df = _make_exchange_rate_df("6.84 USD", tax_collected=0.10)
         formatter = ColumnFormatter(df)
         courses_paths = ["/path/a", "/path/b"]
@@ -280,7 +322,10 @@ class TestCreateExchangeRateDMinus1Column:
         assert _args[2] == "USD"
 
     def test_exchange_rate_parse_receives_ticker_and_date_from_row(self) -> None:
-        """_parse_value_with_currency must receive the row's Ticker and Date (kills mutmut_32-53)."""
+        """Arrange: Row contains Ticker, Date, and Net Dividend.
+        Act: create the Exchange Rate D-1 column.
+        Assert: _parse_value_with_currency receives the row's Ticker and Date.
+        """
         df = pd.DataFrame(
             {
                 "Net Dividend": ["6.84 USD"],
@@ -310,7 +355,10 @@ class TestCreateExchangeRateDMinus1Column:
         assert "2025-05-29" in call_args[3]  # date (kills mutmut_40-48)
 
     def test_exchange_rate_missing_tax_collected_key_proceeds_to_rate(self) -> None:
-        """Row without 'Tax Collected' key skips the tax check and returns the rate (kills mutmut_7)."""
+        """Arrange: Row lacks the 'Tax Collected' column.
+        Act: create the Exchange Rate D-1 column.
+        Assert: Tax check is skipped and the exchange rate is returned.
+        """
         df = pd.DataFrame(
             {
                 "Net Dividend": ["6.84 USD"],
@@ -326,7 +374,10 @@ class TestCreateExchangeRateDMinus1Column:
         assert result["Exchange Rate D-1"].iloc[0] == "3.8500 PLN"
 
     def test_exchange_rate_tax_nan_does_not_return_dash_early(self) -> None:
-        """NaN Tax Collected must not trigger early '-' return (kills mutmut_11)."""
+        """Arrange: Tax Collected is NaN.
+        Act: create the Exchange Rate D-1 column.
+        Assert: NaN Tax Collected does not trigger early '-' return.
+        """
         df = _make_exchange_rate_df("6.84 USD", tax_collected=None)
         formatter = ColumnFormatter(df)
 
@@ -337,7 +388,10 @@ class TestCreateExchangeRateDMinus1Column:
         assert result["Exchange Rate D-1"].iloc[0] == "3.8500 PLN"
 
     def test_exchange_rate_step9_logged(self) -> None:
-        """Step 9 message is emitted to the logger (kills mutmut_96-99)."""
+        """Arrange: Column creation is requested.
+        Act: create the Exchange Rate D-1 column.
+        Assert: Step 9 message is logged.
+        """
         from unittest.mock import MagicMock
 
         import data_processing.column_formatter as mod
@@ -386,7 +440,10 @@ class TestAddTaxCollectedAmount:
     """Tests for ColumnFormatter.add_tax_collected_amount branches."""
 
     def test_tax_amount_invalid_net_dividend_returns_dash(self) -> None:
-        """When Net Dividend has != 2 parts returns '-' (line 227)."""
+        """Arrange: Net Dividend has != 2 parts.
+        Act: add Tax Collected Amount column.
+        Assert: Tax Collected Amount is '-'.
+        """
         df = _make_tax_amount_df("INVALID", tax_collected=0.15)
         formatter = ColumnFormatter(df)
 
@@ -395,7 +452,10 @@ class TestAddTaxCollectedAmount:
         assert result["Tax Collected Amount"].iloc[0] == "-"
 
     def test_tax_amount_non_numeric_dividend_value_returns_dash(self) -> None:
-        """When Net Dividend amount cannot be cast to float returns '-' (lines 232-233)."""
+        """Arrange: Net Dividend amount cannot be parsed as float.
+        Act: add Tax Collected Amount column.
+        Assert: Tax Collected Amount is '-'.
+        """
         df = _make_tax_amount_df("abc USD", tax_collected=0.15)
         formatter = ColumnFormatter(df)
 
@@ -404,7 +464,10 @@ class TestAddTaxCollectedAmount:
         assert result["Tax Collected Amount"].iloc[0] == "-"
 
     def test_tax_amount_zero_tax_percentage_returns_dash(self) -> None:
-        """When Tax Collected is 0 returns '-'."""
+        """Arrange: Tax Collected is 0.
+        Act: add Tax Collected Amount column.
+        Assert: Tax Collected Amount is '-'.
+        """
         df = _make_tax_amount_df("6.84 USD", tax_collected=0)
         formatter = ColumnFormatter(df)
 
@@ -413,7 +476,10 @@ class TestAddTaxCollectedAmount:
         assert result["Tax Collected Amount"].iloc[0] == "-"
 
     def test_tax_amount_nan_tax_percentage_returns_dash(self) -> None:
-        """When Tax Collected is NaN returns '-'."""
+        """Arrange: Tax Collected is NaN.
+        Act: add Tax Collected Amount column.
+        Assert: Tax Collected Amount is '-'.
+        """
         df = _make_tax_amount_df("6.84 USD", tax_collected=None)
         formatter = ColumnFormatter(df)
 
@@ -422,7 +488,10 @@ class TestAddTaxCollectedAmount:
         assert result["Tax Collected Amount"].iloc[0] == "-"
 
     def test_tax_amount_usd_statement_uses_raw_column(self) -> None:
-        """For USD statement with Tax Collected Raw column, uses abs(raw) value (lines 241-246)."""
+        """Arrange: USD statement with Tax Collected Raw column set to -1.21.
+        Act: add Tax Collected Amount column.
+        Assert: Tax Collected Amount uses absolute value of raw column.
+        """
         df = _make_tax_amount_df(
             "6.84 USD",
             tax_collected=0.15,
@@ -436,7 +505,10 @@ class TestAddTaxCollectedAmount:
         assert result["Tax Collected Amount"].iloc[0] == "1.21 USD"
 
     def test_tax_amount_pln_statement_calculates_from_percentage(self) -> None:
-        """For PLN statement, calculates tax amount from net dividend and percentage."""
+        """Arrange: PLN statement with 28.22 PLN dividend and 19% tax.
+        Act: add Tax Collected Amount column.
+        Assert: Tax amount is calculated as gross × 19%.
+        """
         df = _make_tax_amount_df("28.22 PLN", tax_collected=0.19)
         formatter = ColumnFormatter(df)
 
@@ -444,3 +516,282 @@ class TestAddTaxCollectedAmount:
 
         # gross = 28.22 / (1 - 0.19) = 34.8395..., tax = gross * 0.19 = 6.6195...
         assert result["Tax Collected Amount"].iloc[0] == "6.62 PLN"
+
+    def test_tax_amount_default_statement_currency_is_pln(self) -> None:
+        """Arrange: add_tax_collected_amount called without statement_currency argument.
+        Act: add Tax Collected Amount column with default currency.
+        Assert: Default statement_currency is 'PLN'.
+        """
+        df = _make_tax_amount_df("28.22 PLN", tax_collected=0.19)
+        formatter = ColumnFormatter(df)
+
+        # Call without statement_currency to test default
+        result = formatter.add_tax_collected_amount()
+
+        # Should use PLN calculation
+        assert result["Tax Collected Amount"].iloc[0] == "6.62 PLN"
+
+    def test_tax_amount_tax_percentage_default_is_zero_not_one(self) -> None:
+        """Arrange: Tax Collected is NaN (uses default value).
+        Act: add Tax Collected Amount column.
+        Assert: Default tax_percentage is 0, not 1.
+        """
+        df = _make_tax_amount_df("6.84 USD", tax_collected=None)
+        formatter = ColumnFormatter(df)
+
+        result = formatter.add_tax_collected_amount()
+
+        # With default 0 (NaN check passes), should return "-"
+        assert result["Tax Collected Amount"].iloc[0] == "-"
+
+    def test_tax_amount_ticker_column_name_correct(self) -> None:
+        """Arrange: Row contains Ticker, Net Dividend, Date, Tax Collected.
+        Act: add Tax Collected Amount column.
+        Assert: Ticker is extracted correctly from ColumnName.TICKER.value.
+        """
+        df = pd.DataFrame(
+            {
+                "Net Dividend": ["6.84 USD"],
+                "Tax Collected": [0.15],
+                "Ticker": ["AAPL"],
+                "Date": [pd.Timestamp("2025-05-29")],
+            }
+        )
+        formatter = ColumnFormatter(df)
+
+        result = formatter.add_tax_collected_amount()
+
+        # Should successfully extract currency and return formatted amount
+        assert result["Tax Collected Amount"].iloc[0] != "-"
+
+    def test_tax_amount_date_column_name_correct(self) -> None:
+        """Arrange: Row contains Date, Net Dividend, Ticker, Tax Collected.
+        Act: add Tax Collected Amount column.
+        Assert: Date is extracted correctly from ColumnName.DATE.value.
+        """
+        df = pd.DataFrame(
+            {
+                "Net Dividend": ["6.84 USD"],
+                "Tax Collected": [0.15],
+                "Ticker": ["AAPL"],
+                "Date": [pd.Timestamp("2025-05-29")],
+            }
+        )
+        formatter = ColumnFormatter(df)
+
+        result = formatter.add_tax_collected_amount()
+
+        assert result["Tax Collected Amount"].iloc[0] != "-"
+
+    def test_tax_amount_condition_logic_and_not_or(self) -> None:
+        """Arrange: PLN statement with Tax Collected Raw column present.
+        Act: add Tax Collected Amount column.
+        Assert: Condition uses 'and' (not 'or'); raw column is not used.
+        """
+        df = pd.DataFrame(
+            {
+                "Net Dividend": ["6.84 USD"],
+                "Tax Collected": [0.15],
+                "Tax Collected Raw": [-1.21],
+                "Ticker": ["AAPL"],
+                "Date": [pd.Timestamp("2025-05-29")],
+            }
+        )
+        formatter = ColumnFormatter(df)
+
+        # Call with PLN (non-USD) statement - should NOT use raw column
+        result = formatter.add_tax_collected_amount(statement_currency="PLN")
+
+        # With PLN, should calculate from percentage, not use raw amount
+        # gross = 6.84 / (1 - 0.15) = 8.047..., tax = gross * 0.15 = 1.207...
+        expected = "1.21 USD"  # calculated, not "1.21 USD" from raw
+        assert result["Tax Collected Amount"].iloc[0] == expected
+
+    def test_tax_amount_condition_equality_not_inequality(self) -> None:
+        """Arrange: USD statement with Tax Collected Raw column present.
+        Act: add Tax Collected Amount column.
+        Assert: Condition uses == 'USD'; raw column is used.
+        """
+        df = pd.DataFrame(
+            {
+                "Net Dividend": ["6.84 USD"],
+                "Tax Collected": [0.15],
+                "Tax Collected Raw": [-1.02],
+                "Ticker": ["AAPL"],
+                "Date": [pd.Timestamp("2025-05-29")],
+            }
+        )
+        formatter = ColumnFormatter(df)
+
+        # Call with USD statement - should use raw column
+        result = formatter.add_tax_collected_amount(statement_currency="USD")
+
+        # Should use raw amount (absolute value)
+        assert result["Tax Collected Amount"].iloc[0] == "1.02 USD"
+
+    def test_tax_amount_usd_raw_zero_not_used(self) -> None:
+        """Arrange: USD statement with Tax Collected Raw = 0.
+        Act: add Tax Collected Amount column.
+        Assert: Raw value of 0 is not used; amount is calculated instead.
+        """
+        df = pd.DataFrame(
+            {
+                "Net Dividend": ["6.84 USD"],
+                "Tax Collected": [0.15],
+                "Tax Collected Raw": [0],
+                "Ticker": ["AAPL"],
+                "Date": [pd.Timestamp("2025-05-29")],
+            }
+        )
+        formatter = ColumnFormatter(df)
+
+        result = formatter.add_tax_collected_amount(statement_currency="USD")
+
+        # With raw = 0, should calculate from percentage instead
+        expected = "1.21 USD"  # calculated
+        assert result["Tax Collected Amount"].iloc[0] == expected
+
+    def test_tax_amount_usd_raw_nan_not_used(self) -> None:
+        """Arrange: USD statement with Tax Collected Raw = NaN.
+        Act: add Tax Collected Amount column.
+        Assert: Raw value of NaN is not used; amount is calculated instead.
+        """
+        df = pd.DataFrame(
+            {
+                "Net Dividend": ["6.84 USD"],
+                "Tax Collected": [0.15],
+                "Tax Collected Raw": [None],
+                "Ticker": ["AAPL"],
+                "Date": [pd.Timestamp("2025-05-29")],
+            }
+        )
+        formatter = ColumnFormatter(df)
+
+        result = formatter.add_tax_collected_amount(statement_currency="USD")
+
+        # With raw = NaN, should calculate from percentage instead
+        expected = "1.21 USD"  # calculated
+        assert result["Tax Collected Amount"].iloc[0] == expected
+
+    def test_tax_amount_absolute_value_of_raw(self) -> None:
+        """Arrange: USD statement with Tax Collected Raw = -1.21.
+        Act: add Tax Collected Amount column.
+        Assert: Absolute value of raw amount is used.
+        """
+        df = pd.DataFrame(
+            {
+                "Net Dividend": ["6.84 USD"],
+                "Tax Collected": [0.15],
+                "Tax Collected Raw": [-1.21],
+                "Ticker": ["AAPL"],
+                "Date": [pd.Timestamp("2025-05-29")],
+            }
+        )
+        formatter = ColumnFormatter(df)
+
+        result = formatter.add_tax_collected_amount(statement_currency="USD")
+
+        # Should take absolute value
+        assert result["Tax Collected Amount"].iloc[0] == "1.21 USD"
+
+    def test_tax_amount_formatting_two_decimals(self) -> None:
+        """Arrange: Tax Collected Raw = -2.345.
+        Act: add Tax Collected Amount column.
+        Assert: Result is formatted with exactly 2 decimal places.
+        """
+        df = pd.DataFrame(
+            {
+                "Net Dividend": ["10.00 USD"],
+                "Tax Collected": [0.19],
+                "Tax Collected Raw": [-2.345],
+                "Ticker": ["AAPL"],
+                "Date": [pd.Timestamp("2025-05-29")],
+            }
+        )
+        formatter = ColumnFormatter(df)
+
+        result = formatter.add_tax_collected_amount(statement_currency="USD")
+
+        # Should format with .2f
+        assert result["Tax Collected Amount"].iloc[0] == "2.35 USD"
+
+    def test_tax_amount_currency_appended(self) -> None:
+        """Arrange: USD statement with Tax Collected Raw column present.
+        Act: add Tax Collected Amount column.
+        Assert: Currency is appended with a space.
+        """
+        df = _make_tax_amount_df(
+            "6.84 USD",
+            tax_collected=0.15,
+            tax_collected_raw=-1.21,
+            include_raw_col=True,
+        )
+        formatter = ColumnFormatter(df)
+
+        result = formatter.add_tax_collected_amount(statement_currency="USD")
+
+        # Must have space before currency
+        assert " USD" in result["Tax Collected Amount"].iloc[0]
+        assert result["Tax Collected Amount"].iloc[0] == "1.21 USD"
+
+    def test_tax_amount_calculation_formula_correct(self) -> None:
+        """Arrange: PLN statement with 100.00 PLN and 20% tax.
+        Act: add Tax Collected Amount column.
+        Assert: Calculation uses gross = net / (1 - tax%), tax = gross * tax%.
+        """
+        df = _make_tax_amount_df("100.00 PLN", tax_collected=0.20)
+        formatter = ColumnFormatter(df)
+
+        result = formatter.add_tax_collected_amount(statement_currency="PLN")
+
+        # gross = 100 / (1 - 0.20) = 100 / 0.80 = 125
+        # tax = 125 * 0.20 = 25.00
+        assert result["Tax Collected Amount"].iloc[0] == "25.00 PLN"
+
+    def test_tax_amount_formula_dividend_not_swapped(self) -> None:
+        """Arrange: PLN statement with 100.00 PLN and 25% tax.
+        Act: add Tax Collected Amount column.
+        Assert: Calculation divides by (1 - tax%), not (1 + tax%).
+        """
+        df = _make_tax_amount_df("100.00 PLN", tax_collected=0.25)
+        formatter = ColumnFormatter(df)
+
+        result = formatter.add_tax_collected_amount(statement_currency="PLN")
+
+        # With division by (1 - 0.25) = 0.75: gross = 133.33, tax = 33.33
+        # With division by (1 + 0.25) = 1.25: gross = 80.00, tax = 20.00
+        assert result["Tax Collected Amount"].iloc[0] == "33.33 PLN"
+
+    def test_tax_amount_column_created(self) -> None:
+        """Arrange: DataFrame with Net Dividend and Tax Collected.
+        Act: add Tax Collected Amount column.
+        Assert: Tax Collected Amount column is created.
+        """
+        df = _make_tax_amount_df("6.84 USD", tax_collected=0.15)
+        formatter = ColumnFormatter(df)
+
+        result = formatter.add_tax_collected_amount()
+
+        assert "Tax Collected Amount" in result.columns
+
+    def test_tax_amount_step10_logged(self) -> None:
+        """Arrange: Column creation is requested.
+        Act: add Tax Collected Amount column.
+        Assert: Step 10 message is logged.
+        """
+        from unittest.mock import MagicMock
+
+        import data_processing.column_formatter as mod
+
+        df = _make_tax_amount_df("6.84 USD", tax_collected=0.15)
+        formatter = ColumnFormatter(df)
+        captured: list[str] = []
+
+        mock_log = MagicMock(
+            side_effect=lambda msg, *a, **kw: captured.append(str(msg))
+        )
+
+        with patch.object(mod.logger, "info", mock_log):
+            formatter.add_tax_collected_amount()
+
+        assert any("Step 10" in m and "Tax Collected Amount" in m for m in captured)
