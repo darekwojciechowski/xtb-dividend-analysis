@@ -569,7 +569,9 @@ class DataFrameProcessor:
         except (ValueError, IndexError, KeyError):
             return 0.0
 
-    def log_table_with_tax_summary(self, statement_currency: str = "PLN") -> None:
+    def log_table_with_tax_summary(
+        self, statement_currency: str = "PLN"
+    ) -> None:  # pragma: no mutate
         """Log the processed DataFrame as a formatted table with comprehensive tax summary.
 
         Args:

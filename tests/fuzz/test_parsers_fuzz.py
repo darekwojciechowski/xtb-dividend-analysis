@@ -34,6 +34,10 @@ hostile_text = st.text(
 
 @given(raw=hostile_text)
 def test_convert_date_never_crashes(raw: str) -> None:
+    """Given an arbitrary Unicode string (Hypothesis-generated),
+    when convert_date processes it,
+    then it returns None or a date-like object — never an unexpected exception.
+    """
     try:
         result = convert_date(raw)
     except DOMAIN_ERRORS:
@@ -43,6 +47,11 @@ def test_convert_date_never_crashes(raw: str) -> None:
 
 @given(raw=hostile_text)
 def test_parse_value_with_currency_is_bounded(raw: str) -> None:
+    """Given an arbitrary Unicode string as a dividend amount field,
+    when _parse_value_with_currency processes it,
+    then it returns a (float, str) pair or raises ValueError/TypeError —
+    never KeyError, IndexError, AttributeError, or UnicodeError.
+    """
     try:
         numeric, currency = TaxCalculator._parse_value_with_currency(
             raw, column_name="Net Dividend", ticker="FUZZ", date="2025-01-01"
@@ -55,6 +64,11 @@ def test_parse_value_with_currency_is_bounded(raw: str) -> None:
 
 @given(raw=hostile_text)
 def test_parse_tax_collected_amount_is_bounded(raw: str) -> None:
+    """Given an arbitrary Unicode string as a tax-collected field,
+    when _parse_tax_collected_amount processes it,
+    then it returns a float or raises ValueError/TypeError — never an
+    unexpected exception type.
+    """
     calc = TaxCalculator.__new__(TaxCalculator)
     try:
         out = calc._parse_tax_collected_amount(raw, ticker="FUZZ", date="2025-01-01")
@@ -65,6 +79,11 @@ def test_parse_tax_collected_amount_is_bounded(raw: str) -> None:
 
 @given(raw=hostile_text)
 def test_parse_exchange_rate_is_bounded(raw: str) -> None:
+    """Given an arbitrary Unicode string as an exchange-rate field,
+    when _parse_exchange_rate processes it,
+    then it returns a float or raises ValueError/TypeError — never an
+    unexpected exception type.
+    """
     calc = TaxCalculator.__new__(TaxCalculator)
     try:
         out = calc._parse_exchange_rate(raw, ticker="FUZZ", date="2025-01-01")
@@ -75,6 +94,11 @@ def test_parse_exchange_rate_is_bounded(raw: str) -> None:
 
 @given(comment=hostile_text)
 def test_extract_dividend_from_comment_never_crashes(comment: str) -> None:
+    """Given an arbitrary Unicode string as a broker comment,
+    when extract_dividend_from_comment processes it,
+    then it returns (None, None) or a (float, 3-char str) pair —
+    never an unhandled exception.
+    """
     conv = CurrencyConverter.__new__(CurrencyConverter)
     value, currency = conv.extract_dividend_from_comment(comment)
     assert value is None or isinstance(value, float)

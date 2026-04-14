@@ -24,6 +24,11 @@ pytestmark = pytest.mark.fuzz
 def test_loader_never_raises_on_random_bytes(
     tmp_path_factory: pytest.TempPathFactory, payload: bytes
 ) -> None:
+    """Given a file containing arbitrary random bytes (Hypothesis-generated),
+    when import_and_process_data processes it,
+    then the result is either (None, None) or a (DataFrame, str) pair —
+    never an unhandled exception.
+    """
     tmp_dir = tmp_path_factory.mktemp("fuzz_xlsx")
     target = tmp_dir / "fuzz.xlsx"
     target.write_bytes(payload)
@@ -37,6 +42,10 @@ def test_loader_never_raises_on_random_bytes(
 
 
 def test_loader_handles_missing_path(tmp_path: Path) -> None:
+    """Given a path that does not exist on disk,
+    when import_and_process_data is called,
+    then both return values are None.
+    """
     df, currency = import_and_process_data(tmp_path / "does-not-exist.xlsx")
     assert df is None
     assert currency is None

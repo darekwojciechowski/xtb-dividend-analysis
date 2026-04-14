@@ -23,6 +23,11 @@ class TestOutputCsvSchema:
     def test_exported_csv_matches_output_schema(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        """Arrange: a synthetic two-row DataFrame covering PLN and USD dividends.
+        Act: export via GoogleSpreadsheetExporter and reload the written CSV.
+        Assert: the file satisfies OUTPUT_CSV_SCHEMA and omits the raw
+        ``Tax Collected`` column.
+        """
         monkeypatch.chdir(tmp_path)
 
         df = pd.DataFrame(

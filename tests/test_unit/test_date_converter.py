@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 
 import pytest
+from loguru import logger
 
 from data_processing.date_converter import DateConverter, convert_date, to_date
 
@@ -211,6 +212,55 @@ class TestConvertDateFunction:
         result = convert_date("2024/06/15", format="%Y/%m/%d")
 
         assert result.strftime("%Y-%m-%d") == "2024-06-15"
+
+    def test_convert_date_when_default_format_then_day_field_is_25(self) -> None:
+        # Kills mutmut_1/2/3: day=25 is unambiguous — any wrong format either
+        # fails to parse (→ None) or maps the fields incorrectly.
+        result = convert_date("25.06.2024 08:15:00")
+
+        assert result is not None
+        assert result.day == 25
+        assert result.month == 6
+
+    def test_convert_date_when_default_format_then_four_digit_year_is_preserved(
+        self,
+    ) -> None:
+        # Kills mutmut_2: %y (2-digit) would misparse "2024" as year 20 or fail.
+        result = convert_date("15.03.2024 00:00:00")
+
+        assert result is not None
+        assert result.year == 2024
+
+    def test_convert_date_when_default_format_then_month_field_is_correct(self) -> None:
+        # Kills mutmut_3: %D/%M swap — day=15 > 12 forces correct %d/%m ordering.
+        result = convert_date("15.11.2024 00:00:00")
+
+        assert result is not None
+        assert result.day == 15
+        assert result.month == 11
+
+
+@pytest.mark.unit
+class TestConvertDateLogging:
+    """Tests that verify error logging behaviour inside convert_date."""
+
+    def test_convert_date_when_invalid_input_then_logs_error_with_exception_text(
+        self,
+    ) -> None:
+        # Kills mutmut_12: logger.error(None) would not contain "Error converting date".
+        # Arrange
+        captured: list[str] = []
+        sink_id = logger.add(lambda msg: captured.append(msg), level="ERROR")
+
+        # Act
+        try:
+            convert_date("not-a-date")
+        finally:
+            logger.remove(sink_id)
+
+        # Assert
+        assert len(captured) == 1
+        assert "Error converting date" in captured[0]
 
 
 @pytest.mark.unit

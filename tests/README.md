@@ -39,17 +39,6 @@ Follow these conventions when writing new tests:
 
 - **Naming**: `test_<unit>_<scenario>_<expected_outcome>`
 - **Structure**: AAA pattern with blank lines between each section:
-  ```python
-  def test_column_normalizer_bilingual_columns_normalized_to_english():
-      # Arrange
-      df = pd.DataFrame({"Akcja PL": [1], "Akcja EN": [2]})
-
-      # Act
-      result = ColumnNormalizer(df).normalize_columns()
-
-      # Assert
-      assert list(result.columns) == ["Ticker"]
-  ```
 - **Markers**: Add appropriate pytest marker (`@pytest.mark.unit`, `@pytest.mark.integration`, etc.)
 - **Mocking**: Use `unittest.mock.patch` or `MagicMock` for external I/O
 - **Independence**: Each test must be fully independent; no shared mutable state
@@ -92,3 +81,33 @@ poetry lock --no-update
 Coverage reports are generated in `htmlcov/`. Open `htmlcov/index.html` in your browser to view detailed coverage by file and line.
 
 Target coverage: 80%+ overall, enforced via CI/CD workflow.
+
+## Mutation testing
+
+Mutation tests use [mutmut](https://mutmut.readthedocs.io/) to verify that the test suite actually catches logic errors. Mutmut introduces small code changes (mutations) and checks whether at least one test fails for each one.
+
+Run mutation testing:
+
+```bash
+poetry run mutmut run
+```
+
+View results after the run completes:
+
+```bash
+poetry run mutmut results                # All results
+poetry run mutmut show 1                 # Diff for a specific mutant
+```
+
+Run mutations against a single file to speed things up:
+
+```bash
+poetry run mutmut run --paths-to-mutate data_processing/tax_calculator.py
+```
+
+Configuration in `pyproject.toml` (`[tool.mutmut]`):
+- **Mutates:** `data_processing/` (excluding `import_data_xlsx.py`, `data_aggregator.py`, `constants.py`, `file_paths.py`)
+- **Tests used:** `tests/test_unit/`
+- Property-based and slow tests are excluded from each mutation run for speed
+
+Results are cached in `.mutmut-cache` (SQLite). Delete this file to force a full re-run.

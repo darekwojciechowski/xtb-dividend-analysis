@@ -80,6 +80,10 @@ def _net_sum(df: pd.DataFrame) -> float:
 @_SETTINGS
 @given(df=raw_rows())
 def test_permutation_invariance_of_net_sum(df: pd.DataFrame) -> None:
+    """Given a generated transaction DataFrame and a row-shuffled copy,
+    when merge_rows_and_reorder is applied to each,
+    then the net dividend sums are equal within floating-point tolerance.
+    """
     shuffled = df.sample(frac=1, random_state=7).reset_index(drop=True)
     assert math.isclose(_net_sum(df), _net_sum(shuffled), abs_tol=0.01)
 
@@ -87,6 +91,10 @@ def test_permutation_invariance_of_net_sum(df: pd.DataFrame) -> None:
 @_SETTINGS
 @given(df=raw_rows())
 def test_duplication_doubles_net_sum(df: pd.DataFrame) -> None:
+    """Given a transaction DataFrame and a copy with every row duplicated,
+    when merge_rows_and_reorder is applied to each,
+    then the doubled net sum equals 2× the base net sum within tolerance.
+    """
     doubled = pd.concat([df, df], ignore_index=True)
     assert math.isclose(
         _net_sum(doubled), 2 * _net_sum(df), abs_tol=0.02 * len(df) + 0.01
@@ -96,6 +104,10 @@ def test_duplication_doubles_net_sum(df: pd.DataFrame) -> None:
 @_SETTINGS
 @given(df=raw_rows())
 def test_unique_ticker_count_preserved_under_duplication(df: pd.DataFrame) -> None:
+    """Given a transaction DataFrame and a copy with every row duplicated,
+    when merge_rows_and_reorder is applied to each,
+    then both results contain exactly the same set of tickers.
+    """
     doubled = pd.concat([df, df], ignore_index=True)
     base_agg = DataAggregator(df.copy()).merge_rows_and_reorder()
     doubled_agg = DataAggregator(doubled.copy()).merge_rows_and_reorder()

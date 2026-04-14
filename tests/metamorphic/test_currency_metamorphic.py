@@ -31,12 +31,21 @@ pytestmark = pytest.mark.metamorphic
     )
 )
 def test_currency_inference_is_idempotent(ticker: str) -> None:
+    """Given a known ticker symbol,
+    when _currency_for_ticker is called twice on the same CurrencyConverter,
+    then both calls return the same currency — no hidden mutable state.
+    """
     conv = CurrencyConverter(pd.DataFrame())
     assert conv._currency_for_ticker(ticker) == conv._currency_for_ticker(ticker)
 
 
 @given(base=st.dates(min_value=date(2020, 1, 1), max_value=date(2030, 12, 31)))
 def test_previous_business_day_never_weekend(base: date) -> None:
+    """Given any calendar date between 2020 and 2030,
+    when get_previous_business_day is applied,
+    then the result is a weekday (Monday–Friday) strictly before the next
+    calendar day.
+    """
     prev = CurrencyConverter.get_previous_business_day(base)
     assert prev.weekday() < 5
     assert prev < base + timedelta(days=1)
@@ -47,6 +56,10 @@ def test_previous_business_day_never_weekend(base: date) -> None:
     post=st.text(alphabet=" \t", max_size=4),
 )
 def test_comment_extraction_whitespace_invariant(pre: str, post: str) -> None:
+    """Given a canonical broker comment and a whitespace-padded variant,
+    when extract_dividend_from_comment processes each,
+    then both calls return the same (value, currency) pair.
+    """
     conv = CurrencyConverter(pd.DataFrame())
     canonical = "TXT.PL PLN 1.6600/ SHR"
     padded = f"{pre}{canonical}{post}"

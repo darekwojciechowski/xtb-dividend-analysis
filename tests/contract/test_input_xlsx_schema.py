@@ -21,6 +21,11 @@ pytestmark = pytest.mark.contract
 
 class TestInputXlsxSchema:
     def test_raw_xlsx_matches_structural_schema(self, demo_xlsx_path: Path) -> None:
+        """Arrange: the demo XLSX fixture from the test suite.
+        Act: load it through import_and_process_data.
+        Assert: the resulting DataFrame satisfies INPUT_XLSX_SCHEMA and the
+        detected currency is "PLN".
+        """
         df, currency = import_and_process_data(demo_xlsx_path)
 
         assert df is not None
@@ -30,6 +35,10 @@ class TestInputXlsxSchema:
     def test_dividend_subset_matches_dividend_schema(
         self, demo_xlsx_path: Path
     ) -> None:
+        """Arrange: the demo XLSX loaded into a DataFrame.
+        Act: filter to dividend-type rows.
+        Assert: the subset satisfies DIVIDEND_ROWS_SCHEMA and is non-empty.
+        """
         df, _ = import_and_process_data(demo_xlsx_path)
         assert df is not None
 
@@ -40,6 +49,10 @@ class TestInputXlsxSchema:
     def test_structural_schema_rejects_missing_column(
         self, demo_xlsx_path: Path
     ) -> None:
+        """Given a valid DataFrame with the ``Symbol`` column removed,
+        when INPUT_XLSX_SCHEMA validates it,
+        then SchemaErrors is raised.
+        """
         df, _ = import_and_process_data(demo_xlsx_path)
         assert df is not None
 
@@ -51,6 +64,10 @@ class TestInputXlsxSchema:
     def test_dividend_schema_rejects_unknown_transaction_type(
         self, demo_xlsx_path: Path
     ) -> None:
+        """Given a dividend DataFrame whose first row has an unrecognised Type value,
+        when DIVIDEND_ROWS_SCHEMA validates it,
+        then SchemaErrors is raised.
+        """
         df, _ = import_and_process_data(demo_xlsx_path)
         assert df is not None
 

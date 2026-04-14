@@ -504,6 +504,63 @@ class TestConvertDates:
 
         assert pd.api.types.is_datetime64_any_dtype(processor.df["Date"])
 
+    def test_convert_dates_when_explicit_col_given_then_converts_that_column(
+        self,
+    ) -> None:
+        """Tests that explicit date_col bypasses auto-detection."""
+        df = pd.DataFrame(
+            {
+                "settlement_date": ["2024-03-10", "2024-09-22"],
+                "Ticker": ["A", "B"],
+            }
+        )
+        processor = DataFrameProcessor(df)
+
+        processor.convert_dates(date_col="settlement_date")
+
+        assert pd.api.types.is_datetime64_any_dtype(processor.df["settlement_date"])
+
+    def test_convert_dates_when_data_column_present_then_auto_detects_it(
+        self,
+    ) -> None:
+        """Tests that convert_dates resolves 'Data' column automatically."""
+        df = pd.DataFrame(
+            {
+                "Data": ["2024-01-15", "2024-07-04"],
+                "Ticker": ["A", "B"],
+            }
+        )
+        processor = DataFrameProcessor(df)
+
+        processor.convert_dates()
+
+        assert pd.api.types.is_datetime64_any_dtype(processor.df["Data"])
+
+    def test_convert_dates_when_called_then_values_are_correct_datetimes(
+        self,
+    ) -> None:
+        """Tests that parsed datetime values match the original date strings."""
+        df = pd.DataFrame({"Date": ["2024-01-15", "2024-07-04"]})
+        processor = DataFrameProcessor(df)
+
+        processor.convert_dates()
+
+        assert processor.df["Date"].iloc[0] == pd.Timestamp("2024-01-15")
+        assert processor.df["Date"].iloc[1] == pd.Timestamp("2024-07-04")
+
+    def test_convert_dates_when_invalid_date_then_becomes_nat(
+        self,
+    ) -> None:
+        """Tests that invalid date strings are coerced to NaT, not raised."""
+        df = pd.DataFrame({"Date": ["2024-01-01", "not-a-date", "2024-12-31"]})
+        processor = DataFrameProcessor(df)
+
+        processor.convert_dates()
+
+        assert pd.isna(processor.df["Date"].iloc[1])
+        assert processor.df["Date"].iloc[0] == pd.Timestamp("2024-01-01")
+        assert processor.df["Date"].iloc[2] == pd.Timestamp("2024-12-31")
+
 
 @pytest.mark.unit
 class TestPrepareAndConvert:
