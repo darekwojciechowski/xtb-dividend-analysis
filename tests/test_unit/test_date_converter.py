@@ -241,6 +241,95 @@ class TestConvertDateFunction:
 
 
 @pytest.mark.unit
+class TestDateConverterFormatSpecificityMutation:
+    """Mutation-targeted tests for DateConverter.convert_to_date format correctness.
+
+    These tests kill mutmut_1/2/3 (corrupt default format strings) by asserting on
+    unambiguous day/month values, and mutmut_8/10 (format=None / format dropped) by
+    using an ambiguous date where day != month so that format=None would swap them.
+    """
+
+    def test_convert_when_unambiguous_date_then_day_and_month_are_correct(self) -> None:
+        """day=15, month=11 — a corrupt format raises ValueError → None, killing mutmut_1/2/3."""
+        # Arrange
+        converter = DateConverter("15.11.2024 00:00:00")
+
+        # Act
+        converter.convert_to_date()
+        result = converter.get_date()
+
+        # Assert
+        assert result is not None
+        assert result.day == 15
+        assert result.month == 11
+        assert result.year == 2024
+
+    def test_convert_when_ambiguous_date_then_format_controls_day_vs_month(
+        self,
+    ) -> None:
+        """01.02.2024 — with correct %d.%m format day=1, month=2.
+
+        Kills mutmut_8 (format=None) and mutmut_10 (format arg removed): pandas with
+        inferred format may parse this as month=1, day=2 (US convention).
+        """
+        # Arrange
+        converter = DateConverter("01.02.2024 00:00:00")
+
+        # Act
+        converter.convert_to_date()
+        result = converter.get_date()
+
+        # Assert
+        assert result is not None
+        assert result.day == 1
+        assert result.month == 2
+
+    def test_convert_when_custom_format_then_format_argument_is_used(self) -> None:
+        """Custom format %Y/%m/%d — without format the default %d.%m.%Y raises ValueError.
+
+        Kills mutmut_8/10: format=None or missing causes a parse failure for this input.
+        """
+        # Arrange
+        converter = DateConverter("2024/09/20")
+
+        # Act
+        converter.convert_to_date(format="%Y/%m/%d")
+        result = converter.get_date()
+
+        # Assert
+        assert result is not None
+        assert result.day == 20
+        assert result.month == 9
+        assert result.year == 2024
+
+
+@pytest.mark.unit
+class TestDateConverterLogging:
+    """Mutation-targeted logging tests for DateConverter.convert_to_date.
+
+    Kills mutmut_11: logger.error(None) would not produce "Error converting date".
+    """
+
+    def test_convert_when_invalid_input_then_logs_error_with_exception_text(
+        self,
+    ) -> None:
+        # Arrange
+        captured: list[str] = []
+        sink_id = logger.add(lambda msg: captured.append(msg), level="ERROR")
+        converter = DateConverter("not-a-date")
+
+        # Act
+        try:
+            converter.convert_to_date()
+        finally:
+            logger.remove(sink_id)
+
+        # Assert
+        assert len(captured) == 1
+        assert "Error converting date" in captured[0]
+
+
+@pytest.mark.unit
 class TestConvertDateLogging:
     """Tests that verify error logging behaviour inside convert_date."""
 

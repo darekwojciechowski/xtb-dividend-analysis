@@ -29,8 +29,9 @@ class DateConverter:
         self.date_only: pd.Timestamp | None = None
 
     def convert_to_date(
-        self, format: str = "%d.%m.%Y %H:%M:%S"
-    ) -> None:  # pragma: no mutate
+        self,
+        format: str = "%d.%m.%Y %H:%M:%S",  # pragma: no mutate
+    ) -> None:
         """Convert the date string to a date object using the provided format.
 
         Sets ``self.date_only`` to ``None`` when the input is empty or

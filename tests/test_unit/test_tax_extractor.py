@@ -14,6 +14,8 @@ All tests are marked ``@pytest.mark.unit``.
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pandas as pd
 import pytest
 
@@ -489,3 +491,190 @@ class TestExtractTaxRateDecimalAdditional:
 
         # Assert
         assert result == pytest.approx(0.125)
+
+
+# ---------------------------------------------------------------------------
+# TestExtractTaxPercentageMutationKillers
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestExtractTaxPercentageMutationKillers:
+    """Targeted tests to kill surviving mutants in extract_tax_percentage_from_comment."""
+
+    # --- mutmut_1, mutmut_2: default statement_currency="PLN" ---
+
+    def test_default_currency_arg_does_not_create_raw_column(self) -> None:
+        """Calling with no args defaults to PLN — no 'Tax Collected Raw' column created."""
+        # Arrange
+        df = _make_group_df(include_tax_col=True)
+        extractor = TaxExtractor(df)
+
+        # Act
+        result = extractor.extract_tax_percentage_from_comment()
+
+        # Assert
+        assert "Tax Collected Raw" not in result.columns
+
+    # --- mutmut_5: `and` → `or` in currency + col guard ---
+
+    def test_pln_currency_with_existing_tax_col_does_not_create_raw_column(
+        self,
+    ) -> None:
+        """PLN statement must NOT copy Tax Collected to Tax Collected Raw even if column exists."""
+        # Arrange
+        df = _make_group_df(include_tax_col=True)
+        extractor = TaxExtractor(df)
+
+        # Act
+        result = extractor.extract_tax_percentage_from_comment(statement_currency="PLN")
+
+        # Assert
+        assert "Tax Collected Raw" not in result.columns
+
+    # --- mutmut_10: raw col assigned None instead of actual values ---
+
+    def test_usd_statement_raw_column_contains_original_tax_values(self) -> None:
+        """For USD statement, Tax Collected Raw must hold the actual pre-extraction values."""
+        # Arrange
+        original_tax = 5.75
+        df = _make_group_df(include_tax_col=True)
+        df["Tax Collected"] = original_tax
+        extractor = TaxExtractor(df)
+
+        # Act
+        result = extractor.extract_tax_percentage_from_comment(statement_currency="USD")
+
+        # Assert
+        assert "Tax Collected Raw" in result.columns
+        assert result["Tax Collected Raw"].notna().all()
+        assert result["Tax Collected Raw"].iloc[0] == pytest.approx(original_tax)
+
+    # --- mutmut_29: round(tax_percentage, 2) vs round(tax_percentage, 3) ---
+
+    def test_comment_extracted_rate_is_rounded_to_two_decimal_places(self) -> None:
+        """WHT 27.3% → 0.273 stored as round(0.273, 2) = 0.27, not 0.273."""
+        # Arrange
+        df = _make_group_df(
+            ticker="NOVOB.DK",
+            comments=["NOVOB.DK DKK 1.20/ SHR", "NOVOB.DK DKK WHT 27.3%"],
+        )
+        extractor = TaxExtractor(df)
+
+        # Act
+        result = extractor.extract_tax_percentage_from_comment(statement_currency="PLN")
+
+        # Assert — round(0.273, 2) == 0.27, round(0.273, 3) == 0.273
+        assert result["Tax Collected"].iloc[0] == pytest.approx(0.27)
+        assert result["Tax Collected"].iloc[0] != pytest.approx(0.273)
+
+    # --- mutmut_41: round(default_rate, 2) vs round(default_rate, 3) ---
+
+    def test_default_rate_is_rounded_to_two_decimal_places(self) -> None:
+        """Default rate 0.273 stored as round(0.273, 2) = 0.27, not 0.273."""
+        # Arrange
+        df = _make_group_df(
+            ticker="XYZ.ZZ",
+            comments=["XYZ.ZZ USD 1.00/ SHR"],  # no WHT row → uses default
+        )
+        extractor = TaxExtractor(df)
+
+        # Act — patch get_default_tax_rate to return a 3-dp value
+        with patch.object(extractor, "get_default_tax_rate", return_value=0.273):
+            result = extractor.extract_tax_percentage_from_comment(
+                statement_currency="PLN"
+            )
+
+        # Assert — round(0.273, 2) == 0.27, round(0.273, 3) == 0.273
+        assert result["Tax Collected"].iloc[0] == pytest.approx(0.27)
+        assert result["Tax Collected"].iloc[0] != pytest.approx(0.273)
+
+    # --- mutmut_42, mutmut_43: if default_rate == 0.0 branch ---
+
+    def test_zero_default_rate_logs_info_not_warning(self) -> None:
+        """0% default rate (e.g., UK stock) emits an INFO message, not WARNING."""
+        # Arrange
+        from loguru import logger
+
+        df = _make_group_df(
+            ticker="HSBA.UK",
+            comments=["HSBA.UK GBP 0.30/ SHR"],
+        )
+        extractor = TaxExtractor(df)
+        messages: list[str] = []
+        sink_id = logger.add(messages.append, format="{level}:{message}")
+
+        try:
+            # Act
+            extractor.extract_tax_percentage_from_comment(statement_currency="PLN")
+        finally:
+            logger.remove(sink_id)
+
+        # Assert — INFO message about 0% present; no WARNING for this ticker
+        assert any("INFO" in m and "0%" in m for m in messages)
+        assert not any("WARNING" in m and "HSBA.UK" in m for m in messages)
+
+    def test_nonzero_default_rate_logs_warning_not_info_for_missing_wht(self) -> None:
+        """Non-zero default rate (US stock without WHT comment) emits WARNING."""
+        # Arrange
+        from loguru import logger
+
+        df = _make_group_df(
+            ticker="SBUX.US",
+            comments=["SBUX.US USD 0.57/ SHR"],  # no WHT row
+        )
+        extractor = TaxExtractor(df)
+        messages: list[str] = []
+        sink_id = logger.add(messages.append, format="{level}:{message}")
+
+        try:
+            # Act
+            extractor.extract_tax_percentage_from_comment(statement_currency="PLN")
+        finally:
+            logger.remove(sink_id)
+
+        # Assert — WARNING about missing WHT must be present
+        assert any(
+            "WARNING" in m and "No WHT" in m and "SBUX.US" in m for m in messages
+        )
+
+    # --- mutmut_51, mutmut_53, mutmut_54: ignore_index=False in pd.concat ---
+
+    def test_original_index_is_preserved_after_extraction(self) -> None:
+        """pd.concat(..., ignore_index=False) keeps original DataFrame indices."""
+        # Arrange
+        df = _make_group_df(
+            ticker="SBUX.US",
+            comments=["SBUX.US USD 0.57/ SHR", "SBUX.US USD WHT 15%"],
+        )
+        custom_index = [100, 200]
+        df.index = custom_index
+        extractor = TaxExtractor(df)
+
+        # Act
+        result = extractor.extract_tax_percentage_from_comment(statement_currency="PLN")
+
+        # Assert — ignore_index=True would reset to 0,1; False preserves 100,200
+        assert 100 in result.index
+        assert 200 in result.index
+
+    # --- mutmut_55-58: log message string mutations ---
+
+    def test_completion_log_message_is_emitted_with_correct_casing(self) -> None:
+        """Exact INFO message 'Extracted tax percentages...' is logged after extraction."""
+        # Arrange
+        from loguru import logger
+
+        df = _make_group_df()
+        extractor = TaxExtractor(df)
+        messages: list[str] = []
+        sink_id = logger.add(messages.append, format="{level}:{message}")
+
+        try:
+            # Act
+            extractor.extract_tax_percentage_from_comment(statement_currency="PLN")
+        finally:
+            logger.remove(sink_id)
+
+        # Assert — message must start with capital 'E', not be prefixed or all-caps
+        assert any("INFO" in m and "Extracted tax percentages" in m for m in messages)

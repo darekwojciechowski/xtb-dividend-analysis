@@ -210,6 +210,155 @@ class TestCreateExchangeRateDMinus1Column:
 
         assert result["Exchange Rate D-1"].iloc[0] == "3.8512 PLN"
 
+    def test_exchange_rate_converter_created_with_df(self) -> None:
+        """CurrencyConverter is constructed with self.df, not None (kills mutmut_3)."""
+        df = _make_exchange_rate_df("6.84 USD", tax_collected=0.10)
+        formatter = ColumnFormatter(df)
+
+        with patch("data_processing.column_formatter.CurrencyConverter") as MockCC:
+            MockCC.return_value.get_exchange_rate.return_value = 3.85
+            formatter.create_exchange_rate_d_minus_1_column([])
+
+        MockCC.assert_called_once_with(df)
+
+    def test_exchange_rate_injected_converter_is_reused(self) -> None:
+        """When _converter is pre-injected it is used directly; no new CurrencyConverter (kills mutmut_3 via injection path)."""
+        from unittest.mock import MagicMock
+
+        df = _make_exchange_rate_df("6.84 USD", tax_collected=0.10)
+        mock_converter = MagicMock()
+        mock_converter.get_exchange_rate.return_value = 4.20
+        formatter = ColumnFormatter(df, converter=mock_converter)
+
+        with patch("data_processing.column_formatter.CurrencyConverter") as MockCC:
+            result = formatter.create_exchange_rate_d_minus_1_column([])
+            MockCC.assert_not_called()
+
+        assert result["Exchange Rate D-1"].iloc[0] == "4.2000 PLN"
+
+    def test_exchange_rate_rate_one_non_pln_returns_formatted_rate(self) -> None:
+        """rate == 1.0 with non-PLN currency must return a formatted rate, not '-' (kills mutmut_80)."""
+        df = _make_exchange_rate_df("6.84 USD", tax_collected=0.10)
+        formatter = ColumnFormatter(df)
+
+        with patch("data_processing.column_formatter.CurrencyConverter") as MockCC:
+            MockCC.return_value.get_exchange_rate.return_value = 1.0
+            result = formatter.create_exchange_rate_d_minus_1_column([])
+
+        assert result["Exchange Rate D-1"].iloc[0] == "1.0000 PLN"
+
+    def test_exchange_rate_get_exchange_rate_receives_correct_date_format(self) -> None:
+        """get_exchange_rate must be called with a YYYY-MM-DD date string (kills mutmut_64, 67-69)."""
+        d_minus_1 = pd.Timestamp("2025-05-28")
+        df = _make_exchange_rate_df(
+            "6.84 USD", tax_collected=0.10, date_d_minus_1=d_minus_1
+        )
+        formatter = ColumnFormatter(df)
+
+        with patch("data_processing.column_formatter.CurrencyConverter") as MockCC:
+            MockCC.return_value.get_exchange_rate.return_value = 3.85
+            formatter.create_exchange_rate_d_minus_1_column(["/some/path"])
+
+        _args, _kwargs = MockCC.return_value.get_exchange_rate.call_args
+        date_arg = _args[1]
+        assert date_arg == "2025-05-28"
+
+    def test_exchange_rate_get_exchange_rate_receives_courses_paths_and_currency(
+        self,
+    ) -> None:
+        """get_exchange_rate must receive courses_paths[0] and extracted currency (kills mutmut_71-76)."""
+        df = _make_exchange_rate_df("6.84 USD", tax_collected=0.10)
+        formatter = ColumnFormatter(df)
+        courses_paths = ["/path/a", "/path/b"]
+
+        with patch("data_processing.column_formatter.CurrencyConverter") as MockCC:
+            MockCC.return_value.get_exchange_rate.return_value = 3.85
+            formatter.create_exchange_rate_d_minus_1_column(courses_paths)
+
+        _args, _kwargs = MockCC.return_value.get_exchange_rate.call_args
+        assert _args[0] == courses_paths
+        assert _args[2] == "USD"
+
+    def test_exchange_rate_parse_receives_ticker_and_date_from_row(self) -> None:
+        """_parse_value_with_currency must receive the row's Ticker and Date (kills mutmut_32-53)."""
+        df = pd.DataFrame(
+            {
+                "Net Dividend": ["6.84 USD"],
+                "Tax Collected": [0.10],
+                "Date D-1": [pd.Timestamp("2025-05-28")],
+                "Ticker": ["AAPL"],
+                "Date": [pd.Timestamp("2025-05-29")],
+            }
+        )
+        formatter = ColumnFormatter(df)
+
+        with (
+            patch("data_processing.column_formatter.CurrencyConverter") as MockCC,
+            patch(
+                "data_processing.column_formatter.TaxCalculator._parse_value_with_currency",
+                return_value=(6.84, "USD"),
+            ) as mock_parse,
+        ):
+            MockCC.return_value.get_exchange_rate.return_value = 3.85
+            formatter.create_exchange_rate_d_minus_1_column([])
+
+        mock_parse.assert_called_once()
+        call_args = mock_parse.call_args[0]
+        assert call_args[0] == "6.84 USD"  # net_dividend_str
+        assert call_args[1] == "Net Dividend"  # label (kills mutmut_51-60)
+        assert call_args[2] == "AAPL"  # ticker (kills mutmut_32-39)
+        assert "2025-05-29" in call_args[3]  # date (kills mutmut_40-48)
+
+    def test_exchange_rate_missing_tax_collected_key_proceeds_to_rate(self) -> None:
+        """Row without 'Tax Collected' key skips the tax check and returns the rate (kills mutmut_7)."""
+        df = pd.DataFrame(
+            {
+                "Net Dividend": ["6.84 USD"],
+                "Date D-1": [pd.Timestamp("2025-05-28")],
+            }
+        )
+        formatter = ColumnFormatter(df)
+
+        with patch("data_processing.column_formatter.CurrencyConverter") as MockCC:
+            MockCC.return_value.get_exchange_rate.return_value = 3.85
+            result = formatter.create_exchange_rate_d_minus_1_column([])
+
+        assert result["Exchange Rate D-1"].iloc[0] == "3.8500 PLN"
+
+    def test_exchange_rate_tax_nan_does_not_return_dash_early(self) -> None:
+        """NaN Tax Collected must not trigger early '-' return (kills mutmut_11)."""
+        df = _make_exchange_rate_df("6.84 USD", tax_collected=None)
+        formatter = ColumnFormatter(df)
+
+        with patch("data_processing.column_formatter.CurrencyConverter") as MockCC:
+            MockCC.return_value.get_exchange_rate.return_value = 3.85
+            result = formatter.create_exchange_rate_d_minus_1_column([])
+
+        assert result["Exchange Rate D-1"].iloc[0] == "3.8500 PLN"
+
+    def test_exchange_rate_step9_logged(self) -> None:
+        """Step 9 message is emitted to the logger (kills mutmut_96-99)."""
+        from unittest.mock import MagicMock
+
+        import data_processing.column_formatter as mod
+
+        df = _make_exchange_rate_df("6.84 USD", tax_collected=0.10)
+        formatter = ColumnFormatter(df)
+        captured: list[str] = []
+
+        mock_log = MagicMock(
+            side_effect=lambda msg, *a, **kw: captured.append(str(msg))
+        )
+
+        with (
+            patch("data_processing.column_formatter.CurrencyConverter") as MockCC,
+            patch.object(mod.logger, "info", mock_log),
+        ):
+            MockCC.return_value.get_exchange_rate.return_value = 3.85
+            formatter.create_exchange_rate_d_minus_1_column([])
+
+        assert any("Step 9" in m and "Exchange Rate D-1" in m for m in captured)
+
 
 # ---------------------------------------------------------------------------
 # TestAddTaxCollectedAmount
