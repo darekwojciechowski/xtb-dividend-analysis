@@ -176,13 +176,6 @@ class DataFrameProcessor:
         """Move negative values from 'Net Dividend' to 'Tax Collected'."""
         self.df = self._get_data_aggregator().move_negative_values()
 
-    def merge_and_sum(self) -> None:
-        """Merge rows with the same 'Date' and 'Ticker', summing amounts.
-
-        DEPRECATED: Use merge_rows_and_reorder() instead.
-        """
-        self.merge_rows_and_reorder()
-
     def extract_tax_percentage_from_comment(
         self, statement_currency: str = "PLN"
     ) -> None:
@@ -367,48 +360,6 @@ class DataFrameProcessor:
         self.df = self._get_currency_converter().calculate_dividend(
             courses_paths, statement_currency, comment_col, amount_col
         )
-        return self.df
-
-    def replace_tax_values(
-        self,
-        ticker_col: str | None = None,
-        amount_col: str | None = None,
-        tax_col: str = ColumnName.TAX_COLLECTED.value,
-    ) -> pd.DataFrame:
-        """Update the 'Tax Collected' column based on the 'Net Dividend' column and ticker type.
-
-        DEPRECATED: Tax extraction is now handled by extract_tax_percentage_from_comment().
-
-        Args:
-            ticker_col: The name of the column containing the ticker information.
-            amount_col: The name of the column (Net Dividend) to base the calculation on.
-            tax_col: The name of the column to update with the tax values.
-
-        Returns:
-            DataFrame with tax values updated.
-        """
-        ticker_col = ticker_col or self.get_column_name("Ticker", "Symbol")
-        amount_col = amount_col or ColumnName.NET_DIVIDEND.value
-
-        tax_extractor = self._get_tax_extractor()
-
-        def calculate_tax(row):
-            """Calculate tax for a single row."""
-            comment = row.get(ColumnName.COMMENT.value, "")
-
-            # First, try to extract the tax rate from the comment
-            tax_rate = tax_extractor.extract_tax_rate_from_comment(comment)
-
-            # If not found in comment, use default rate based on ticker
-            if tax_rate is None:
-                tax_rate = tax_extractor.get_default_tax_rate(row[ticker_col])
-
-            # Calculate tax amount
-            return row[amount_col] * tax_rate
-
-        # Apply calculation to all rows using vectorized operation
-        self.df[tax_col] = self.df.apply(calculate_tax, axis=1)
-
         return self.df
 
     def replace_tax_with_percentage(
@@ -637,30 +588,3 @@ class DataFrameProcessor:
 
         # Log processed data with summary
         logger.info("\n" + table_with_summary)
-
-    def process(self) -> pd.DataFrame:
-        """Process the DataFrame by applying a standard sequence of transformations.
-
-        Returns:
-            The processed DataFrame.
-        """
-        logger.info("Starting DataFrame processing.")
-        # Convert dates if needed
-        self.convert_dates()
-
-        # Filter and group dividends
-        self.filter_dividends()
-        self.group_by_dividends()
-
-        # Add tax column if needed
-        if "Tax Collected" not in self.df.columns:
-            self.add_empty_column("Tax Collected")
-
-        # Process tax information
-        self.replace_tax_with_percentage()
-
-        # Merge and clean up
-        self.merge_and_sum()
-        logger.info("DataFrame processing completed.")
-
-        return self.df

@@ -598,34 +598,6 @@ class TestPrepareAndConvert:
 
 
 @pytest.mark.unit
-class TestDeprecatedMethods:
-    """Test suite for deprecated/forwarding methods."""
-
-    def test_merge_and_sum_when_called_then_delegates_to_merge_rows_and_reorder(
-        self,
-    ) -> None:
-        """Tests that merge_and_sum calls merge_rows_and_reorder."""
-        df = pd.DataFrame(
-            {
-                "Date": pd.to_datetime(["2024-01-01", "2024-01-01"]),
-                "Ticker": ["AAPL", "AAPL"],
-                "Net Dividend": [5.0, 3.0],
-                "Tax Collected": [1.0, 0.5],
-                "Shares": [1, 1],
-                "Currency": ["USD", "USD"],
-                "Type": ["Dividend", "Withholding Tax"],
-                "Comment": ["div", "tax"],
-            }
-        )
-        processor = DataFrameProcessor(df)
-
-        processor.merge_and_sum()
-
-        assert "Type" not in processor.df.columns
-        assert "Comment" not in processor.df.columns
-
-
-@pytest.mark.unit
 class TestPrivateDelegates:
     """Test suite for private forwarding delegate methods."""
 
@@ -684,45 +656,6 @@ class TestPrivateDelegates:
             result = processor._get_exchange_rate(["dummy.csv"], "2024-01-01", "USD")
 
         assert result == pytest.approx(4.2)
-
-
-@pytest.mark.unit
-class TestReplaceTaxValues:
-    """Test suite for the deprecated replace_tax_values method."""
-
-    def test_replace_tax_values_when_called_then_computes_tax_from_rate(self) -> None:
-        """Tests that replace_tax_values fills Tax Collected based on comment rate."""
-        df = pd.DataFrame(
-            {
-                "Date": ["2024-01-01"],
-                "Ticker": ["AAPL.US"],
-                "Net Dividend": [100.0],
-                "Tax Collected": [0.0],
-                "Comment": ["WHT 15%"],
-            }
-        )
-        processor = DataFrameProcessor(df)
-
-        result = processor.replace_tax_values()
-
-        assert result.loc[0, "Tax Collected"] == pytest.approx(15.0)
-
-    def test_replace_tax_values_when_no_comment_rate_then_uses_default(self) -> None:
-        """Tests that replace_tax_values falls back to default rate when comment has no rate."""
-        df = pd.DataFrame(
-            {
-                "Date": ["2024-01-01"],
-                "Ticker": ["AAPL.US"],
-                "Net Dividend": [100.0],
-                "Tax Collected": [0.0],
-                "Comment": ["Dividend payment"],
-            }
-        )
-        processor = DataFrameProcessor(df)
-
-        result = processor.replace_tax_values()
-
-        assert result.loc[0, "Tax Collected"] == pytest.approx(15.0)
 
 
 @pytest.mark.unit
@@ -839,52 +772,6 @@ class TestLogTableWithTaxSummary:
         processor = DataFrameProcessor(df)
 
         processor.log_table_with_tax_summary(statement_currency="USD")
-
-
-@pytest.mark.unit
-class TestProcess:
-    """Test suite for the process() orchestration method."""
-
-    def test_process_when_called_then_executes_all_pipeline_steps(self) -> None:
-        """Tests that process() calls each pipeline step and returns a DataFrame."""
-        df = pd.DataFrame(
-            {
-                "Date": ["2024-01-01"],
-                "Ticker": ["AAPL"],
-                "Amount": [10.0],
-                "Type": ["Dividend"],
-                "Comment": ["div"],
-                "Tax Collected": [0.15],
-                "Shares": [1],
-                "Currency": ["USD"],
-            }
-        )
-        processor = DataFrameProcessor(df)
-
-        with patch.object(processor, "merge_and_sum"):
-            result = processor.process()
-
-        assert isinstance(result, pd.DataFrame)
-
-    def test_process_when_no_tax_collected_column_then_adds_it(self) -> None:
-        """Tests that process() adds Tax Collected column when it is absent."""
-        df = pd.DataFrame(
-            {
-                "Date": ["2024-01-01"],
-                "Ticker": ["AAPL"],
-                "Amount": [10.0],
-                "Type": ["Dividend"],
-                "Comment": ["div"],
-                "Shares": [1],
-                "Currency": ["USD"],
-            }
-        )
-        processor = DataFrameProcessor(df)
-
-        with patch.object(processor, "merge_and_sum"):
-            result = processor.process()
-
-        assert isinstance(result, pd.DataFrame)
 
 
 @pytest.mark.performance

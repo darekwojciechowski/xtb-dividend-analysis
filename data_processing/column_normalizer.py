@@ -65,15 +65,6 @@ class ColumnNormalizer:
             self.get_column_name("Type", "Typ"): ColumnName.TYPE.value,
         }
 
-        missing_columns = [
-            col for col in column_mapping.keys() if col not in self.df.columns
-        ]
-        if missing_columns:
-            missing_cols_str = ", ".join(missing_columns)
-            raise KeyError(
-                f"The following columns are missing in the DataFrame: {missing_cols_str}"
-            )
-
         self.df = self.df.rename(columns=column_mapping)
         logger.info("Step 2 - Normalized column names to English standard.")
 

@@ -206,6 +206,26 @@ class TestNormalizeColumnNames:
         # Assert
         assert len(result) == len(df)
 
+    def test_normalize_logs_step2_message(self) -> None:
+        """Normalization emits the expected Step 2 log message."""
+        from loguru import logger
+
+        # Arrange
+        messages: list[str] = []
+        sink_id = logger.add(messages.append, format="{message}")
+        normalizer = ColumnNormalizer(_english_df())
+
+        try:
+            # Act
+            normalizer.normalize_column_names()
+        finally:
+            logger.remove(sink_id)
+
+        # Assert
+        assert any(
+            "Step 2" in msg and "Normalized column names" in msg for msg in messages
+        )
+
 
 # ---------------------------------------------------------------------------
 # TestDropColumns
