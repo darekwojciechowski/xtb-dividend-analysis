@@ -67,7 +67,7 @@ or currency codes appear anywhere in source.
 
 ## Testing
 
-The test suite has four tiers, each with a distinct scope and tooling:
+The test suite has seven tiers, each with a distinct scope and tooling:
 
 | Tier | Files | Framework | What it covers |
 |------|-------|-----------|----------------|
@@ -75,6 +75,9 @@ The test suite has four tiers, each with a distinct scope and tooling:
 | Integration | 6 | `pytest` + real DataFrames | End-to-end pipeline with actual XLSX fixtures and NBP CSV files |
 | Property-based | 2 | `hypothesis` (100 examples/run) | Mathematical invariants in `TaxCalculator`, `CurrencyConverter`, `DateConverter`, and `DataFrameProcessor` |
 | Security | 2 | `bandit` + custom SARIF parser | SARIF output structure, severity mapping, security summary generation |
+| Contract | 2 | `pandera` | Schema tripwires on the raw XTB XLSX and the Google-Sheets CSV — catches silent broker format drift |
+| Fuzz | 2 | `hypothesis` (binary & text strategies) | Robustness of the XLSX loader and string parsers against hostile input; whitelisted exceptions only |
+| Metamorphic | 3 | `hypothesis` + relation assertions | Logical invariants of tax/currency/aggregate logic (permutation, duplication, additivity, linear scaling) without an oracle |
 
 All tests follow the AAA pattern (Arrange / Act / Assert) with a blank line
 between each section, and are named
@@ -93,6 +96,9 @@ poetry run pytest -m unit
 poetry run pytest -m integration
 poetry run pytest -m property_based
 poetry run pytest -m security
+poetry run pytest -m contract
+poetry run pytest -m fuzz
+poetry run pytest -m metamorphic
 ```
 
 Run across Python 3.9–3.13 with tox:

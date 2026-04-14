@@ -7,8 +7,8 @@ license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.13,<4.0"
 dependencies = [
-    "pandas>=3.0.1",
-    "numpy>=2.4.3",
+    "pandas (>=3.0.2)",
+    "numpy (>=2.4.4)",
     "matplotlib>=3.10.8",
     "openpyxl>=3.1.5",
     "playwright>=1.58.0",
@@ -26,19 +26,20 @@ requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^9.0.2"
-pytest-cov = "^7.0.0"
+pytest = "^9.0.3"
+pytest-cov = "^7.1.0"
 pytest-timeout = "^2.4.0"
-hypothesis = "^6.151.9"
-ruff = "^0.15.5"
-mypy = "^1.19.1"
-types-tabulate = "^0.10.0.20260308"
+hypothesis = "^6.151.14"
+ruff = "^0.15.10"
+mypy = "^1.20.1"
+types-tabulate = "^0.10.0.20260408"
 safety = "^3.7.0"
 bandit = "^1.9.4"
-tox = "^4.49.1"
+tox = "^4.52.1"
 pre-commit = "^4.5.1"
 mutmut = "^3.5.0"
-pytest-randomly = ">=3.15"
+pytest-randomly = ">=4.0.1"
+pandera = "^0.31.0"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -74,7 +75,10 @@ markers = [
     "performance: Performance and stress tests",
     "edge_case: Edge case and boundary tests",
     "property_based: Property-based tests using Hypothesis",
-    "slow: Slow tests (excluded from fast-feedback runs with -m 'not slow')"
+    "slow: Slow tests (excluded from fast-feedback runs with -m 'not slow')",
+    "contract: Schema/contract tests for input XLSX and output CSV",
+    "fuzz: Fuzz tests for parser robustness (Hypothesis binary/text strategies)",
+    "metamorphic: Metamorphic relation tests for tax/currency/aggregate logic"
 ]
 
 [tool.ruff]
