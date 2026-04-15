@@ -19,6 +19,7 @@ record_demo.sh
 account*
 .DS_Store
 .github/agents/
+.github/hooks/
 .github/README.md
 .qodo
 .vscode/

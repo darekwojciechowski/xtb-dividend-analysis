@@ -795,3 +795,42 @@ class TestAddTaxCollectedAmount:
             formatter.add_tax_collected_amount()
 
         assert any("Step 10" in m and "Tax Collected Amount" in m for m in captured)
+
+    def test_add_tax_collected_amount_missing_tax_collected_column_returns_dash(
+        self,
+    ) -> None:
+        """Arrange: DataFrame with 'Net Dividend' but no 'Tax Collected' column.
+        Act: add Tax Collected Amount column with statement_currency='PLN'.
+        Assert: Tax Collected Amount is '-' (uses default 0, which triggers early return).
+        """
+        df = pd.DataFrame({"Net Dividend": ["10.00 USD"]})
+        formatter = ColumnFormatter(df)
+
+        result = formatter.add_tax_collected_amount(statement_currency="PLN")
+
+        assert result["Tax Collected Amount"].iloc[0] == "-"
+
+    def test_add_tax_collected_amount_pln_with_raw_col_present_uses_formula(
+        self,
+    ) -> None:
+        """Arrange: PLN statement with 'Tax Collected Raw' column present and non-zero.
+        Act: add Tax Collected Amount column with statement_currency='PLN'.
+        Assert: Uses formula path (gross * rate), not raw value path.
+        """
+        df = pd.DataFrame(
+            {
+                "Net Dividend": ["10.00 USD"],
+                "Tax Collected": [0.30],
+                "Tax Collected Raw": [-1.30],
+                "Ticker": ["TEST"],
+                "Date": [pd.Timestamp("2025-05-29")],
+            }
+        )
+        formatter = ColumnFormatter(df)
+
+        result = formatter.add_tax_collected_amount(statement_currency="PLN")
+
+        # Formula path: gross = 10.00 / (1 - 0.30) ≈ 14.286, tax = 14.286 * 0.30 ≈ 4.286
+        # Expected: "4.29 USD"
+        # Raw path would give "1.30 USD"
+        assert result["Tax Collected Amount"].iloc[0] == "4.29 USD"

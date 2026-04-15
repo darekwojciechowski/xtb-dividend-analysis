@@ -1671,3 +1671,188 @@ class TestUncoveredBranches:
 
         # Assert — only the two valid entries are summed; INVALID is skipped
         assert result == pytest.approx(8.0)
+
+
+@pytest.mark.unit
+class TestParsingErrorPaths:
+    """Test suite for parsing error paths with invalid input formats."""
+
+    @pytest.mark.parametrize(
+        "invalid_input,column_name,error_match",
+        [
+            ("1.5 USD EUR", "Net Dividend", "Invalid 'Net Dividend' format"),
+            (
+                "1.5 USD GBP PLN",
+                "Tax Collected Amount",
+                "Invalid 'Tax Collected Amount' format",
+            ),
+            ("3 4 5", "Exchange Rate", "Invalid 'Exchange Rate' format"),
+        ],
+    )
+    def test_parse_value_with_currency_with_three_plus_parts_raises_error(
+        self, invalid_input, column_name, error_match
+    ) -> None:
+        """Test that parsing fails when input has 3+ space-separated parts."""
+        # Act & Assert
+        with pytest.raises(ValueError, match=error_match):
+            TaxCalculator._parse_value_with_currency(
+                invalid_input, column_name, "TEST.US", "2025-01-01"
+            )
+
+    def test_parse_value_with_currency_with_empty_string_raises_error(self) -> None:
+        """Test that parsing fails with empty string."""
+        # Act & Assert
+        with pytest.raises(ValueError, match="Missing 'Net Dividend' value"):
+            TaxCalculator._parse_value_with_currency(
+                "", "Net Dividend", "TEST.US", "2025-01-01"
+            )
+
+    def test_parse_value_with_currency_with_nan_string_raises_error(self) -> None:
+        """Test that parsing fails with 'nan' string (literal NaN sentinel)."""
+        # Act & Assert
+        with pytest.raises(ValueError, match="Missing 'Net Dividend' value"):
+            TaxCalculator._parse_value_with_currency(
+                "nan", "Net Dividend", "TEST.US", "2025-01-01"
+            )
+
+    @pytest.mark.parametrize(
+        "invalid_input,error_match",
+        [
+            ("1.5", "Invalid 'Tax Collected Amount' format"),
+            ("1.5 USD EUR", "Invalid 'Tax Collected Amount' format"),
+            ("1.5 USD GBP DKK", "Invalid 'Tax Collected Amount' format"),
+        ],
+    )
+    def test_parse_tax_collected_amount_with_invalid_format_raises_error(
+        self, invalid_input, error_match
+    ) -> None:
+        """Test that tax collected parsing fails with invalid part count."""
+        # Arrange
+        calculator = TaxCalculator(pd.DataFrame({"dummy": [1]}))
+
+        # Act & Assert
+        with pytest.raises(ValueError, match=error_match):
+            calculator._parse_tax_collected_amount(
+                invalid_input, "TEST.US", "2025-01-01"
+            )
+
+    @pytest.mark.parametrize(
+        "invalid_input,error_match",
+        [
+            ("4.1512", "Invalid 'Exchange Rate D-1' format"),
+            ("4.1512 PLN DKK", "Invalid 'Exchange Rate D-1' format"),
+            ("4.1512 PLN EUR USD", "Invalid 'Exchange Rate D-1' format"),
+        ],
+    )
+    def test_parse_exchange_rate_with_invalid_format_raises_error(
+        self, invalid_input, error_match
+    ) -> None:
+        """Test that exchange rate parsing fails with invalid part count."""
+        # Arrange
+        calculator = TaxCalculator(pd.DataFrame({"dummy": [1]}))
+
+        # Act & Assert
+        with pytest.raises(ValueError, match=error_match):
+            calculator._parse_exchange_rate(invalid_input, "TEST.US", "2025-01-01")
+
+    def test_parse_exchange_rate_with_nan_string_returns_unity(self) -> None:
+        """Test that 'nan' string literal in exchange rate returns 1.0 (PLN)."""
+        # Arrange
+        calculator = TaxCalculator(pd.DataFrame({"dummy": [1]}))
+
+        # Act
+        result = calculator._parse_exchange_rate("nan", "TEST.US", "2025-01-01")
+
+        # Assert
+        assert result == 1.0
+
+    def test_parse_tax_collected_amount_with_nan_string_returns_zero(self) -> None:
+        """Test that 'nan' string literal in tax collected amount returns 0.0."""
+        # Arrange
+        calculator = TaxCalculator(pd.DataFrame({"dummy": [1]}))
+
+        # Act
+        result = calculator._parse_tax_collected_amount("nan", "TEST.US", "2025-01-01")
+
+        # Assert
+        assert result == 0.0
+
+    def test_calculate_tax_pln_row_with_nan_tax_collected_raises_error(self) -> None:
+        """Test that missing Tax Collected (NaN) raises ValueError with context."""
+        # Arrange
+        df = pd.DataFrame(
+            {
+                "Date": ["2025-01-01"],
+                "Ticker": ["MISSING_TAX.US"],
+                "Net Dividend": ["10.0 USD"],
+                "Tax Collected": [pd.NA],
+                "Tax Collected Amount": ["1.0 USD"],
+                "Exchange Rate D-1": ["4.0 PLN"],
+            }
+        )
+        calculator = TaxCalculator(df)
+
+        # Act & Assert — error should include ticker and date context
+        with pytest.raises(ValueError, match="Missing 'Tax Collected' value"):
+            calculator.calculate_tax_for_pln_statement("PLN")
+
+    def test_calculate_tax_pln_row_with_invalid_net_dividend_raises_error(self) -> None:
+        """Test that invalid Net Dividend format propagates parsing error."""
+        # Arrange
+        df = pd.DataFrame(
+            {
+                "Date": ["2025-01-01"],
+                "Ticker": ["BAD_NET.US"],
+                "Net Dividend": ["invalid_format"],
+                "Tax Collected": [0.10],
+                "Tax Collected Amount": ["1.0 USD"],
+                "Exchange Rate D-1": ["4.0 PLN"],
+            }
+        )
+        calculator = TaxCalculator(df)
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="Invalid 'Net Dividend' format"):
+            calculator.calculate_tax_for_pln_statement("PLN")
+
+    def test_calculate_tax_pln_row_with_invalid_tax_collected_amount_raises_error(
+        self,
+    ) -> None:
+        """Test that invalid Tax Collected Amount format propagates parsing error."""
+        # Arrange
+        df = pd.DataFrame(
+            {
+                "Date": ["2025-01-01"],
+                "Ticker": ["BAD_TAX_AMT.US"],
+                "Net Dividend": ["10.0 USD"],
+                "Tax Collected": [0.10],
+                "Tax Collected Amount": ["invalid_format"],
+                "Exchange Rate D-1": ["4.0 PLN"],
+            }
+        )
+        calculator = TaxCalculator(df)
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="Invalid 'Tax Collected Amount' format"):
+            calculator.calculate_tax_for_pln_statement("PLN")
+
+    def test_calculate_tax_pln_row_with_invalid_exchange_rate_raises_error(
+        self,
+    ) -> None:
+        """Test that invalid Exchange Rate D-1 format propagates parsing error."""
+        # Arrange
+        df = pd.DataFrame(
+            {
+                "Date": ["2025-01-01"],
+                "Ticker": ["BAD_EXRATE.US"],
+                "Net Dividend": ["10.0 USD"],
+                "Tax Collected": [0.10],
+                "Tax Collected Amount": ["1.0 USD"],
+                "Exchange Rate D-1": ["invalid_format"],
+            }
+        )
+        calculator = TaxCalculator(df)
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="Invalid 'Exchange Rate D-1' format"):
+            calculator.calculate_tax_for_pln_statement("PLN")

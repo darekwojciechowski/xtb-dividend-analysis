@@ -135,9 +135,11 @@ class DataAggregator:
         self.df[ColumnName.NET_DIVIDEND.value] = pd.to_numeric(
             self.df[ColumnName.NET_DIVIDEND.value], errors="coerce"
         ).round(2)
-        self.df[ColumnName.TAX_COLLECTED.value] = pd.to_numeric(
-            self.df[ColumnName.TAX_COLLECTED.value], errors="coerce"
-        ).round(2)
+        # If Tax Collected exists, round it
+        if ColumnName.TAX_COLLECTED.value in self.df.columns:
+            self.df[ColumnName.TAX_COLLECTED.value] = pd.to_numeric(
+                self.df[ColumnName.TAX_COLLECTED.value], errors="coerce"
+            ).round(2)
         # If Shares column exists and needs rounding
         self.df[ColumnName.SHARES.value] = pd.to_numeric(
             self.df[ColumnName.SHARES.value], errors="coerce"
