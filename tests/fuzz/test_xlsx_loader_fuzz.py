@@ -4,6 +4,8 @@ Goal: no matter what garbage we hand the loader, it must return the well-typed
 ``(None, None)`` failure tuple OR a valid ``(DataFrame, currency)`` pair. It
 must *never* escape with an unhandled exception — the whole point of the try/
 except in ``import_and_process_data`` is to be a hard boundary.
+
+Scope: payload bytes only; file paths are not fuzzed (trusted filesystem).
 """
 
 from __future__ import annotations

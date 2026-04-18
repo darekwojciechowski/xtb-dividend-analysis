@@ -2,15 +2,21 @@
 
 Strategies hit date strings, currency-annotated amounts, and dividend-comment
 extraction with Unicode edge cases: surrogates, NUL bytes, zero-width joiners,
-RTL marks, and long strings. Each parser must either return a well-typed
-value or raise ``ValueError`` / ``TypeError`` — never ``KeyError``,
-``IndexError``, ``AttributeError``, or ``UnicodeError``.
+RTL marks, and long strings.
+
+Two distinct contracts apply:
+
+- ``convert_date`` and the three ``TaxCalculator`` parse methods: raise-or-return —
+  each must either return a well-typed value or raise ``ValueError`` / ``TypeError``,
+  never ``KeyError``, ``IndexError``, ``AttributeError``, or ``UnicodeError``.
+- ``extract_dividend_from_comment``: total function — always returns a typed
+  ``(float | None, str | None)`` tuple, never raises.
 """
 
 from __future__ import annotations
 
 import pytest
-from hypothesis import given
+from hypothesis import example, given
 from hypothesis import strategies as st
 
 from data_processing.currency_converter import CurrencyConverter
@@ -32,6 +38,10 @@ hostile_text = st.text(
 )
 
 
+@example(raw="")
+@example(raw="-")
+@example(raw="nan")
+@example(raw="2025-01-01")
 @given(raw=hostile_text)
 def test_convert_date_never_crashes(raw: str) -> None:
     """Given an arbitrary Unicode string (Hypothesis-generated),
@@ -45,6 +55,10 @@ def test_convert_date_never_crashes(raw: str) -> None:
     assert result is None or hasattr(result, "year")
 
 
+@example(raw="")
+@example(raw="-")
+@example(raw="nan")
+@example(raw="10.50 USD")
 @given(raw=hostile_text)
 def test_parse_value_with_currency_is_bounded(raw: str) -> None:
     """Given an arbitrary Unicode string as a dividend amount field,
@@ -62,44 +76,58 @@ def test_parse_value_with_currency_is_bounded(raw: str) -> None:
     assert isinstance(currency, str)
 
 
+@example(raw="")
+@example(raw="-")
+@example(raw="nan")
+@example(raw="0.0 USD")
 @given(raw=hostile_text)
-def test_parse_tax_collected_amount_is_bounded(raw: str) -> None:
+def test_parse_tax_collected_amount_is_bounded(
+    tax_calc: TaxCalculator, raw: str
+) -> None:
     """Given an arbitrary Unicode string as a tax-collected field,
     when _parse_tax_collected_amount processes it,
     then it returns a float or raises ValueError/TypeError — never an
     unexpected exception type.
     """
-    calc = TaxCalculator.__new__(TaxCalculator)
     try:
-        out = calc._parse_tax_collected_amount(raw, ticker="FUZZ", date="2025-01-01")
+        out = tax_calc._parse_tax_collected_amount(
+            raw, ticker="FUZZ", date="2025-01-01"
+        )
     except DOMAIN_ERRORS:
         return
     assert isinstance(out, float)
 
 
+@example(raw="")
+@example(raw="-")
+@example(raw="nan")
+@example(raw="3.9250")
 @given(raw=hostile_text)
-def test_parse_exchange_rate_is_bounded(raw: str) -> None:
+def test_parse_exchange_rate_is_bounded(tax_calc: TaxCalculator, raw: str) -> None:
     """Given an arbitrary Unicode string as an exchange-rate field,
     when _parse_exchange_rate processes it,
     then it returns a float or raises ValueError/TypeError — never an
     unexpected exception type.
     """
-    calc = TaxCalculator.__new__(TaxCalculator)
     try:
-        out = calc._parse_exchange_rate(raw, ticker="FUZZ", date="2025-01-01")
+        out = tax_calc._parse_exchange_rate(raw, ticker="FUZZ", date="2025-01-01")
     except DOMAIN_ERRORS:
         return
     assert isinstance(out, float)
 
 
+@example(comment="")
+@example(comment="\x00")
+@example(comment="Tax 15% USD 0.50 dividend")
 @given(comment=hostile_text)
-def test_extract_dividend_from_comment_never_crashes(comment: str) -> None:
+def test_extract_dividend_from_comment_never_crashes(
+    currency_conv: CurrencyConverter, comment: str
+) -> None:
     """Given an arbitrary Unicode string as a broker comment,
     when extract_dividend_from_comment processes it,
     then it returns (None, None) or a (float, 3-char str) pair —
-    never an unhandled exception.
+    never an unhandled exception (total function, always returns typed tuple).
     """
-    conv = CurrencyConverter.__new__(CurrencyConverter)
-    value, currency = conv.extract_dividend_from_comment(comment)
+    value, currency = currency_conv.extract_dividend_from_comment(comment)
     assert value is None or isinstance(value, float)
     assert currency is None or (isinstance(currency, str) and len(currency) == 3)
