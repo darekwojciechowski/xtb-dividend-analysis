@@ -18,6 +18,11 @@ record_demo.sh
 *.pdf
 account*
 .DS_Store
+
+# Agent/project meta files
+CLAUDE.md
+PROGRESS.md
+.agent/
 .github/agents/
 .github/hooks/
 .github/README.md
@@ -173,6 +178,7 @@ dmypy.json
 # Mutation testing
 .mutmut-cache
 mutants/
+mutation-results/
 analyze_incompetent_mutations.py
 detailed_incompetent_analysis.py
 mutmut-run.log

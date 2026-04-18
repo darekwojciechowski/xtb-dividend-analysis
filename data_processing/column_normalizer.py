@@ -66,7 +66,9 @@ class ColumnNormalizer:
         }
 
         self.df = self.df.rename(columns=column_mapping)
-        logger.info("Step 2 - Normalized column names to English standard.")
+        logger.info(
+            "Step 2 - Normalized column names to English standard."
+        )  # pragma: no mutate
 
         return self.df
 

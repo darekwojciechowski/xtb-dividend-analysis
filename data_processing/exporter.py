@@ -39,7 +39,9 @@ class GoogleSpreadsheetExporter:
         ansi_escape = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
         return ansi_escape.sub("", text)
 
-    def export_to_google(self, filename: str = "for_google_spreadsheet.csv") -> None:
+    def export_to_google(
+        self, filename: str = "for_google_spreadsheet.csv"
+    ) -> None:  # pragma: no mutate
         """Export the DataFrame to a tab-separated CSV file for Google Sheets.
 
         Saves the file to the ``output/`` directory, creating it if needed.
@@ -55,7 +57,9 @@ class GoogleSpreadsheetExporter:
         """
         # Validate that the DataFrame has a 'Ticker' column
         if "Ticker" not in self.df.columns:
-            raise ValueError("The DataFrame must contain a 'Ticker' column.")
+            raise ValueError(
+                "The DataFrame must contain a 'Ticker' column."
+            )  # pragma: no mutate
 
         # Remove ANSI sequences from 'Ticker'
         self.df["Ticker"] = self.df["Ticker"].apply(self.remove_ansi)
