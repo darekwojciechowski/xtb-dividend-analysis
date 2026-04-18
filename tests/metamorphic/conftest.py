@@ -63,12 +63,3 @@ def dividend_rows(draw, *, max_rows: int = 8) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows)
-
-
-def parse_tax_amount(formatted: str | float) -> float:
-    """Turn ``"18.15 PLN"`` / ``"-"`` / 0 into a plain float for summation."""
-    if formatted == "-" or formatted == 0:
-        return 0.0
-    if isinstance(formatted, str) and " PLN" in formatted:
-        return float(formatted.replace(" PLN", "").strip())
-    return float(formatted)

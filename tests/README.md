@@ -32,6 +32,7 @@ poetry run pytest -m security      # Security tests with Bandit
 - `test_integration/` — Integration tests using real DataFrames and file fixtures
 - `test_security/` — Static security analysis tests (Bandit SARIF conversion, security summary)
 - `property_based/` — Generative tests with Hypothesis for property verification
+- `metamorphic/` — Metamorphic relation tests: no oracle needed — tests assert invariants that must hold between a base run and a transformed run (e.g. permuted, scaled, split input). Run with `-m metamorphic`.
 
 ## Test conventions
 

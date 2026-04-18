@@ -48,7 +48,7 @@ def test_previous_business_day_never_weekend(base: date) -> None:
     """
     prev = CurrencyConverter.get_previous_business_day(base)
     assert prev.weekday() < 5
-    assert prev < base + timedelta(days=1)
+    assert base - prev <= timedelta(days=3)
 
 
 @given(

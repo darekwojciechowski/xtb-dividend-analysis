@@ -11,7 +11,7 @@ import math
 
 import pandas as pd
 import pytest
-from hypothesis import HealthCheck, given, settings
+from hypothesis import given
 from hypothesis import strategies as st
 
 from data_processing.data_aggregator import DataAggregator
@@ -19,15 +19,13 @@ from data_processing.data_aggregator import DataAggregator
 pytestmark = pytest.mark.metamorphic
 
 
-_SETTINGS = settings(
-    max_examples=100,
-    deadline=None,
-    suppress_health_check=[HealthCheck.too_slow, HealthCheck.function_scoped_fixture],
-)
-
-
 @st.composite
 def raw_rows(draw) -> pd.DataFrame:
+    """Generate a small DataFrame shaped like the DataAggregator input.
+
+    Draws 2–8 rows with realistic ticker/date/amount/share combinations so that
+    the groupby merge path exercises meaningful aggregation without numeric churn.
+    """
     n = draw(st.integers(min_value=2, max_value=8))
     tickers = draw(
         st.lists(
@@ -77,7 +75,6 @@ def _net_sum(df: pd.DataFrame) -> float:
     return float(pd.to_numeric(agg["Net Dividend"], errors="coerce").fillna(0).sum())
 
 
-@_SETTINGS
 @given(df=raw_rows())
 def test_permutation_invariance_of_net_sum(df: pd.DataFrame) -> None:
     """Given a generated transaction DataFrame and a row-shuffled copy,
@@ -88,7 +85,6 @@ def test_permutation_invariance_of_net_sum(df: pd.DataFrame) -> None:
     assert math.isclose(_net_sum(df), _net_sum(shuffled), abs_tol=0.01)
 
 
-@_SETTINGS
 @given(df=raw_rows())
 def test_duplication_doubles_net_sum(df: pd.DataFrame) -> None:
     """Given a transaction DataFrame and a copy with every row duplicated,
@@ -101,7 +97,6 @@ def test_duplication_doubles_net_sum(df: pd.DataFrame) -> None:
     )
 
 
-@_SETTINGS
 @given(df=raw_rows())
 def test_unique_ticker_count_preserved_under_duplication(df: pd.DataFrame) -> None:
     """Given a transaction DataFrame and a copy with every row duplicated,

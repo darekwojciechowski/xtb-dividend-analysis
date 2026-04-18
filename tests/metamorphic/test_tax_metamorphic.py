@@ -12,7 +12,7 @@ import math
 
 import pandas as pd
 import pytest
-from hypothesis import HealthCheck, given, settings
+from hypothesis import assume, given
 
 from data_processing.tax_calculator import TaxCalculator
 
@@ -21,20 +21,12 @@ from .conftest import dividend_rows
 pytestmark = pytest.mark.metamorphic
 
 
-_SETTINGS = settings(
-    max_examples=100,
-    deadline=None,
-    suppress_health_check=[HealthCheck.too_slow, HealthCheck.function_scoped_fixture],
-)
-
-
 def _total_tax(df: pd.DataFrame) -> float:
     calc = TaxCalculator(df.copy(), polish_tax_rate=0.19)
     out = calc.calculate_tax_for_pln_statement("PLN")
     return TaxCalculator.calculate_total_tax_amount(out)
 
 
-@_SETTINGS
 @given(df=dividend_rows())
 def test_permutation_invariance(df: pd.DataFrame) -> None:
     """Given a generated dividend DataFrame and a row-shuffled copy of it,
@@ -45,7 +37,6 @@ def test_permutation_invariance(df: pd.DataFrame) -> None:
     assert math.isclose(_total_tax(df), _total_tax(shuffled), abs_tol=0.01)
 
 
-@_SETTINGS
 @given(df=dividend_rows(max_rows=4))
 def test_additivity_under_split(df: pd.DataFrame) -> None:
     """Given a dividend DataFrame split into two halves,
@@ -53,8 +44,7 @@ def test_additivity_under_split(df: pd.DataFrame) -> None:
     then the full total equals the sum of the two partial totals within
     per-row rounding tolerance.
     """
-    if len(df) < 2:
-        return
+    assume(len(df) >= 2)
     midpoint = len(df) // 2
     left = df.iloc[:midpoint].reset_index(drop=True)
     right = df.iloc[midpoint:].reset_index(drop=True)
@@ -66,7 +56,6 @@ def test_additivity_under_split(df: pd.DataFrame) -> None:
     assert math.isclose(combined, split_sum, abs_tol=0.01 * len(df))
 
 
-@_SETTINGS
 @given(df=dividend_rows())
 def test_duplication_doubles_tax(df: pd.DataFrame) -> None:
     """Given a dividend DataFrame and a copy with every row duplicated,
@@ -82,7 +71,6 @@ def test_duplication_doubles_tax(df: pd.DataFrame) -> None:
     assert math.isclose(twice, 2 * base, abs_tol=0.01 * len(df) + 0.01)
 
 
-@_SETTINGS
 @given(df=dividend_rows())
 def test_zero_tax_row_insertion_does_not_change_total(df: pd.DataFrame) -> None:
     """Given a dividend DataFrame augmented with a row whose withholding
@@ -109,7 +97,6 @@ def test_zero_tax_row_insertion_does_not_change_total(df: pd.DataFrame) -> None:
     assert math.isclose(_total_tax(df), _total_tax(augmented), abs_tol=0.01)
 
 
-@_SETTINGS
 @given(df=dividend_rows())
 def test_linear_scaling_of_dividends(df: pd.DataFrame) -> None:
     """Given a dividend DataFrame and a scaled copy where all amounts are
