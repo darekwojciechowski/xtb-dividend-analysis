@@ -26,6 +26,7 @@ PROGRESS.md
 .github/agents/
 .github/hooks/
 .github/README.md
+.github/copilot-instructions.md
 .qodo
 .vscode/
 
