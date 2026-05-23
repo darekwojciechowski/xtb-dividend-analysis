@@ -7,14 +7,14 @@ license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.13,<4.0"
 dependencies = [
-    "pandas (>=3.0.2)",
-    "numpy (>=2.4.4)",
-    "matplotlib>=3.10.8",
+    "pandas (>=3.0.3)",
+    "numpy (>=2.4.6)",
+    "matplotlib (>=3.10.9)",
     "openpyxl>=3.1.5",
-    "playwright>=1.58.0",
+    "playwright (>=1.60.0)",
     "tabulate>=0.10.0",
     "loguru (>=0.7.3)",
-    "pydantic-settings>=2.13.1"
+    "pydantic-settings (>=2.14.1)"
 ]
 
 [tool.poetry]
@@ -29,16 +29,16 @@ build-backend = "poetry.core.masonry.api"
 pytest = "^9.0.3"
 pytest-cov = "^7.1.0"
 pytest-timeout = "^2.4.0"
-hypothesis = "^6.152.1"
-ruff = "^0.15.11"
-mypy = "^1.20.1"
-types-tabulate = "^0.10.0.20260408"
+hypothesis = "^6.152.9"
+ruff = "^0.15.14"
+mypy = "^2.1.0"
+types-tabulate = "^0.10.0.20260508"
 safety = "^3.7.0"
 bandit = "^1.9.4"
-tox = "^4.53.0"
-pre-commit = "^4.5.1"
+tox = "^4.54.0"
+pre-commit = "^4.6.0"
 mutmut = "^3.5.0"
-pytest-randomly = ">=4.0.1"
+pytest-randomly = ">=4.1.0"
 pandera = "^0.31.1"
 
 [tool.pytest.ini_options]

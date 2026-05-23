@@ -13,16 +13,23 @@ poetry run pytest
 Run tests with coverage report:
 
 ```bash
-poetry run pytest --cov=config --cov=data_processing --cov=data_acquisition --cov=visualization
+poetry run pytest --cov=data_processing --cov=data_acquisition --cov=config --cov=scripts
 ```
 
 Run tests by marker:
 
 ```bash
-poetry run pytest -m unit          # Unit tests only
-poetry run pytest -m integration   # Integration tests only
+poetry run pytest -m unit            # Unit tests only
+poetry run pytest -m integration     # Integration tests only
 poetry run pytest -m property_based  # Property-based tests with Hypothesis
-poetry run pytest -m security      # Security tests with Bandit
+poetry run pytest -m security        # Security tests with Bandit
+poetry run pytest -m performance     # Performance and stress tests
+poetry run pytest -m edge_case       # Edge case and boundary tests
+poetry run pytest -m slow            # Slow tests
+poetry run pytest -m contract        # Schema/contract tests (Pandera)
+poetry run pytest -m fuzz            # Fuzz tests (Hypothesis binary/text)
+poetry run pytest -m metamorphic     # Metamorphic relation tests
+poetry run pytest -m "not slow"      # Fast-feedback run, skips slow tests
 ```
 
 ## Folder structure
@@ -33,6 +40,9 @@ poetry run pytest -m security      # Security tests with Bandit
 - `test_security/` — Static security analysis tests (Bandit SARIF conversion, security summary)
 - `property_based/` — Generative tests with Hypothesis for property verification
 - `metamorphic/` — Metamorphic relation tests: no oracle needed — tests assert invariants that must hold between a base run and a transformed run (e.g. permuted, scaled, split input). Run with `-m metamorphic`.
+- `contract/` — Schema/contract tests for input XLSX and output CSV (Pandera schemas). Run with `-m contract`.
+- `fuzz/` — Fuzz tests for parser robustness using Hypothesis binary/text strategies. Run with `-m fuzz`.
+- `performance/` — Performance and stress tests split by module (currency, dataframe, filter, memory, scalability, tax). Run with `-m performance`. Excluded from default fast-feedback runs.
 
 ## Test conventions
 
@@ -65,7 +75,7 @@ poetry run pytest tests/test_integration/test_dataframe_processor.py -v
 
 ## Environment setup
 
-Tests run in the configured Python environment (Python 3.12+). Install development dependencies:
+Tests run in the configured Python environment (Python 3.13+). Install development dependencies:
 
 ```bash
 poetry install
@@ -74,7 +84,7 @@ poetry install
 If you modify dependencies, regenerate the lock file:
 
 ```bash
-poetry lock --no-update
+poetry lock
 ```
 
 ## Coverage

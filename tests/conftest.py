@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 # Hypothesis global profile
 # Registered here so every @given test picks it up without per-test @settings.
-# max_examples=50 keeps the CI run fast while still exercising edge cases;
+# max_examples=100 keeps the CI run fast while still exercising edge cases;
 # suppress HealthCheck.too_slow to avoid flaky timeouts on slow runners.
 # ---------------------------------------------------------------------------
 settings.register_profile(
