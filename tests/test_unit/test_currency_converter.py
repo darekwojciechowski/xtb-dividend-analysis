@@ -14,6 +14,7 @@ All tests are marked ``@pytest.mark.unit``.
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -1113,3 +1114,356 @@ class TestAddCurrencyToDividends:
 
         # Assert
         assert result.loc[0, "Net Dividend"].endswith(f" {expected_suffix}")
+
+
+# ---------------------------------------------------------------------------
+# TestBuildRateLookupMutations
+# ---------------------------------------------------------------------------
+
+
+def _multi_currency_csv(
+    tmp_path: Path,
+    rows: list[tuple[str, ...]],
+    *,
+    name: str = "archiwum_tab_a_2024.csv",
+    columns: str = "data;1USD;1EUR;1GBP;1DKK",
+) -> Path:
+    """Write a CSV with arbitrary rows; each row is a tuple of cell strings."""
+    header = columns + "\n"
+    body = "".join(";".join(row) + "\n" for row in rows)
+    path = tmp_path / name
+    path.write_text(header + body, encoding="ISO-8859-1")
+    return path
+
+
+@pytest.mark.unit
+class TestBuildRateLookupMutations:
+    """Targeted tests for CurrencyConverter._build_rate_lookup.
+
+    Designed to kill survived mutations on caching, CSV reading,
+    decimal-comma parsing, and the continue/break loop control flow.
+    """
+
+    def test_build_rate_lookup_caches_result_for_same_paths(
+        self, tmp_path: Path
+    ) -> None:
+        """Arrange: Build the lookup once.
+        Act: Build it again with the same paths.
+        Assert: Identical dict instance is returned (cache hit, not rebuilt).
+        """
+        # Arrange
+        csv_file = _nbp_csv(tmp_path, "20240115", 3.95)
+        converter = _converter()
+        paths = [str(csv_file)]
+
+        # Act
+        first = converter._build_rate_lookup(paths)
+        second = converter._build_rate_lookup(list(paths))
+
+        # Assert
+        assert first is second
+
+    def test_build_rate_lookup_separate_paths_get_separate_cache_entries(
+        self, tmp_path: Path
+    ) -> None:
+        """Arrange: Two distinct CSV files written.
+        Act: Build lookup for each path list.
+        Assert: Different dict instances; cache_key is tuple-based not None.
+        """
+        # Arrange
+        csv_a = _nbp_csv(tmp_path, "20240115", 3.95)
+        csv_b = tmp_path / "archiwum_tab_a_2023.csv"
+        csv_b.write_text(
+            "data;1USD;1EUR;1GBP;1DKK\n20230115;3,9000;4,3000;5,0000;0,5500\n",
+            encoding="ISO-8859-1",
+        )
+        converter = _converter()
+
+        # Act
+        lookup_a = converter._build_rate_lookup([str(csv_a)])
+        lookup_b = converter._build_rate_lookup([str(csv_b)])
+
+        # Assert
+        assert lookup_a is not lookup_b
+        assert ("USD", datetime(2024, 1, 15)) in lookup_a
+        assert ("USD", datetime(2023, 1, 15)) in lookup_b
+
+    def test_build_rate_lookup_parses_comma_decimal_separator(
+        self, tmp_path: Path
+    ) -> None:
+        """Arrange: NBP CSV uses comma decimal separator (4,1234).
+        Act: Build the lookup.
+        Assert: Rate is parsed as float 4.1234 (kills .replace(",", ".") → .replace(".")).
+        """
+        # Arrange
+        csv_file = _multi_currency_csv(
+            tmp_path, [("20240115", "4,1234", "4,5000", "5,1000", "0,5700")]
+        )
+        converter = _converter()
+
+        # Act
+        lookup = converter._build_rate_lookup([str(csv_file)])
+
+        # Assert
+        assert lookup[("USD", datetime(2024, 1, 15))] == pytest.approx(4.1234)
+        assert lookup[("EUR", datetime(2024, 1, 15))] == pytest.approx(4.5000)
+
+    def test_build_rate_lookup_invalid_date_continues_to_next_row(
+        self, tmp_path: Path
+    ) -> None:
+        """Arrange: CSV has malformed date then valid date.
+        Act: Build the lookup.
+        Assert: Valid row is in lookup (kills 'continue' → 'break' on date-parse fail).
+        """
+        # Arrange
+        csv_file = _multi_currency_csv(
+            tmp_path,
+            [
+                ("not-a-date", "3,9000", "4,2500", "5,1200", "0,5700"),
+                ("20240116", "3,9500", "4,2500", "5,1200", "0,5700"),
+            ],
+        )
+        converter = _converter()
+
+        # Act
+        lookup = converter._build_rate_lookup([str(csv_file)])
+
+        # Assert
+        assert ("USD", datetime(2024, 1, 16)) in lookup
+        assert lookup[("USD", datetime(2024, 1, 16))] == pytest.approx(3.95)
+
+    def test_build_rate_lookup_invalid_rate_continues_to_next_row(
+        self, tmp_path: Path
+    ) -> None:
+        """Arrange: CSV has unparseable rate string then valid rate.
+        Act: Build the lookup.
+        Assert: Valid row is in lookup (kills 'continue' → 'break' on float fail).
+        """
+        # Arrange
+        csv_file = _multi_currency_csv(
+            tmp_path,
+            [
+                ("20240115", "abc", "4,2500", "5,1200", "0,5700"),
+                ("20240116", "3,9500", "4,2500", "5,1200", "0,5700"),
+            ],
+        )
+        converter = _converter()
+
+        # Act
+        lookup = converter._build_rate_lookup([str(csv_file)])
+
+        # Assert — first USD rate is dropped (unparseable), second one kept
+        assert ("USD", datetime(2024, 1, 15)) not in lookup
+        assert lookup[("USD", datetime(2024, 1, 16))] == pytest.approx(3.95)
+
+    def test_build_rate_lookup_skips_nan_rates(self, tmp_path: Path) -> None:
+        """Arrange: CSV has empty USD rate (NaN) and present EUR rate.
+        Act: Build the lookup.
+        Assert: NaN row is skipped, sibling currency rate is still present
+        (kills pd.isna(raw_rate) → pd.isna(None) which would always be True).
+        """
+        # Arrange — empty USD cell becomes NaN after pd.read_csv
+        csv_file = _multi_currency_csv(
+            tmp_path, [("20240115", "", "4,2500", "5,1200", "0,5700")]
+        )
+        converter = _converter()
+
+        # Act
+        lookup = converter._build_rate_lookup([str(csv_file)])
+
+        # Assert
+        assert ("USD", datetime(2024, 1, 15)) not in lookup
+        assert lookup[("EUR", datetime(2024, 1, 15))] == pytest.approx(4.25)
+
+    def test_build_rate_lookup_missing_currency_column_skips_only_that_currency(
+        self, tmp_path: Path
+    ) -> None:
+        """Arrange: CSV with only data + 1USD columns (no EUR/GBP/DKK).
+        Act: Build the lookup.
+        Assert: USD row is present; other currencies absent
+        (kills 'continue' → 'break' inside the per-currency loop).
+        """
+        # Arrange
+        csv_file = _multi_currency_csv(
+            tmp_path,
+            [("20240115", "3,9500")],
+            columns="data;1USD",
+        )
+        converter = _converter()
+
+        # Act
+        lookup = converter._build_rate_lookup([str(csv_file)])
+
+        # Assert
+        assert ("USD", datetime(2024, 1, 15)) in lookup
+        assert ("EUR", datetime(2024, 1, 15)) not in lookup
+        assert ("GBP", datetime(2024, 1, 15)) not in lookup
+
+    def test_build_rate_lookup_first_file_wins_on_duplicate_keys(
+        self, tmp_path: Path
+    ) -> None:
+        """Arrange: Two CSV files contain the same date with different rates.
+        Act: Build the lookup with file_a then file_b.
+        Assert: file_a's rate is kept (kills `key not in lookup` flip).
+        """
+        # Arrange
+        csv_a = tmp_path / "a.csv"
+        csv_a.write_text(
+            "data;1USD;1EUR;1GBP;1DKK\n20240115;3,9000;4,2500;5,1200;0,5700\n",
+            encoding="ISO-8859-1",
+        )
+        csv_b = tmp_path / "b.csv"
+        csv_b.write_text(
+            "data;1USD;1EUR;1GBP;1DKK\n20240115;9,9999;9,9999;9,9999;9,9999\n",
+            encoding="ISO-8859-1",
+        )
+        converter = _converter()
+
+        # Act
+        lookup = converter._build_rate_lookup([str(csv_a), str(csv_b)])
+
+        # Assert
+        assert lookup[("USD", datetime(2024, 1, 15))] == pytest.approx(3.90)
+
+    def test_build_rate_lookup_missing_file_continues_to_next_file(
+        self, tmp_path: Path
+    ) -> None:
+        """Arrange: First path does not exist; second path has data.
+        Act: Build the lookup.
+        Assert: Lookup contains second file's rates (FileNotFoundError → 'continue').
+        """
+        # Arrange
+        missing = str(tmp_path / "does_not_exist.csv")
+        csv_present = _nbp_csv(tmp_path, "20240115", 3.95)
+        converter = _converter()
+
+        # Act
+        lookup = converter._build_rate_lookup([missing, str(csv_present)])
+
+        # Assert
+        assert lookup[("USD", datetime(2024, 1, 15))] == pytest.approx(3.95)
+
+    def test_build_rate_lookup_corrupt_file_continues_to_next_file(
+        self, tmp_path: Path
+    ) -> None:
+        """Arrange: First file is corrupt binary; second file has valid CSV.
+        Act: Build the lookup.
+        Assert: Second file's rate is in the lookup
+        (kills generic 'Exception → continue' replaced with 'break').
+        """
+        # Arrange
+        corrupt = tmp_path / "corrupt.csv"
+        corrupt.write_bytes(b"\x00\x01\x02not_csv_data\xff")
+        csv_present = _nbp_csv(tmp_path, "20240115", 3.95)
+        converter = _converter()
+
+        # Act
+        lookup = converter._build_rate_lookup([str(corrupt), str(csv_present)])
+
+        # Assert
+        assert lookup[("USD", datetime(2024, 1, 15))] == pytest.approx(3.95)
+
+    def test_build_rate_lookup_csv_without_data_column_is_skipped(
+        self, tmp_path: Path
+    ) -> None:
+        """Arrange: CSV missing the 'data' column; second CSV is valid.
+        Act: Build the lookup.
+        Assert: Second file's rate is still added (kills 'continue' → 'break').
+        """
+        # Arrange
+        bad = tmp_path / "no_data_col.csv"
+        bad.write_text(
+            "wrong_col;1USD\n20240115;3,9500\n", encoding="ISO-8859-1"
+        )
+        good = _nbp_csv(tmp_path, "20240116", 3.96)
+        converter = _converter()
+
+        # Act
+        lookup = converter._build_rate_lookup([str(bad), str(good)])
+
+        # Assert
+        assert lookup[("USD", datetime(2024, 1, 16))] == pytest.approx(3.96)
+
+    def test_build_rate_lookup_empty_paths_returns_empty_dict(self) -> None:
+        """Arrange: No CSV paths.
+        Act: Build the lookup.
+        Assert: Empty dict (no crash).
+        """
+        # Arrange
+        converter = _converter()
+
+        # Act
+        lookup = converter._build_rate_lookup([])
+
+        # Assert
+        assert lookup == {}
+
+
+# ---------------------------------------------------------------------------
+# TestExchangeRateUnavailableErrorMessage
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestExchangeRateUnavailableErrorMessage:
+    """Targeted tests for ExchangeRateUnavailableError.__init__ message construction."""
+
+    def test_error_message_contains_currency_and_date_and_searched_files(
+        self,
+    ) -> None:
+        """Arrange: instantiate with concrete fields.
+        Act: stringify the error.
+        Assert: every required field appears in the message
+        (kills `message = None` and component-string mutations).
+        """
+        # Arrange
+        from data_processing.currency_converter import ExchangeRateUnavailableError
+
+        # Act
+        err = ExchangeRateUnavailableError(
+            "USD", "2024-01-15", ["/tmp/archiwum_tab_a_2024.csv"]
+        )
+        message = str(err)
+
+        # Assert
+        assert "USD" in message
+        assert "2024-01-15" in message
+        assert "/tmp/archiwum_tab_a_2024.csv" in message
+        assert "No exchange rate data found" in message
+        assert "business days" in message
+        assert "archiwum_tab_a_XXXX.csv" in message
+
+    def test_error_message_empty_searched_files_shows_bracket_placeholder(
+        self,
+    ) -> None:
+        """Arrange: instantiate with empty searched_files list.
+        Act: stringify.
+        Assert: '[]' placeholder appears (kills the `or '[]'` branch).
+        """
+        # Arrange
+        from data_processing.currency_converter import ExchangeRateUnavailableError
+
+        # Act
+        err = ExchangeRateUnavailableError("EUR", "2024-02-01", [])
+        message = str(err)
+
+        # Assert
+        assert "[]" in message
+        assert "EUR" in message
+
+    def test_error_searched_files_is_copied_not_aliased(self) -> None:
+        """Arrange: pass a list to the constructor.
+        Act: mutate the original list.
+        Assert: error.searched_files is unaffected (kills list() removal).
+        """
+        # Arrange
+        from data_processing.currency_converter import ExchangeRateUnavailableError
+
+        original = ["/tmp/a.csv"]
+
+        # Act
+        err = ExchangeRateUnavailableError("USD", "2024-01-15", original)
+        original.append("/tmp/b.csv")
+
+        # Assert
+        assert err.searched_files == ["/tmp/a.csv"]

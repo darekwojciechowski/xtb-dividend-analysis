@@ -142,36 +142,32 @@ class TestValidateTaxRateValid:
 
 
 @pytest.mark.property_based
-class TestValidateTaxRateProperty:
-    """Property: every float in [0, 1] is accepted; everything outside is rejected."""
+@given(
+    st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False)
+)
+def test_any_rate_in_unit_interval_is_valid(rate: float) -> None:
+    """Property: every float in [0, 1] is accepted."""
+    s = Settings(POLISH_TAX_RATE=rate)
 
-    @given(
-        st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False)
+    assert 0.0 <= s.polish_tax_rate <= 1.0
+
+
+@pytest.mark.property_based
+@given(
+    st.one_of(
+        st.floats(max_value=-1e-9, allow_nan=False, allow_infinity=False),
+        st.floats(
+            min_value=1.0 + 1e-9,
+            max_value=1e6,
+            allow_nan=False,
+            allow_infinity=False,
+        ),
     )
-    def test_any_rate_in_unit_interval_is_valid(self, rate: float) -> None:
-        """Any float in [0.0, 1.0] must not raise."""
-        # Arrange / Act
-        s = Settings(POLISH_TAX_RATE=rate)
-
-        # Assert
-        assert 0.0 <= s.polish_tax_rate <= 1.0
-
-    @given(
-        st.one_of(
-            st.floats(max_value=-1e-9, allow_nan=False, allow_infinity=False),
-            st.floats(
-                min_value=1.0 + 1e-9,
-                max_value=1e6,
-                allow_nan=False,
-                allow_infinity=False,
-            ),
-        )
-    )
-    def test_any_rate_outside_unit_interval_is_invalid(self, rate: float) -> None:
-        """Any float strictly outside [0.0, 1.0] must raise ValidationError."""
-        # Arrange / Act / Assert
-        with pytest.raises(ValidationError):
-            Settings(POLISH_TAX_RATE=rate)
+)
+def test_any_rate_outside_unit_interval_is_invalid(rate: float) -> None:
+    """Property: every float outside [0, 1] is rejected."""
+    with pytest.raises(ValidationError):
+        Settings(POLISH_TAX_RATE=rate)
 
 
 # ---------------------------------------------------------------------------

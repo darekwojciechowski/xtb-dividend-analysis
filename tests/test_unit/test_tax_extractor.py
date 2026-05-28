@@ -678,3 +678,271 @@ class TestExtractTaxPercentageMutationKillers:
 
         # Assert — message must start with capital 'E', not be prefixed or all-caps
         assert any("INFO" in m and "Extracted tax percentages" in m for m in messages)
+
+
+# ---------------------------------------------------------------------------
+# TestValidateTaxCollectedMutationKillers
+# ---------------------------------------------------------------------------
+
+
+def _capture_loguru() -> tuple[list[str], int]:
+    """Subscribe a sink to loguru and return (messages, sink_id) for teardown."""
+    from loguru import logger
+
+    messages: list[str] = []
+    sink_id = logger.add(messages.append, format="{level}:{message}")
+    return messages, sink_id
+
+
+@pytest.mark.unit
+class TestValidateTaxCollectedMutationKillers:
+    """Targeted tests for TaxExtractor.validate_tax_collected.
+
+    Each test kills one or more survived mutations from the mutmut run by
+    asserting log content (loguru sink) rather than only "no exception".
+    """
+
+    def test_validate_emits_no_invalid_warning_when_all_rows_valid(self) -> None:
+        """Arrange: all rows have valid non-zero tax.
+        Act: validate.
+        Assert: no 'missing or zero' warning is emitted (kills `not empty` flip
+        and the `== 0` → `!= 0` mutation which would mark valid rows invalid).
+        """
+        # Arrange
+        from loguru import logger
+
+        df = pd.DataFrame(
+            {"Ticker": ["AAPL.US"], "Date": ["2024-01-15"], "Tax Collected": [0.15]}
+        )
+        extractor = TaxExtractor(df)
+        messages, sink_id = _capture_loguru()
+
+        try:
+            # Act
+            extractor.validate_tax_collected()
+        finally:
+            logger.remove(sink_id)
+
+        # Assert
+        assert not any(
+            "WARNING" in m and "missing or zero tax percentages" in m
+            for m in messages
+        )
+
+    def test_validate_invalid_warning_counts_nan_and_zero_via_or(self) -> None:
+        """Arrange: one NaN row + one zero row + one valid row.
+        Act: validate.
+        Assert: warning says exactly 2 invalid rows (kills `|` → `&` mutation
+        which would yield 0 invalid rows because NaN==0 is False).
+        """
+        # Arrange
+        from loguru import logger
+
+        df = pd.DataFrame(
+            {
+                "Ticker": ["SBUX.US", "HSBA.UK", "AAPL.US"],
+                "Date": ["2024-01-15"] * 3,
+                "Tax Collected": [0.15, float("nan"), 0],
+            }
+        )
+        extractor = TaxExtractor(df)
+        messages, sink_id = _capture_loguru()
+
+        try:
+            # Act
+            extractor.validate_tax_collected()
+        finally:
+            logger.remove(sink_id)
+
+        # Assert
+        warning = next(
+            m for m in messages
+            if "WARNING" in m and "missing or zero tax percentages" in m
+        )
+        assert "Found 2 rows" in warning
+        assert "HSBA.UK" in warning
+        assert "AAPL.US" in warning
+
+    def test_validate_invalid_warning_uses_zero_literal_not_one(self) -> None:
+        """Arrange: tax == 1 should NOT count as invalid.
+        Act: validate.
+        Assert: no 'missing or zero' warning (kills `== 0` → `== 1`).
+        """
+        # Arrange
+        from loguru import logger
+
+        df = pd.DataFrame(
+            {"Ticker": ["AAPL.US"], "Date": ["2024-01-15"], "Tax Collected": [1.0]}
+        )
+        extractor = TaxExtractor(df)
+        messages, sink_id = _capture_loguru()
+
+        try:
+            # Act
+            extractor.validate_tax_collected()
+        finally:
+            logger.remove(sink_id)
+
+        # Assert
+        assert not any(
+            "WARNING" in m and "missing or zero tax percentages" in m
+            for m in messages
+        )
+
+    def test_validate_us_30pct_warning_text_is_exact_and_lists_examples(
+        self,
+    ) -> None:
+        """Arrange: US ticker with 30% tax.
+        Act: validate.
+        Assert: W8BEN warning is emitted with the exact ticker name
+        (kills `- 0.30` → `+ 0.30` mutation which would skip the warning, and
+        head(3) → head(None) which would crash).
+        """
+        # Arrange
+        from loguru import logger
+
+        df = pd.DataFrame(
+            {
+                "Ticker": ["MMM.US"],
+                "Date": ["2024-01-15"],
+                "Tax Collected": [0.30],
+            }
+        )
+        extractor = TaxExtractor(df)
+        messages, sink_id = _capture_loguru()
+
+        try:
+            # Act
+            extractor.validate_tax_collected()
+        finally:
+            logger.remove(sink_id)
+
+        # Assert
+        warning = next(
+            m for m in messages if "WARNING" in m and "30% tax rate" in m
+        )
+        assert "MMM.US" in warning
+        assert "W8BEN" in warning
+
+    def test_validate_us_15pct_does_not_trigger_30pct_warning(self) -> None:
+        """Arrange: US ticker with 15% tax (correct W8BEN rate).
+        Act: validate.
+        Assert: NO W8BEN warning is emitted (kills `< 0.01` → `< 1.01` which
+        would always match and falsely warn for every US ticker).
+        """
+        # Arrange
+        from loguru import logger
+
+        df = pd.DataFrame(
+            {
+                "Ticker": ["AAPL.US"],
+                "Date": ["2024-01-15"],
+                "Tax Collected": [0.15],
+            }
+        )
+        extractor = TaxExtractor(df)
+        messages, sink_id = _capture_loguru()
+
+        try:
+            # Act
+            extractor.validate_tax_collected()
+        finally:
+            logger.remove(sink_id)
+
+        # Assert
+        assert not any(
+            "WARNING" in m and "30% tax rate" in m for m in messages
+        )
+
+    def test_validate_us_30pct_warning_caps_examples_at_three(self) -> None:
+        """Arrange: five US tickers, all at 30% tax.
+        Act: validate.
+        Assert: W8BEN warning lists exactly 3 ticker examples (kills
+        head(3) → head(None) which would return all five or crash).
+        """
+        # Arrange
+        from loguru import logger
+
+        tickers = ["A.US", "B.US", "C.US", "D.US", "E.US"]
+        df = pd.DataFrame(
+            {
+                "Ticker": tickers,
+                "Date": ["2024-01-15"] * 5,
+                "Tax Collected": [0.30] * 5,
+            }
+        )
+        extractor = TaxExtractor(df)
+        messages, sink_id = _capture_loguru()
+
+        try:
+            # Act
+            extractor.validate_tax_collected()
+        finally:
+            logger.remove(sink_id)
+
+        # Assert — warning mentions exactly the first 3 tickers in head() order
+        warning = next(
+            m for m in messages if "WARNING" in m and "30% tax rate" in m
+        )
+        listed = [t for t in tickers if t in warning]
+        assert len(listed) == 3
+
+    def test_validate_logs_exact_completion_messages(self) -> None:
+        """Arrange: minimal valid DataFrame.
+        Act: validate.
+        Assert: both 'Tax Collected column validated.' and the 'Step 6 - ...'
+        log messages are emitted verbatim (kills case-flip and XX-marker mutations).
+        """
+        # Arrange
+        from loguru import logger
+
+        df = pd.DataFrame(
+            {"Ticker": ["AAPL.US"], "Date": ["2024-01-15"], "Tax Collected": [0.15]}
+        )
+        extractor = TaxExtractor(df)
+        messages, sink_id = _capture_loguru()
+
+        try:
+            # Act
+            extractor.validate_tax_collected()
+        finally:
+            logger.remove(sink_id)
+
+        # Assert — exact strings (mutation flipped casing or wrapped in XX..XX)
+        assert any("INFO:Tax Collected column validated." in m for m in messages)
+        assert any(
+            "INFO:Step 6 - Updated 'Tax Collected' column "
+            "with calculated tax percentages." in m
+            for m in messages
+        )
+
+    def test_validate_handles_nan_ticker_without_crash(self) -> None:
+        """Arrange: a row with NaN in the Ticker column.
+        Act: validate.
+        Assert: no crash, no false 30% warning (kills `na=False` → `na=None`
+        and `na=False` removal mutations).
+        """
+        # Arrange
+        from loguru import logger
+
+        df = pd.DataFrame(
+            {
+                "Ticker": [float("nan"), "AAPL.US"],
+                "Date": ["2024-01-15", "2024-01-15"],
+                "Tax Collected": [0.15, 0.15],
+            }
+        )
+        extractor = TaxExtractor(df)
+        messages, sink_id = _capture_loguru()
+
+        try:
+            # Act
+            result = extractor.validate_tax_collected()
+        finally:
+            logger.remove(sink_id)
+
+        # Assert
+        assert len(result) == 2
+        assert not any(
+            "WARNING" in m and "30% tax rate" in m for m in messages
+        )

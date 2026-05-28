@@ -26,7 +26,14 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
+from data_processing.column_formatter import ColumnFormatter
+from data_processing.column_normalizer import ColumnNormalizer
+from data_processing.currency_converter import CurrencyConverter
+from data_processing.data_aggregator import DataAggregator
 from data_processing.dataframe_processor import DataFrameProcessor
+from data_processing.dividend_filter import DividendFilter
+from data_processing.tax_calculator import TaxCalculator
+from data_processing.tax_extractor import TaxExtractor
 
 
 @pytest.fixture
@@ -876,3 +883,142 @@ class TestPerformance:
                 )
             )
             assert len(processor.df) == unique_dates
+
+
+# ---------------------------------------------------------------------------
+# TestSpecialistCaching
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestSpecialistCaching:
+    """Targeted tests for DataFrameProcessor._get_specialist and the per-class
+    factory wrappers.
+
+    Each test kills survived mutations on the caching logic by asserting both
+    identity reuse on repeated calls AND identity refresh when self.df changes.
+    """
+
+    @pytest.mark.parametrize(
+        "factory_name, expected_cls",
+        [
+            ("_get_column_normalizer", ColumnNormalizer),
+            ("_get_dividend_filter", DividendFilter),
+            ("_get_data_aggregator", DataAggregator),
+            ("_get_currency_converter", CurrencyConverter),
+            ("_get_tax_extractor", TaxExtractor),
+            ("_get_tax_calculator", TaxCalculator),
+            ("_get_column_formatter", ColumnFormatter),
+        ],
+    )
+    def test_specialist_factory_returns_correct_class(
+        self, factory_name: str, expected_cls: type
+    ) -> None:
+        """Arrange: minimal DataFrameProcessor.
+        Act: invoke the per-class specialist factory.
+        Assert: returns an instance of the expected class
+        (kills factory_name typo and class-arg swap mutations).
+        """
+        # Arrange
+        processor = DataFrameProcessor(pd.DataFrame({"x": [1]}))
+
+        # Act
+        instance = getattr(processor, factory_name)()
+
+        # Assert
+        assert isinstance(instance, expected_cls)
+
+    @pytest.mark.parametrize(
+        "factory_name",
+        [
+            "_get_column_normalizer",
+            "_get_dividend_filter",
+            "_get_data_aggregator",
+            "_get_currency_converter",
+            "_get_tax_extractor",
+            "_get_tax_calculator",
+            "_get_column_formatter",
+        ],
+    )
+    def test_specialist_is_cached_when_df_unchanged(
+        self, factory_name: str
+    ) -> None:
+        """Arrange: invoke factory once.
+        Act: invoke it again with unchanged self.df.
+        Assert: identical instance (kills `or` → `and` flip and the
+        `setattr(self, df_attr, None)` mutation that would defeat caching).
+        """
+        # Arrange
+        processor = DataFrameProcessor(pd.DataFrame({"x": [1]}))
+        first = getattr(processor, factory_name)()
+
+        # Act
+        second = getattr(processor, factory_name)()
+
+        # Assert
+        assert first is second
+
+    @pytest.mark.parametrize(
+        "factory_name",
+        [
+            "_get_column_normalizer",
+            "_get_dividend_filter",
+            "_get_data_aggregator",
+            "_get_currency_converter",
+            "_get_tax_extractor",
+            "_get_tax_calculator",
+            "_get_column_formatter",
+        ],
+    )
+    def test_specialist_is_rebuilt_when_df_replaced(
+        self, factory_name: str
+    ) -> None:
+        """Arrange: invoke factory once, then replace self.df.
+        Act: invoke again.
+        Assert: new instance (kills `is None` → `is not None`, `or` → `and`,
+        and the `getattr(None, ...)` parameter-swap mutations).
+        """
+        # Arrange
+        processor = DataFrameProcessor(pd.DataFrame({"x": [1]}))
+        first = getattr(processor, factory_name)()
+        processor.df = pd.DataFrame({"y": [2]})
+
+        # Act
+        second = getattr(processor, factory_name)()
+
+        # Assert
+        assert first is not second
+
+    def test_column_formatter_receives_cached_currency_converter(self) -> None:
+        """Arrange: instantiate processor.
+        Act: get the column_formatter and the currency_converter independently.
+        Assert: the formatter's currency_converter is the same cached instance
+        (kills the constructor-arg drop mutation).
+        """
+        # Arrange
+        processor = DataFrameProcessor(pd.DataFrame({"x": [1]}))
+
+        # Act
+        formatter = processor._get_column_formatter()
+        currency_converter = processor._get_currency_converter()
+
+        # Assert
+        assert formatter._converter is currency_converter
+
+    def test_get_specialist_uses_attr_name_to_namespace_cache(self) -> None:
+        """Arrange: invoke two different factories on the same processor.
+        Act: get both specialists.
+        Assert: each is its own class (kills `instance_attr = None` mutation
+        which would cause all factories to share one cache slot).
+        """
+        # Arrange
+        processor = DataFrameProcessor(pd.DataFrame({"x": [1]}))
+
+        # Act
+        normalizer = processor._get_column_normalizer()
+        aggregator = processor._get_data_aggregator()
+
+        # Assert
+        assert isinstance(normalizer, ColumnNormalizer)
+        assert isinstance(aggregator, DataAggregator)
+        assert normalizer is not aggregator

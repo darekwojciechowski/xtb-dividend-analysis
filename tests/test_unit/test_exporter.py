@@ -224,3 +224,111 @@ class TestExportFileFormat:
 
         # Assert
         assert (tmp_path / "output" / "result.csv").exists()
+
+
+# ---------------------------------------------------------------------------
+# TestExportToGoogleMutationKillers
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestExportToGoogleMutationKillers:
+    """Targeted tests for GoogleSpreadsheetExporter.export_to_google."""
+
+    def test_default_filename_is_for_google_spreadsheet_csv(
+        self,
+        sample_dataframe_with_ansi: pd.DataFrame,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Arrange: invoke export_to_google with no filename argument.
+        Act: call export.
+        Assert: the canonical default file 'for_google_spreadsheet.csv' is created
+        (kills the default-string mutations to 'XX...XX' or upper-case).
+        """
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+        exporter = GoogleSpreadsheetExporter(sample_dataframe_with_ansi)
+
+        # Act
+        exporter.export_to_google()
+
+        # Assert
+        assert (tmp_path / "output" / "for_google_spreadsheet.csv").exists()
+
+    def test_output_dir_is_lowercase_output_not_uppercase(
+        self,
+        sample_dataframe_with_ansi: pd.DataFrame,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Arrange: chdir to a fresh tmp_path.
+        Act: call export.
+        Assert: a directory literally named 'output' exists; 'OUTPUT' was not used.
+        Note: skipped on case-insensitive filesystems (macOS default HFS+/APFS),
+        where the case mutation is genuinely equivalent.
+        """
+        # Arrange
+        import sys
+
+        if sys.platform == "darwin":
+            pytest.skip("Default macOS filesystems are case-insensitive")
+        monkeypatch.chdir(tmp_path)
+        exporter = GoogleSpreadsheetExporter(sample_dataframe_with_ansi)
+
+        # Act
+        exporter.export_to_google(filename="r.csv")
+
+        # Assert
+        existing = {p.name for p in tmp_path.iterdir() if p.is_dir()}
+        assert "output" in existing
+
+    def test_numeric_columns_rounded_to_exact_two_decimals_in_dataframe(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Arrange: DataFrame with a numeric column that has 4 decimals.
+        Act: export.
+        Assert: in-memory DataFrame is rounded to 2 decimals
+        (kills `.round(2)` → `None` and `.round(2)` → `.round(N)` constants).
+        """
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+        df = pd.DataFrame(
+            {"Ticker": ["AAPL"], "Amount": [1.23456]}
+        )
+        exporter = GoogleSpreadsheetExporter(df)
+
+        # Act
+        exporter.export_to_google(filename="rounded.csv")
+
+        # Assert
+        assert exporter.df.loc[0, "Amount"] == pytest.approx(1.23)
+
+    def test_export_writes_index_excluded_from_csv(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Arrange: DataFrame with a custom non-trivial index.
+        Act: export and read back the CSV.
+        Assert: first column is 'Ticker', not the integer index
+        (kills `index=False` removal / swap mutations).
+        """
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+        df = pd.DataFrame(
+            {"Ticker": ["AAPL", "MSFT"], "Amount": [1.0, 2.0]},
+            index=[42, 99],
+        )
+        exporter = GoogleSpreadsheetExporter(df)
+
+        # Act
+        exporter.export_to_google(filename="noidx.csv")
+        raw = (tmp_path / "output" / "noidx.csv").read_text()
+
+        # Assert — header first field is 'Ticker' (no '42'/'99' index column)
+        header = raw.splitlines()[0]
+        assert header.split("\t")[0] == "Ticker"
+        assert "42" not in header and "99" not in header

@@ -677,3 +677,120 @@ def test_merge_rows_and_reorder_preserves_column_order():
     cols = list(result.columns)
     assert cols[-1] == "Shares"
     assert cols[-2] != "Shares"
+
+
+# ---------------------------------------------------------------------------
+# Mutation killers — add_empty_column defaults
+# ---------------------------------------------------------------------------
+
+
+def test_add_empty_column_default_args_create_tax_collected_at_position_four():
+    """Arrange: DataFrame with 5 non-tax columns.
+    Act: call add_empty_column() with NO arguments (default col + default pos).
+    Assert: column is named exactly 'Tax Collected' AND lives at index 4
+    (kills col_name default-string mutations and position default 4 → 5).
+    """
+    df = pd.DataFrame(
+        {
+            "Date": [1],
+            "Ticker": ["A"],
+            "Net Dividend": [1.0],
+            "Shares": [1.0],
+            "Comment": ["x"],
+        }
+    )
+    agg = DataAggregator(df)
+
+    result = agg.add_empty_column()
+
+    cols = list(result.columns)
+    assert "Tax Collected" in cols
+    assert cols.index("Tax Collected") == 4
+
+
+def test_add_empty_column_inserts_pd_na_not_python_none():
+    """Arrange: empty DataFrame with one row.
+    Act: call add_empty_column.
+    Assert: the new column contains pd.NA (na-detected), not the Python None
+    sentinel (kills `pd.NA` → `None` mutation; both look 'null' but pd.NA
+    preserves nullable extension dtypes whereas None coerces to object).
+    """
+    df = pd.DataFrame({"A": [1, 2]})
+    agg = DataAggregator(df)
+
+    result = agg.add_empty_column(col_name="X", position=0)
+
+    # pd.isna treats both as NA, so the distinguishing fact is the *value type*.
+    # Inserting pd.NA produces pd.NA in the column; inserting None produces None.
+    assert all(v is pd.NA for v in result["X"])
+
+
+# ---------------------------------------------------------------------------
+# Mutation killers — move_negative_values boundary semantics
+# ---------------------------------------------------------------------------
+
+
+def test_move_negative_values_zero_net_dividend_is_kept_not_moved():
+    """Arrange: a row whose Net Dividend is exactly 0.
+    Act: move_negative_values.
+    Assert: Net Dividend stays 0; Tax Collected is NOT populated from it
+    (kills `< 0` → `<= 0` and `< 0` → `< 1` mutations which would erroneously
+    treat zero/positive small values as 'negative').
+    """
+    df = pd.DataFrame(
+        {
+            "Date": ["2024-01-01"],
+            "Ticker": ["A"],
+            "Net Dividend": [0.0],
+            "Shares": [1.0],
+        }
+    )
+    agg = DataAggregator(df)
+
+    result = agg.move_negative_values()
+
+    assert result.loc[0, "Net Dividend"] == 0.0
+    assert pd.isna(result.loc[0, "Tax Collected"]) or result.loc[0, "Tax Collected"] != 0.0
+
+
+def test_move_negative_values_positive_below_one_is_kept():
+    """Arrange: a row whose Net Dividend is +0.5 (positive but < 1).
+    Act: move_negative_values.
+    Assert: row is untouched (kills `< 0` → `< 1` which would treat 0.5 as
+    negative and move it).
+    """
+    df = pd.DataFrame(
+        {
+            "Date": ["2024-01-01"],
+            "Ticker": ["A"],
+            "Net Dividend": [0.5],
+            "Shares": [1.0],
+        }
+    )
+    agg = DataAggregator(df)
+
+    result = agg.move_negative_values()
+
+    assert result.loc[0, "Net Dividend"] == pytest.approx(0.5)
+    assert pd.isna(result.loc[0, "Tax Collected"])
+
+
+def test_move_negative_values_negative_amount_is_moved_to_tax_collected():
+    """Arrange: a row with Net Dividend = -3.
+    Act: move_negative_values.
+    Assert: Tax Collected = -3, Net Dividend = NaN (baseline behaviour).
+    """
+    df = pd.DataFrame(
+        {
+            "Date": ["2024-01-01"],
+            "Ticker": ["A"],
+            "Net Dividend": [-3.0],
+            "Shares": [1.0],
+        }
+    )
+    agg = DataAggregator(df)
+
+    result = agg.move_negative_values()
+
+    assert result.loc[0, "Tax Collected"] == pytest.approx(-3.0)
+    assert pd.isna(result.loc[0, "Net Dividend"])
