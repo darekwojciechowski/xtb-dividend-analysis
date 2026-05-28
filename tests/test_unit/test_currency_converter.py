@@ -1372,9 +1372,7 @@ class TestBuildRateLookupMutations:
         """
         # Arrange
         bad = tmp_path / "no_data_col.csv"
-        bad.write_text(
-            "wrong_col;1USD\n20240115;3,9500\n", encoding="ISO-8859-1"
-        )
+        bad.write_text("wrong_col;1USD\n20240115;3,9500\n", encoding="ISO-8859-1")
         good = _nbp_csv(tmp_path, "20240116", 3.96)
         converter = _converter()
 

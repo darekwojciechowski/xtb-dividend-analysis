@@ -42,7 +42,9 @@ class DataAggregator:
         return self.df
 
     def add_empty_column(
-        self, col_name: str = "Tax Collected", position: int = 4  # pragma: no mutate
+        self,
+        col_name: str = "Tax Collected",
+        position: int = 4,  # pragma: no mutate
     ) -> pd.DataFrame:
         """Add an empty column to the DataFrame if it does not already exist.
 
@@ -125,24 +127,30 @@ class DataAggregator:
 
         # Merge rows with the same 'Date' and 'Ticker'
         self.df = self.df.groupby(
-            [ColumnName.DATE.value, ColumnName.TICKER.value], as_index=False  # pragma: no mutate
+            [ColumnName.DATE.value, ColumnName.TICKER.value],
+            as_index=False,  # pragma: no mutate
         ).agg(agg_dict)
 
         # Drop specified columns (if they exist in the DataFrame)
-        self.df.drop(columns=drop_columns, errors="ignore", inplace=True)  # pragma: no mutate
+        self.df.drop(
+            columns=drop_columns, errors="ignore", inplace=True
+        )  # pragma: no mutate
 
         # Round the numeric columns to 2 decimal places
         self.df[ColumnName.NET_DIVIDEND.value] = pd.to_numeric(
-            self.df[ColumnName.NET_DIVIDEND.value], errors="coerce"  # pragma: no mutate
+            self.df[ColumnName.NET_DIVIDEND.value],
+            errors="coerce",  # pragma: no mutate
         ).round(2)
         # If Tax Collected exists, round it
         if ColumnName.TAX_COLLECTED.value in self.df.columns:
             self.df[ColumnName.TAX_COLLECTED.value] = pd.to_numeric(
-                self.df[ColumnName.TAX_COLLECTED.value], errors="coerce"  # pragma: no mutate
+                self.df[ColumnName.TAX_COLLECTED.value],
+                errors="coerce",  # pragma: no mutate
             ).round(2)
         # If Shares column exists and needs rounding
         self.df[ColumnName.SHARES.value] = pd.to_numeric(
-            self.df[ColumnName.SHARES.value], errors="coerce"  # pragma: no mutate
+            self.df[ColumnName.SHARES.value],
+            errors="coerce",  # pragma: no mutate
         ).round(2)
 
         # Move 'Shares' column to the end

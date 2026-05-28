@@ -89,7 +89,8 @@ class TaxExtractor:
         return 0.0  # Default to 0% if country not recognized
 
     def extract_tax_percentage_from_comment(
-        self, statement_currency: str = "PLN"  # pragma: no mutate
+        self,
+        statement_currency: str = "PLN",  # pragma: no mutate
     ) -> pd.DataFrame:
         """Extract tax percentage from Comment column and store in 'Tax Collected' column.
 
@@ -124,7 +125,8 @@ class TaxExtractor:
 
         # Group by Date and Ticker, then extract tax percentage for each group
         grouped = self.df.groupby(
-            [ColumnName.DATE.value, ColumnName.TICKER.value], group_keys=False  # pragma: no mutate
+            [ColumnName.DATE.value, ColumnName.TICKER.value],
+            group_keys=False,  # pragma: no mutate
         )
 
         # Process each group to extract tax percentage. Per-group logging is
@@ -169,7 +171,8 @@ class TaxExtractor:
         if default_rate_fallbacks:
             sample = default_rate_fallbacks[:3]  # pragma: no mutate
             sample_str = ", ".join(  # pragma: no mutate
-                f"{tkr} on {dt} ({rate * 100:.0f}%)" for tkr, dt, rate in sample  # pragma: no mutate
+                f"{tkr} on {dt} ({rate * 100:.0f}%)"
+                for tkr, dt, rate in sample  # pragma: no mutate
             )
             logger.warning(
                 f"No WHT information in Comment for {len(default_rate_fallbacks)} "  # pragma: no mutate

@@ -142,9 +142,7 @@ class TestValidateTaxRateValid:
 
 
 @pytest.mark.property_based
-@given(
-    st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False)
-)
+@given(st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False))
 def test_any_rate_in_unit_interval_is_valid(rate: float) -> None:
     """Property: every float in [0, 1] is accepted."""
     s = Settings(POLISH_TAX_RATE=rate)

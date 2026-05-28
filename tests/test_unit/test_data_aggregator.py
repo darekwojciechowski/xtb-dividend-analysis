@@ -750,7 +750,9 @@ def test_move_negative_values_zero_net_dividend_is_kept_not_moved():
     result = agg.move_negative_values()
 
     assert result.loc[0, "Net Dividend"] == 0.0
-    assert pd.isna(result.loc[0, "Tax Collected"]) or result.loc[0, "Tax Collected"] != 0.0
+    assert (
+        pd.isna(result.loc[0, "Tax Collected"]) or result.loc[0, "Tax Collected"] != 0.0
+    )
 
 
 def test_move_negative_values_positive_below_one_is_kept():
@@ -794,3 +796,102 @@ def test_move_negative_values_negative_amount_is_moved_to_tax_collected():
 
     assert result.loc[0, "Tax Collected"] == pytest.approx(-3.0)
     assert pd.isna(result.loc[0, "Net Dividend"])
+
+
+# ---------------------------------------------------------------------------
+# reorder_columns
+# ---------------------------------------------------------------------------
+
+
+def _full_reorder_df() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "Tax Amount PLN": ["1"],
+            "Exchange Rate D-1": ["2"],
+            "Date D-1": ["3"],
+            "Tax Collected %": ["4"],
+            "Tax Collected Amount": ["5"],
+            "Net Dividend": ["6"],
+            "Shares": ["7"],
+            "Ticker": ["8"],
+            "Date": ["9"],
+        }
+    )
+
+
+@pytest.mark.unit
+class TestReorderColumns:
+    """Tests for DataAggregator.reorder_columns ordering and filtering."""
+
+    def test_reorders_columns_to_canonical_order(self) -> None:
+        agg = DataAggregator(_full_reorder_df())
+
+        result = agg.reorder_columns()
+
+        assert list(result.columns) == [
+            "Date",
+            "Ticker",
+            "Shares",
+            "Net Dividend",
+            "Tax Collected Amount",
+            "Tax Collected %",
+            "Date D-1",
+            "Exchange Rate D-1",
+            "Tax Amount PLN",
+        ]
+
+    def test_drops_columns_not_in_desired_order(self) -> None:
+        df = _full_reorder_df()
+        df["Extra"] = ["x"]
+        agg = DataAggregator(df)
+
+        result = agg.reorder_columns()
+
+        assert "Extra" not in result.columns
+
+    def test_handles_subset_of_desired_columns(self) -> None:
+        df = pd.DataFrame({"Ticker": ["AAPL"], "Date": ["2024-01-01"]})
+        agg = DataAggregator(df)
+
+        result = agg.reorder_columns()
+
+        assert list(result.columns) == ["Date", "Ticker"]
+
+    def test_places_date_first(self) -> None:
+        agg = DataAggregator(_full_reorder_df())
+
+        result = agg.reorder_columns()
+
+        assert result.columns[0] == "Date"
+
+    def test_places_tax_amount_pln_last(self) -> None:
+        agg = DataAggregator(_full_reorder_df())
+
+        result = agg.reorder_columns()
+
+        assert result.columns[-1] == "Tax Amount PLN"
+
+    def test_ticker_comes_before_shares(self) -> None:
+        agg = DataAggregator(_full_reorder_df())
+
+        result = agg.reorder_columns()
+
+        cols = list(result.columns)
+        assert cols.index("Ticker") < cols.index("Shares")
+
+    def test_preserves_row_data(self) -> None:
+        df = _full_reorder_df()
+        agg = DataAggregator(df)
+
+        result = agg.reorder_columns()
+
+        assert result["Date"].iloc[0] == "9"
+        assert result["Ticker"].iloc[0] == "8"
+
+    def test_returns_empty_columns_when_no_canonical_column_present(self) -> None:
+        df = pd.DataFrame({"Extra1": ["a"], "Extra2": ["b"]})
+        agg = DataAggregator(df)
+
+        result = agg.reorder_columns()
+
+        assert list(result.columns) == []

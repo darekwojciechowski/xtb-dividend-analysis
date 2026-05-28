@@ -940,9 +940,7 @@ class TestSpecialistCaching:
             "_get_column_formatter",
         ],
     )
-    def test_specialist_is_cached_when_df_unchanged(
-        self, factory_name: str
-    ) -> None:
+    def test_specialist_is_cached_when_df_unchanged(self, factory_name: str) -> None:
         """Arrange: invoke factory once.
         Act: invoke it again with unchanged self.df.
         Assert: identical instance (kills `or` → `and` flip and the
@@ -970,9 +968,7 @@ class TestSpecialistCaching:
             "_get_column_formatter",
         ],
     )
-    def test_specialist_is_rebuilt_when_df_replaced(
-        self, factory_name: str
-    ) -> None:
+    def test_specialist_is_rebuilt_when_df_replaced(self, factory_name: str) -> None:
         """Arrange: invoke factory once, then replace self.df.
         Act: invoke again.
         Assert: new instance (kills `is None` → `is not None`, `or` → `and`,
@@ -1022,3 +1018,173 @@ class TestSpecialistCaching:
         assert isinstance(normalizer, ColumnNormalizer)
         assert isinstance(aggregator, DataAggregator)
         assert normalizer is not aggregator
+
+
+@pytest.mark.unit
+class TestDelegateForwarding:
+    """Verify each thin-delegate method forwards to its specialist and stores
+    the returned DataFrame on ``self.df`` (kills ``self.df = None`` mutants
+    and default-arg string mutants on facade methods).
+    """
+
+    @staticmethod
+    def _processor() -> DataFrameProcessor:
+        return DataFrameProcessor(pd.DataFrame({"x": [1]}))
+
+    def test_drop_columns_forwards_to_column_normalizer_and_assigns_df(self) -> None:
+        processor = self._processor()
+        sentinel = pd.DataFrame({"y": [2]})
+        with patch.object(
+            ColumnNormalizer, "drop_columns", return_value=sentinel
+        ) as patched:
+            processor.drop_columns(["x"])
+
+        patched.assert_called_once_with(["x"])
+        assert processor.df is sentinel
+
+    def test_normalize_column_names_forwards_and_assigns_df(self) -> None:
+        processor = self._processor()
+        sentinel = pd.DataFrame({"y": [2]})
+        with patch.object(
+            ColumnNormalizer, "normalize_column_names", return_value=sentinel
+        ) as patched:
+            processor.normalize_column_names()
+
+        patched.assert_called_once_with()
+        assert processor.df is sentinel
+
+    def test_apply_date_converter_forwards_and_assigns_df(self) -> None:
+        processor = self._processor()
+        sentinel = pd.DataFrame({"y": [2]})
+        with patch.object(
+            ColumnFormatter, "apply_date_converter", return_value=sentinel
+        ) as patched:
+            processor.apply_date_converter()
+
+        patched.assert_called_once_with()
+        assert processor.df is sentinel
+
+    def test_extract_tax_percentage_default_is_pln(self) -> None:
+        processor = self._processor()
+        sentinel = pd.DataFrame({"y": [2]})
+        with patch.object(
+            TaxExtractor, "extract_tax_percentage_from_comment", return_value=sentinel
+        ) as patched:
+            processor.extract_tax_percentage_from_comment()
+
+        patched.assert_called_once_with("PLN")
+        assert processor.df is sentinel
+
+    def test_extract_tax_percentage_forwards_custom_currency(self) -> None:
+        processor = self._processor()
+        sentinel = pd.DataFrame({"y": [2]})
+        with patch.object(
+            TaxExtractor, "extract_tax_percentage_from_comment", return_value=sentinel
+        ) as patched:
+            processor.extract_tax_percentage_from_comment("USD")
+
+        patched.assert_called_once_with("USD")
+
+    def test_merge_rows_and_reorder_default_drop_columns(self) -> None:
+        processor = self._processor()
+        sentinel = pd.DataFrame({"y": [2]})
+        with patch.object(
+            DataAggregator, "merge_rows_and_reorder", return_value=sentinel
+        ) as patched:
+            processor.merge_rows_and_reorder()
+
+        patched.assert_called_once_with(["Type", "Comment"])
+        assert processor.df is sentinel
+
+    def test_calculate_tax_in_pln_for_detected_pln_forwards_and_returns_df(
+        self,
+    ) -> None:
+        processor = self._processor()
+        sentinel = pd.DataFrame({"y": [2]})
+        with patch.object(
+            TaxCalculator, "calculate_tax_for_pln_statement", return_value=sentinel
+        ) as patched:
+            result = processor.calculate_tax_in_pln_for_detected_pln("PLN")
+
+        patched.assert_called_once_with("PLN")
+        assert processor.df is sentinel
+        assert result is sentinel
+
+    def test_add_tax_percentage_display_forwards_and_returns_df(self) -> None:
+        processor = self._processor()
+        sentinel = pd.DataFrame({"y": [2]})
+        with patch.object(
+            ColumnFormatter, "add_tax_percentage_display", return_value=sentinel
+        ) as patched:
+            result = processor.add_tax_percentage_display()
+
+        patched.assert_called_once_with()
+        assert result is sentinel
+        assert processor.df is sentinel
+
+    def test_create_date_d_minus_1_column_default_step_is_8(self) -> None:
+        processor = self._processor()
+        sentinel = pd.DataFrame({"y": [2]})
+        with patch.object(
+            ColumnFormatter, "create_date_d_minus_1_column", return_value=sentinel
+        ) as patched:
+            processor.create_date_d_minus_1_column()
+
+        patched.assert_called_once_with("8")
+        assert processor.df is sentinel
+
+    def test_create_date_d_minus_1_column_forwards_custom_step(self) -> None:
+        processor = self._processor()
+        sentinel = pd.DataFrame({"y": [2]})
+        with patch.object(
+            ColumnFormatter, "create_date_d_minus_1_column", return_value=sentinel
+        ):
+            processor.create_date_d_minus_1_column("4a")
+
+        assert processor.df is sentinel
+
+    def test_create_exchange_rate_d_minus_1_column_forwards_paths(self) -> None:
+        processor = self._processor()
+        sentinel = pd.DataFrame({"y": [2]})
+        with patch.object(
+            ColumnFormatter,
+            "create_exchange_rate_d_minus_1_column",
+            return_value=sentinel,
+        ) as patched:
+            processor.create_exchange_rate_d_minus_1_column(["data/a.csv"])
+
+        patched.assert_called_once_with(["data/a.csv"])
+        assert processor.df is sentinel
+
+    def test_add_tax_collected_amount_default_is_pln(self) -> None:
+        processor = self._processor()
+        sentinel = pd.DataFrame({"y": [2]})
+        with patch.object(
+            ColumnFormatter, "add_tax_collected_amount", return_value=sentinel
+        ) as patched:
+            processor.add_tax_collected_amount()
+
+        patched.assert_called_once_with("PLN")
+        assert processor.df is sentinel
+
+    def test_add_tax_collected_amount_forwards_custom_currency(self) -> None:
+        processor = self._processor()
+        sentinel = pd.DataFrame({"y": [2]})
+        with patch.object(
+            ColumnFormatter, "add_tax_collected_amount", return_value=sentinel
+        ) as patched:
+            processor.add_tax_collected_amount("USD")
+
+        patched.assert_called_once_with("USD")
+
+    def test_reorder_columns_forwards_and_returns_df(self) -> None:
+        processor = self._processor()
+        sentinel = pd.DataFrame({"y": [2]})
+        with patch.object(
+            DataAggregator, "reorder_columns", return_value=sentinel
+        ) as patched:
+            result = processor.reorder_columns()
+
+        patched.assert_called_once_with()
+        assert result is sentinel
+        assert processor.df is sentinel

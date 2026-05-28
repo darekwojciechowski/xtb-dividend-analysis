@@ -40,7 +40,9 @@ class DividendFilter:
 
         self.df = self.df[self.df[type_col].notna()]
         self.df = self.df[self.df[type_col].isin(TransactionType.dividend_types())]
-        logger.info("Step 3 - Filtered rows to include only dividend-related data.")  # pragma: no mutate
+        logger.info(
+            "Step 3 - Filtered rows to include only dividend-related data."
+        )  # pragma: no mutate
 
         return self.df
 

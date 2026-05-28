@@ -834,3 +834,137 @@ class TestAddTaxCollectedAmount:
         # Expected: "4.29 USD"
         # Raw path would give "1.30 USD"
         assert result["Tax Collected Amount"].iloc[0] == "4.29 USD"
+
+
+@pytest.mark.unit
+class TestAddTaxPercentageDisplay:
+    """Tests for ColumnFormatter.add_tax_percentage_display."""
+
+    def test_zero_value_returns_dash(self) -> None:
+        df = pd.DataFrame({"Tax Collected": [0.0]})
+        formatter = ColumnFormatter(df)
+
+        result = formatter.add_tax_percentage_display()
+
+        assert result["Tax Collected %"].iloc[0] == "-"
+
+    def test_nan_value_returns_dash(self) -> None:
+        df = pd.DataFrame({"Tax Collected": [pd.NA]}, dtype="object")
+        formatter = ColumnFormatter(df)
+
+        result = formatter.add_tax_percentage_display()
+
+        assert result["Tax Collected %"].iloc[0] == "-"
+
+    def test_fifteen_percent_value_returns_15_percent_string(self) -> None:
+        df = pd.DataFrame({"Tax Collected": [0.15]})
+        formatter = ColumnFormatter(df)
+
+        result = formatter.add_tax_percentage_display()
+
+        assert result["Tax Collected %"].iloc[0] == "15%"
+
+    def test_thirty_percent_value_returns_30_percent_string(self) -> None:
+        df = pd.DataFrame({"Tax Collected": [0.30]})
+        formatter = ColumnFormatter(df)
+
+        result = formatter.add_tax_percentage_display()
+
+        assert result["Tax Collected %"].iloc[0] == "30%"
+
+    def test_preserves_original_numeric_column(self) -> None:
+        df = pd.DataFrame({"Tax Collected": [0.15]})
+        formatter = ColumnFormatter(df)
+
+        result = formatter.add_tax_percentage_display()
+
+        assert result["Tax Collected"].iloc[0] == 0.15
+
+    def test_multiplies_by_one_hundred_not_other_factor(self) -> None:
+        df = pd.DataFrame({"Tax Collected": [0.07]})
+        formatter = ColumnFormatter(df)
+
+        result = formatter.add_tax_percentage_display()
+
+        assert result["Tax Collected %"].iloc[0] == "7%"
+
+    def test_uses_integer_truncation_for_percentage(self) -> None:
+        df = pd.DataFrame({"Tax Collected": [0.156]})
+        formatter = ColumnFormatter(df)
+
+        result = formatter.add_tax_percentage_display()
+
+        assert result["Tax Collected %"].iloc[0] == "15%"
+
+    def test_creates_named_tax_collected_pct_column(self) -> None:
+        df = pd.DataFrame({"Tax Collected": [0.19]})
+        formatter = ColumnFormatter(df)
+
+        result = formatter.add_tax_percentage_display()
+
+        assert "Tax Collected %" in result.columns
+
+    def test_returns_dataframe_with_same_row_count(self) -> None:
+        df = pd.DataFrame({"Tax Collected": [0.15, 0.0, 0.30]})
+        formatter = ColumnFormatter(df)
+
+        result = formatter.add_tax_percentage_display()
+
+        assert len(result) == 3
+        assert list(result["Tax Collected %"]) == ["15%", "-", "30%"]
+
+
+@pytest.mark.unit
+class TestApplyDateConverter:
+    """Tests for ColumnFormatter.apply_date_converter."""
+
+    def test_converts_xtb_date_string_to_date(self) -> None:
+        from datetime import date
+
+        df = pd.DataFrame({"Date": ["29.05.2024 10:30:00"]})
+        formatter = ColumnFormatter(df)
+
+        result = formatter.apply_date_converter()
+
+        assert result["Date"].iloc[0] == date(2024, 5, 29)
+
+    def test_invalid_date_becomes_none(self) -> None:
+        df = pd.DataFrame({"Date": ["not-a-date"]})
+        formatter = ColumnFormatter(df)
+
+        result = formatter.apply_date_converter()
+
+        assert result["Date"].iloc[0] is None
+
+    def test_preserves_row_count(self) -> None:
+        df = pd.DataFrame(
+            {
+                "Date": [
+                    "01.01.2024 00:00:00",
+                    "02.02.2024 00:00:00",
+                    "03.03.2024 00:00:00",
+                ]
+            }
+        )
+        formatter = ColumnFormatter(df)
+
+        result = formatter.apply_date_converter()
+
+        assert len(result) == 3
+
+    def test_returns_dataframe_not_none(self) -> None:
+        df = pd.DataFrame({"Date": ["01.01.2024 00:00:00"]})
+        formatter = ColumnFormatter(df)
+
+        result = formatter.apply_date_converter()
+
+        assert result is not None
+        assert isinstance(result, pd.DataFrame)
+
+    def test_operates_on_date_column_not_other_columns(self) -> None:
+        df = pd.DataFrame({"Date": ["01.01.2024 00:00:00"], "Other": ["unchanged"]})
+        formatter = ColumnFormatter(df)
+
+        result = formatter.apply_date_converter()
+
+        assert result["Other"].iloc[0] == "unchanged"

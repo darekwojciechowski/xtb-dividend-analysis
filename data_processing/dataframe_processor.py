@@ -156,7 +156,9 @@ class DataFrameProcessor:
         self.df = self._get_dividend_filter().group_by_dividends()
 
     def add_empty_column(
-        self, col_name: str = "Tax Collected", position: int = 4  # pragma: no mutate
+        self,
+        col_name: str = "Tax Collected",
+        position: int = 4,  # pragma: no mutate
     ) -> None:
         """Add an empty column to the DataFrame if it does not already exist.
 
@@ -164,7 +166,9 @@ class DataFrameProcessor:
             col_name: The name of the column to be added. Defaults to 'Tax Collected'.
             position: The position to insert the column. Defaults to 4.
         """
-        self.df = self._get_data_aggregator().add_empty_column(col_name, position)  # pragma: no mutate
+        self.df = self._get_data_aggregator().add_empty_column(
+            col_name, position
+        )  # pragma: no mutate
 
     def prepare_columns(self) -> None:
         """Ensure that 'Tax Collected' and 'Net Dividend' columns exist in the DataFrame."""
@@ -226,7 +230,9 @@ class DataFrameProcessor:
         return getattr(self, instance_attr)
 
     def _get_column_normalizer(self) -> ColumnNormalizer:
-        return self._get_specialist("column_normalizer", ColumnNormalizer)  # pragma: no mutate
+        return self._get_specialist(
+            "column_normalizer", ColumnNormalizer
+        )  # pragma: no mutate
 
     def _get_column_formatter(self) -> ColumnFormatter:
         current_df = self.df
@@ -245,19 +251,27 @@ class DataFrameProcessor:
         return getattr(self, instance_attr)
 
     def _get_dividend_filter(self) -> DividendFilter:
-        return self._get_specialist("dividend_filter", DividendFilter)  # pragma: no mutate
+        return self._get_specialist(
+            "dividend_filter", DividendFilter
+        )  # pragma: no mutate
 
     def _get_data_aggregator(self) -> DataAggregator:
-        return self._get_specialist("data_aggregator", DataAggregator)  # pragma: no mutate
+        return self._get_specialist(
+            "data_aggregator", DataAggregator
+        )  # pragma: no mutate
 
     def _get_currency_converter(self) -> CurrencyConverter:
-        return self._get_specialist("currency_converter", CurrencyConverter)  # pragma: no mutate
+        return self._get_specialist(
+            "currency_converter", CurrencyConverter
+        )  # pragma: no mutate
 
     def _get_tax_extractor(self) -> TaxExtractor:
         return self._get_specialist("tax_extractor", TaxExtractor)  # pragma: no mutate
 
     def _get_tax_calculator(self) -> TaxCalculator:
-        return self._get_specialist("tax_calculator", TaxCalculator)  # pragma: no mutate
+        return self._get_specialist(
+            "tax_calculator", TaxCalculator
+        )  # pragma: no mutate
 
     # ------------------------------------------------------------------
     # Private forwarding delegates (use cached specialists)
@@ -287,7 +301,8 @@ class DataFrameProcessor:
             Determined currency ('USD', 'PLN', 'EUR', 'DKK', 'GBP')
         """
         return self._get_currency_converter().determine_currency(
-            ticker, extracted_currency  # pragma: no mutate
+            ticker,
+            extracted_currency,  # pragma: no mutate
         )
 
     def _extract_tax_rate_from_comment(self, comment: str) -> float | None:
@@ -326,7 +341,9 @@ class DataFrameProcessor:
             The exchange rate for the specified currency on the specified date.
         """
         return self._get_currency_converter().get_exchange_rate(
-            courses_paths, target_date_str, currency  # pragma: no mutate
+            courses_paths,
+            target_date_str,
+            currency,  # pragma: no mutate
         )
 
     def add_currency_to_dividends(self) -> None:
@@ -357,15 +374,22 @@ class DataFrameProcessor:
         Returns:
             Processed DataFrame with calculated shares and dividends.
         """
-        comment_col = comment_col or self.get_column_name("Comment", "Komentarz")  # pragma: no mutate
+        comment_col = comment_col or self.get_column_name(
+            "Comment", "Komentarz"
+        )  # pragma: no mutate
         amount_col = amount_col or ColumnName.NET_DIVIDEND.value
         self.df = self._get_currency_converter().calculate_dividend(
-            courses_paths, statement_currency, comment_col, amount_col  # pragma: no mutate
+            courses_paths,
+            statement_currency,
+            comment_col,
+            amount_col,  # pragma: no mutate
         )
         return self.df
 
     def replace_tax_with_percentage(
-        self, tax_col: str = "Tax Collected", amount_col: str = "Net Dividend"  # pragma: no mutate
+        self,
+        tax_col: str = "Tax Collected",
+        amount_col: str = "Net Dividend",  # pragma: no mutate
     ) -> pd.DataFrame:
         """Validate Tax Collected column and warn about high US tax rates.
 

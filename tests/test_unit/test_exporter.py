@@ -295,9 +295,7 @@ class TestExportToGoogleMutationKillers:
         """
         # Arrange
         monkeypatch.chdir(tmp_path)
-        df = pd.DataFrame(
-            {"Ticker": ["AAPL"], "Amount": [1.23456]}
-        )
+        df = pd.DataFrame({"Ticker": ["AAPL"], "Amount": [1.23456]})
         exporter = GoogleSpreadsheetExporter(df)
 
         # Act

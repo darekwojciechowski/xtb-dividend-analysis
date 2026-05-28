@@ -101,12 +101,18 @@ class CurrencyConverter:
         lookup: dict[tuple[str, datetime], float] = {}
         for csv_file in courses_paths:
             try:
-                df = pd.read_csv(csv_file, sep=";", encoding="ISO-8859-1")  # pragma: no mutate
+                df = pd.read_csv(
+                    csv_file, sep=";", encoding="ISO-8859-1"
+                )  # pragma: no mutate
             except FileNotFoundError:
-                logger.warning(f"Exchange rate file '{csv_file}' was not found.")  # pragma: no mutate
+                logger.warning(
+                    f"Exchange rate file '{csv_file}' was not found."
+                )  # pragma: no mutate
                 continue
             except Exception as e:
-                logger.warning(f"An error occurred while processing '{csv_file}': {e}")  # pragma: no mutate
+                logger.warning(
+                    f"An error occurred while processing '{csv_file}': {e}"
+                )  # pragma: no mutate
                 continue
 
             if "data" not in df.columns:
@@ -409,7 +415,9 @@ class CurrencyConverter:
 
         if zero_denominator_rows:
             sample = zero_denominator_rows[:3]  # pragma: no mutate
-            sample_str = ", ".join(f"{tkr} on {dt}" for tkr, dt in sample)  # pragma: no mutate
+            sample_str = ", ".join(
+                f"{tkr} on {dt}" for tkr, dt in sample
+            )  # pragma: no mutate
             logger.warning(
                 f"Division by zero encountered in shares calculation for "  # pragma: no mutate
                 f"{len(zero_denominator_rows)} row(s). Examples: {sample_str}."  # pragma: no mutate

@@ -725,8 +725,7 @@ class TestValidateTaxCollectedMutationKillers:
 
         # Assert
         assert not any(
-            "WARNING" in m and "missing or zero tax percentages" in m
-            for m in messages
+            "WARNING" in m and "missing or zero tax percentages" in m for m in messages
         )
 
     def test_validate_invalid_warning_counts_nan_and_zero_via_or(self) -> None:
@@ -756,7 +755,8 @@ class TestValidateTaxCollectedMutationKillers:
 
         # Assert
         warning = next(
-            m for m in messages
+            m
+            for m in messages
             if "WARNING" in m and "missing or zero tax percentages" in m
         )
         assert "Found 2 rows" in warning
@@ -785,8 +785,7 @@ class TestValidateTaxCollectedMutationKillers:
 
         # Assert
         assert not any(
-            "WARNING" in m and "missing or zero tax percentages" in m
-            for m in messages
+            "WARNING" in m and "missing or zero tax percentages" in m for m in messages
         )
 
     def test_validate_us_30pct_warning_text_is_exact_and_lists_examples(
@@ -818,9 +817,7 @@ class TestValidateTaxCollectedMutationKillers:
             logger.remove(sink_id)
 
         # Assert
-        warning = next(
-            m for m in messages if "WARNING" in m and "30% tax rate" in m
-        )
+        warning = next(m for m in messages if "WARNING" in m and "30% tax rate" in m)
         assert "MMM.US" in warning
         assert "W8BEN" in warning
 
@@ -850,9 +847,7 @@ class TestValidateTaxCollectedMutationKillers:
             logger.remove(sink_id)
 
         # Assert
-        assert not any(
-            "WARNING" in m and "30% tax rate" in m for m in messages
-        )
+        assert not any("WARNING" in m and "30% tax rate" in m for m in messages)
 
     def test_validate_us_30pct_warning_caps_examples_at_three(self) -> None:
         """Arrange: five US tickers, all at 30% tax.
@@ -881,9 +876,7 @@ class TestValidateTaxCollectedMutationKillers:
             logger.remove(sink_id)
 
         # Assert — warning mentions exactly the first 3 tickers in head() order
-        warning = next(
-            m for m in messages if "WARNING" in m and "30% tax rate" in m
-        )
+        warning = next(m for m in messages if "WARNING" in m and "30% tax rate" in m)
         listed = [t for t in tickers if t in warning]
         assert len(listed) == 3
 
@@ -943,6 +936,4 @@ class TestValidateTaxCollectedMutationKillers:
 
         # Assert
         assert len(result) == 2
-        assert not any(
-            "WARNING" in m and "30% tax rate" in m for m in messages
-        )
+        assert not any("WARNING" in m and "30% tax rate" in m for m in messages)

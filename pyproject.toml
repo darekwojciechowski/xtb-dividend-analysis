@@ -100,6 +100,7 @@ also_copy = ["visualization/", "main.py"]
 do_not_mutate = [
     "data_processing/import_data_xlsx.py",
     "data_processing/constants.py",
+    "data_acquisition/playwright_download_currency_archive.py",
 ]
 pytest_add_cli_args = ["-o", "addopts=--strict-markers", "-x", "--no-header", "-q", "--no-cov", "--tb=no", "-m", "not slow", "-p", "no:randomly"]
 

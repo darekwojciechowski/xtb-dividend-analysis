@@ -129,7 +129,9 @@ class ColumnFormatter:
             )
             if mask.any():
                 # Cast to object so a string sentinel "-" can coexist with Timestamps.
-                self.df["Date D-1"] = self.df["Date D-1"].astype(object)  # pragma: no mutate
+                self.df["Date D-1"] = self.df["Date D-1"].astype(
+                    object
+                )  # pragma: no mutate
                 self.df.loc[mask, "Date D-1"] = "-"  # pragma: no mutate
 
         logger.info(
@@ -213,7 +215,8 @@ class ColumnFormatter:
         return self.df
 
     def add_tax_collected_amount(
-        self, statement_currency: str = "PLN"  # pragma: no mutate
+        self,
+        statement_currency: str = "PLN",  # pragma: no mutate
     ) -> pd.DataFrame:  # pragma: no mutate
         """Create 'Tax Collected Amount' column showing actual tax amount collected.
 

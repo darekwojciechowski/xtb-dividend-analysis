@@ -40,7 +40,8 @@ class GoogleSpreadsheetExporter:
         return ansi_escape.sub("", text)
 
     def export_to_google(
-        self, filename: str = "for_google_spreadsheet.csv"  # pragma: no mutate
+        self,
+        filename: str = "for_google_spreadsheet.csv",  # pragma: no mutate
     ) -> None:  # pragma: no mutate
         """Export the DataFrame to a tab-separated CSV file for Google Sheets.
 

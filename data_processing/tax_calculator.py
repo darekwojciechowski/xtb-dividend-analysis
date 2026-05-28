@@ -211,7 +211,9 @@ class TaxCalculator:
             date,  # pragma: no mutate
         )
         exchange_rate = self._parse_exchange_rate(
-            exchange_rate_str, ticker, date  # pragma: no mutate
+            exchange_rate_str,
+            ticker,
+            date,  # pragma: no mutate
         )
 
         gross_dividend = gross_dividend_fn(net_dividend, tax_collected_amount)
