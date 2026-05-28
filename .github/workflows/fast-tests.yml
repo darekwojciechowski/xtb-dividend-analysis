@@ -16,12 +16,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v6
-    
+
     - name: Set up Python 3.13
       uses: actions/setup-python@v6
       with:
         python-version: "3.14"
-        
+
     - name: Install Poetry
       uses: snok/install-poetry@v1
       with:
@@ -40,12 +40,12 @@ jobs:
     - name: Install dependencies
       run: |
         poetry install --with dev --no-interaction
-        
+
     - name: Run fast tests
       run: |
         poetry run pytest -v --tb=short \
           -m "not integration and not slow and not security and not performance and not property_based"
-        
+
     - name: Test import of main modules
       run: |
         poetry run python -c "import data_processing.dataframe_processor; print('✓ dataframe_processor imports successfully')"

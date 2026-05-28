@@ -1,7 +1,7 @@
 2026-02-07 10:29:17 | INFO     | data_processing.import_data_xlsx:import_and_process_data:48 | Detected currency for this XTB spreadsheet: PLN
 2026-02-07 10:29:17 | INFO     | data_processing.dataframe_processor:__init__:145 | Step 1 - Initialized DataFrameProcessor with a DataFrame.
-2026-02-07 10:29:17 | INFO     | data_processing.dataframe_processor:normalize_column_names:235 | Step 2 - Normalized column names to English standard.       
-2026-02-07 10:29:17 | INFO     | data_processing.dataframe_processor:filter_dividends:301 | Step 3 - Filtered rows to include only dividend-related data.     
+2026-02-07 10:29:17 | INFO     | data_processing.dataframe_processor:normalize_column_names:235 | Step 2 - Normalized column names to English standard.
+2026-02-07 10:29:17 | INFO     | data_processing.dataframe_processor:filter_dividends:301 | Step 3 - Filtered rows to include only dividend-related data.
 2026-02-07 10:29:17 | INFO     | data_processing.dataframe_processor:group_by_dividends:320 | Step 4 - Grouped data by date, ticker, and type; aggregated amounts.
 2026-02-07 10:29:17 | INFO     | data_processing.dataframe_processor:create_date_d_minus_1_column:1073 | Step 4a - Created 'Date D-1' column with previous business day dates.
 2026-02-07 10:29:17 | INFO     | data_processing.dataframe_processor:calculate_dividend:873 | Step 5 - Calculated dividends and updated shares using exchange rates.
@@ -9,7 +9,7 @@
 2026-02-07 10:29:17 | INFO     | data_processing.dataframe_processor:extract_tax_percentage_from_comment:450 | Extracted tax percentages from Comment column for each Date+Ticker group.
 2026-02-07 10:29:17 | WARNING  | data_processing.dataframe_processor:replace_tax_with_percentage:945 | Found 1 rows with missing or zero tax percentages. Tickers: ['ASB.PL']
 2026-02-07 10:29:17 | INFO     | data_processing.dataframe_processor:replace_tax_with_percentage:950 | Tax Collected column validated.
-2026-02-07 10:29:17 | WARNING  | data_processing.dataframe_processor:replace_tax_with_percentage:958 | ⚠️  WARNING: 30% tax rate detected for US dividend(s):  MMM.US. In Poland, you can file a W8BEN form with your broker, which reduces the withholding tax from 30% to 15% according to the double taxation treaty.     
+2026-02-07 10:29:17 | WARNING  | data_processing.dataframe_processor:replace_tax_with_percentage:958 | ⚠️  WARNING: 30% tax rate detected for US dividend(s):  MMM.US. In Poland, you can file a W8BEN form with your broker, which reduces the withholding tax from 30% to 15% according to the double taxation treaty.
 2026-02-07 10:29:17 | INFO     | data_processing.dataframe_processor:replace_tax_with_percentage:964 | Step 6 - Updated 'Tax Collected' column with calculated tax percentages.
 2026-02-07 10:29:17 | INFO     | data_processing.dataframe_processor:add_tax_percentage_display:1027 | Step 7 - Created 'Tax Collected %' display column with percentage formatting.
 2026-02-07 10:29:17 | INFO     | data_processing.dataframe_processor:create_date_d_minus_1_column:1073 | Step 8 - Created 'Date D-1' column with previous business day dates.

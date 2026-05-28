@@ -7,8 +7,8 @@ license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.13,<4.0"
 dependencies = [
-    "pandas (>=3.0.3)",
-    "numpy (>=2.4.6)",
+    "pandas (>=3.0.3,<4.0.0)",
+    "numpy (>=2.4.6,<3.0.0)",
     "matplotlib (>=3.10.9)",
     "openpyxl>=3.1.5",
     "playwright (>=1.60.0)",
@@ -29,13 +29,13 @@ build-backend = "poetry.core.masonry.api"
 pytest = "^9.0.3"
 pytest-cov = "^7.1.0"
 pytest-timeout = "^2.4.0"
-hypothesis = "^6.152.9"
-ruff = "^0.15.14"
+hypothesis = "^6.155.0"
+ruff = "^0.15.15"
 mypy = "^2.1.0"
 types-tabulate = "^0.10.0.20260508"
-safety = "^3.7.0"
+safety = "^3.8.0"
 bandit = "^1.9.4"
-tox = "^4.54.0"
+tox = "^4.55.0"
 pre-commit = "^4.6.0"
 mutmut = "^3.5.0"
 pytest-randomly = ">=4.1.0"
@@ -94,14 +94,14 @@ quote-style = "double"
 indent-style = "space"
 
 [tool.mutmut]
-paths_to_mutate = ["data_processing/"]
-tests_dir = ["tests/test_unit/"]
-also_copy = ["config/", "data_acquisition/", "visualization/", "main.py"]
+paths_to_mutate = ["data_processing/", "config/", "data_acquisition/"]
+tests_dir = ["tests/test_unit/", "tests/test_integration/", "tests/metamorphic/", "tests/fuzz/"]
+also_copy = ["visualization/", "main.py"]
 do_not_mutate = [
     "data_processing/import_data_xlsx.py",
     "data_processing/constants.py",
 ]
-pytest_add_cli_args = ["-o", "addopts=--strict-markers", "-x", "--no-header", "-q", "--no-cov", "--tb=no", "-m", "not property_based and not slow", "-p", "no:randomly"]
+pytest_add_cli_args = ["-o", "addopts=--strict-markers", "-x", "--no-header", "-q", "--no-cov", "--tb=no", "-m", "not slow", "-p", "no:randomly"]
 
 [tool.coverage.run]
 branch = true
