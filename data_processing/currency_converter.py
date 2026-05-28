@@ -23,12 +23,48 @@ from .constants import (
 from .date_converter import to_date
 
 
+class ExchangeRateUnavailableError(ValueError):
+    """Raised when no NBP exchange rate can be resolved for a requested currency/date.
+
+    Inherits from ``ValueError`` so existing callers that catch ``ValueError``
+    continue to handle the failure; new callers can catch this specific class
+    to distinguish missing-data failures from generic validation errors.
+
+    Attributes:
+        currency: Currency code that was requested.
+        target_date: ISO date string the lookup was anchored on.
+        searched_files: NBP CSV paths that were consulted.
+    """
+
+    def __init__(
+        self, currency: str, target_date: str, searched_files: list[str]
+    ) -> None:
+        self.currency = currency
+        self.target_date = target_date
+        self.searched_files = list(searched_files)
+        message = (
+            f"No exchange rate data found for {currency} on date "
+            f"'{target_date}' or previous {MAX_EXCHANGE_RATE_LOOKBACK_DAYS} "
+            f"business days. Searched files: {self.searched_files or '[]'}. "
+            f"Download the matching 'archiwum_tab_a_XXXX.csv' for that date."
+        )
+        super().__init__(message)
+
+
 class CurrencyConverter:
     """Handles currency operations including exchange rate lookups and conversions.
 
     Provides methods for determining dividend currencies based on tickers,
     retrieving exchange rates from NBP data, and performing currency conversions.
     """
+
+    # Map of supported currency codes to the NBP CSV column that holds the rate.
+    _CURRENCY_COLUMN_MAP = {
+        Currency.USD.value: "1USD",
+        Currency.EUR.value: "1EUR",
+        Currency.GBP.value: "1GBP",
+        Currency.DKK.value: "1DKK",
+    }
 
     def __init__(self, df: pd.DataFrame):
         """Initialize CurrencyConverter with a DataFrame.
@@ -37,6 +73,66 @@ class CurrencyConverter:
             df: DataFrame containing dividend data.
         """
         self.df = df
+        # Cached (currency, date) -> rate lookups, keyed by the tuple of NBP
+        # CSV paths supplied to get_exchange_rate(). Built lazily on first
+        # lookup so callers that never touch FX (PLN-only tests) pay nothing.
+        self._rate_lookup_cache: dict[
+            tuple[str, ...], dict[tuple[str, datetime], float]
+        ] = {}
+
+    def _build_rate_lookup(
+        self, courses_paths: list[str]
+    ) -> dict[tuple[str, datetime], float]:
+        """Read each NBP CSV once and index every (currency, date) -> rate.
+
+        First-file-wins on duplicate keys, matching the original linear scan.
+
+        Args:
+            courses_paths: NBP CSV paths to ingest.
+
+        Returns:
+            A dict keyed by ``(currency_code, datetime)`` mapping to the rate.
+        """
+        cache_key = tuple(courses_paths)
+        cached = self._rate_lookup_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        lookup: dict[tuple[str, datetime], float] = {}
+        for csv_file in courses_paths:
+            try:
+                df = pd.read_csv(csv_file, sep=";", encoding="ISO-8859-1")
+            except FileNotFoundError:
+                logger.warning(f"Exchange rate file '{csv_file}' was not found.")
+                continue
+            except Exception as e:
+                logger.warning(f"An error occurred while processing '{csv_file}': {e}")
+                continue
+
+            if "data" not in df.columns:
+                continue
+
+            dates = df["data"].astype(str)
+            for currency_code, column in self._CURRENCY_COLUMN_MAP.items():
+                if column not in df.columns:
+                    continue
+                for raw_date, raw_rate in zip(dates, df[column]):
+                    if pd.isna(raw_rate):
+                        continue
+                    try:
+                        d = datetime.strptime(raw_date, "%Y%m%d")
+                    except (ValueError, TypeError):
+                        continue
+                    try:
+                        rate = float(str(raw_rate).replace(",", "."))
+                    except (ValueError, TypeError):
+                        continue
+                    key = (currency_code, d)
+                    if key not in lookup:  # preserve first-file-wins ordering
+                        lookup[key] = rate
+
+        self._rate_lookup_cache[cache_key] = lookup
+        return lookup
 
     def _currency_for_ticker(self, ticker: str) -> str:
         """Infer currency from ticker suffix (single source of truth).
@@ -141,10 +237,13 @@ class CurrencyConverter:
 
         Returns:
             The exchange rate for the specified currency on the specified date.
-            Returns 1.0 for PLN. Returns 0.0 if rate not found.
+            Returns 1.0 for PLN (base currency).
 
         Raises:
-            ValueError: If no exchange rate data found for the specified date.
+            ExchangeRateUnavailableError: If no NBP rate can be resolved for the
+                requested currency on the target date or any business day within
+                the configured look-back window. Also raised for currencies not
+                in the supported NBP column map.
         """
         # PLN is the base currency, so exchange rate is always 1.0
         if currency == Currency.PLN.value:
@@ -152,67 +251,33 @@ class CurrencyConverter:
 
         target_date = datetime.strptime(target_date_str, "%Y-%m-%d")
 
-        # Map currency to column name in NBP data
-        currency_column_map = {
-            Currency.USD.value: "1USD",
-            Currency.EUR.value: "1EUR",
-            Currency.GBP.value: "1GBP",
-            Currency.DKK.value: "1DKK",
-        }
-
-        column_name = currency_column_map.get(currency)
-        if not column_name:
-            logger.warning(
-                f"Currency '{currency}' not supported for exchange rate lookup. Using 1.0"
+        if currency not in self._CURRENCY_COLUMN_MAP:
+            raise ExchangeRateUnavailableError(
+                currency, target_date_str, list(courses_paths)
             )
-            return 1.0
 
-        # Try to find exchange rate for target date or previous business days
+        lookup = self._build_rate_lookup(list(courses_paths))
         current_date = target_date
 
         for attempt in range(MAX_EXCHANGE_RATE_LOOKBACK_DAYS):
-            current_date_str_formatted = current_date.strftime("%Y%m%d")
-
-            for csv_file in courses_paths:
-                try:
-                    df = pd.read_csv(csv_file, sep=";", encoding="ISO-8859-1")
-
-                    # Check if the column exists
-                    if column_name not in df.columns:
-                        continue
-
-                    currency_value = df[df["data"] == current_date_str_formatted][
-                        column_name
-                    ].values
-
-                    if len(currency_value) > 0:
-                        rate = float(currency_value[0].replace(",", "."))
-                        if attempt > 0:
-                            logger.info(
-                                f"Exchange rate for {currency} not found for {target_date_str}, "
-                                f"using rate from {current_date.strftime('%Y-%m-%d')}: {rate}"
-                            )
-                        return rate
-                except FileNotFoundError:
-                    logger.warning(f"Exchange rate file '{csv_file}' was not found.")
-                except Exception as e:
-                    logger.warning(
-                        f"An error occurred while processing '{csv_file}': {e}"
+            rate = lookup.get((currency, current_date))
+            if rate is not None:
+                if attempt > 0:
+                    logger.info(
+                        f"Exchange rate for {currency} not found for {target_date_str}, "
+                        f"using rate from {current_date.strftime('%Y-%m-%d')}: {rate}"
                     )
+                return rate
 
-            # Move to previous day
             current_date = current_date - timedelta(days=1)
-
-            # Skip weekends
             while current_date.weekday() in WEEKEND_DAYS:
                 current_date = current_date - timedelta(days=1)
 
-        error_msg = (
-            f"No exchange rate data found for {currency} on date '{target_date_str}' or previous {MAX_EXCHANGE_RATE_LOOKBACK_DAYS} business days. "
-            f"Check if you have downloaded the file 'archiwum_tab_a_XXXX.csv' for the date '{target_date_str}'."
+        error = ExchangeRateUnavailableError(
+            currency, target_date_str, list(courses_paths)
         )
-        logger.error(error_msg)
-        raise ValueError(error_msg)
+        logger.error(str(error))
+        raise error
 
     def calculate_dividend(
         self,
@@ -255,65 +320,101 @@ class CurrencyConverter:
         if currency_col not in self.df.columns:
             self.df[currency_col] = None
 
-        for index, row in self.df.iterrows():
+        date_col = ColumnName.DATE.value
+
+        # Fail fast on rows that have data to process but lack a Date D-1
+        # (the loop below relies on it for the FX lookup).
+        candidates = self.df[
+            self.df[date_col].notna()
+            & self.df[amount_col].notna()
+            & self.df[comment_col].notna()
+        ]
+        missing_d1 = candidates[candidates[date_d1_col].isna()]
+        if not missing_d1.empty:
+            raise ValueError(
+                f"'{date_d1_col}' value is missing for row {missing_d1.index[0]}. "
+                "All rows must have valid 'Date D-1' values."
+            )
+
+        _COMPUTED = "_computed"
+        _SKIPPED = pd.Series(
+            {
+                _COMPUTED: False,
+                shares_col: np.nan,
+                currency_col: None,
+                amount_col: np.nan,
+            }
+        )
+        # Aggregate counter for division-by-zero events so we emit a single
+        # log line instead of one per offending row.
+        zero_denominator_rows: list[tuple[str, str]] = []
+
+        def _compute_row(row: pd.Series) -> pd.Series:
             if (
-                pd.isna(row.get(ColumnName.DATE.value))
+                pd.isna(row.get(date_col))
                 or pd.isna(row.get(amount_col))
                 or pd.isna(row.get(comment_col))
             ):
-                continue
-
-            if pd.isna(row.get(date_d1_col)):
-                raise ValueError(
-                    f"'{date_d1_col}' value is missing for row {index}. "
-                    "All rows must have valid 'Date D-1' values."
-                )
-
-            target_date = row[date_d1_col]
-            target_date_str = target_date.strftime("%Y-%m-%d")
-
-            total_dividend = float(row[amount_col])
-            ticker = row[ticker_col]
+                return _SKIPPED
 
             extracted_value, extracted_currency = self.extract_dividend_from_comment(
                 row[comment_col]
             )
+            if extracted_value is None or extracted_value <= 0:
+                return _SKIPPED
 
-            if extracted_value is not None and extracted_value > 0:
-                dividend_per_share = extracted_value
+            dividend_per_share = extracted_value
+            ticker = row[ticker_col]
+            currency = self.determine_currency(ticker, extracted_currency)
 
-                currency = self.determine_currency(ticker, extracted_currency)
-                self.df.at[index, currency_col] = currency
+            exchange_rate = 1.0
+            if (
+                statement_currency == Currency.PLN.value
+                and currency == Currency.USD.value
+            ):
+                target_date_str = row[date_d1_col].strftime("%Y-%m-%d")
+                exchange_rate = self.get_exchange_rate(
+                    courses_paths, target_date_str, currency
+                )
 
-                exchange_rate = 1.0
-                if (
-                    statement_currency == Currency.PLN.value
-                    and currency == Currency.USD.value
-                ):
-                    exchange_rate = self.get_exchange_rate(
-                        courses_paths, target_date_str, currency
-                    )
+            denom = dividend_per_share * exchange_rate
+            if denom == 0:
+                zero_denominator_rows.append(
+                    (ticker, row[date_d1_col].strftime("%Y-%m-%d"))
+                )
+                shares = 0.0
+            else:
+                shares = float(row[amount_col]) / denom
 
-                if dividend_per_share * exchange_rate == 0:
-                    logger.warning(
-                        "Division by zero encountered in shares calculation for "
-                        f"ticker '{ticker}' on {target_date_str}."
-                    )
-                    shares = 0.0
-                else:
-                    shares = total_dividend / (dividend_per_share * exchange_rate)
+            return pd.Series(
+                {
+                    _COMPUTED: True,
+                    shares_col: float(round(shares)),
+                    currency_col: currency,
+                    # Total dividend = shares × per-share (was a 2-pass calc).
+                    amount_col: float(round(shares)) * dividend_per_share,
+                }
+            )
 
-                self.df.at[index, shares_col] = round(shares)
-                self.df.at[index, amount_col] = dividend_per_share
+        updates = self.df.apply(_compute_row, axis=1)
+        computed = updates[_COMPUTED].astype(bool)
+        if computed.any():
+            self.df.loc[computed, shares_col] = updates.loc[
+                computed, shares_col
+            ].astype(float)
+            self.df.loc[computed, currency_col] = updates.loc[computed, currency_col]
+            self.df.loc[computed, amount_col] = updates.loc[
+                computed, amount_col
+            ].astype(float)
 
-        self.df[amount_col] = self.df.apply(
-            lambda r: (
-                r[shares_col] * r[amount_col]
-                if not pd.isna(r[shares_col])
-                else r[amount_col]
-            ),
-            axis=1,
-        )
+        if zero_denominator_rows:
+            sample = zero_denominator_rows[:3]
+            sample_str = ", ".join(f"{tkr} on {dt}" for tkr, dt in sample)
+            logger.warning(
+                f"Division by zero encountered in shares calculation for "
+                f"{len(zero_denominator_rows)} row(s). Examples: {sample_str}."
+            )
+
         logger.info(
             "Step 5 - Calculated dividends and updated shares using exchange rates."
         )

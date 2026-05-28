@@ -127,8 +127,12 @@ class TaxExtractor:
             [ColumnName.DATE.value, ColumnName.TICKER.value], group_keys=False
         )
 
-        # Process each group to extract tax percentage
+        # Process each group to extract tax percentage. Per-group logging is
+        # aggregated into counters and emitted once after the loop so that a
+        # large statement does not spam the log with one line per group.
         results = []
+        zero_rate_tickers: list[str] = []
+        default_rate_fallbacks: list[tuple[str, object, float]] = []
         for (date, ticker), group in grouped:
             group_copy = group.copy()
 
@@ -148,18 +152,30 @@ class TaxExtractor:
                 group_copy[tax_col] = round(default_rate, 2)
 
                 if default_rate == 0.0:
-                    logger.info(
-                        f"Using 0% tax rate for {ticker} (no withholding tax at source)."
-                    )
+                    zero_rate_tickers.append(ticker)
                 else:
-                    logger.warning(
-                        f"No WHT information in Comment for {ticker} on {date}. "
-                        f"Using default rate {default_rate * 100:.0f}% (common for small dividend amounts)."
-                    )
+                    default_rate_fallbacks.append((ticker, date, default_rate))
 
             results.append(group_copy)
 
         self.df = pd.concat(results, ignore_index=False)
+
+        if zero_rate_tickers:
+            unique = sorted(set(zero_rate_tickers))
+            logger.info(
+                f"Using 0% tax rate for {len(zero_rate_tickers)} group(s) "
+                f"with no withholding tax at source: {unique}."
+            )
+        if default_rate_fallbacks:
+            sample = default_rate_fallbacks[:3]
+            sample_str = ", ".join(
+                f"{tkr} on {dt} ({rate * 100:.0f}%)" for tkr, dt, rate in sample
+            )
+            logger.warning(
+                f"No WHT information in Comment for {len(default_rate_fallbacks)} "
+                f"group(s); using ticker-default rates. Examples: {sample_str}."
+            )
+
         logger.info(
             "Extracted tax percentages from Comment column for each Date+Ticker group."
         )

@@ -462,34 +462,62 @@ class TestGetExchangeRate:
         # Assert
         assert rate == pytest.approx(4.01)
 
-    def test_get_exchange_rate_when_unsupported_currency_then_returns_one(
+    def test_get_exchange_rate_when_unsupported_currency_then_raises(
         self, tmp_path: Path
     ) -> None:
         """Arrange: Currency is unsupported (e.g., CHF).
         Act: get the exchange rate.
-        Assert: Returns 1.0 instead of raising an exception.
+        Assert: Raises ExchangeRateUnavailableError instead of silently returning 1.0.
         """
         # Arrange
+        from data_processing.currency_converter import ExchangeRateUnavailableError
+
         csv_file = _nbp_csv(tmp_path, "20240115", 3.95)
         converter = _converter()
 
-        # Act
-        rate = converter.get_exchange_rate([str(csv_file)], "2024-01-15", "CHF")
-
-        # Assert
-        assert rate == pytest.approx(1.0)
+        # Act / Assert
+        with pytest.raises(ExchangeRateUnavailableError) as excinfo:
+            converter.get_exchange_rate([str(csv_file)], "2024-01-15", "CHF")
+        assert excinfo.value.currency == "CHF"
+        assert excinfo.value.target_date == "2024-01-15"
+        assert excinfo.value.searched_files == [str(csv_file)]
 
     def test_get_exchange_rate_when_no_csv_files_and_nonpln_then_raises(self) -> None:
         """Arrange: No CSV files available, currency is non-PLN.
         Act: get the exchange rate.
-        Assert: Raises ValueError after exhausting look-back.
+        Assert: Raises ExchangeRateUnavailableError (a ValueError subclass)
+        after exhausting look-back.
         """
         # Arrange
+        from data_processing.currency_converter import ExchangeRateUnavailableError
+
         converter = _converter()
 
         # Act / Assert
-        with pytest.raises(ValueError, match="No exchange rate data found"):
+        with pytest.raises(ExchangeRateUnavailableError) as excinfo:
             converter.get_exchange_rate([], "2024-01-15", "USD")
+        assert isinstance(excinfo.value, ValueError)
+        assert excinfo.value.currency == "USD"
+        assert excinfo.value.searched_files == []
+
+    def test_get_exchange_rate_raises_when_no_data(self, tmp_path: Path) -> None:
+        """Arrange: Empty temp dir contains no NBP CSV files.
+        Act: get the exchange rate for USD.
+        Assert: Raises ExchangeRateUnavailableError exposing structured fields.
+        """
+        # Arrange
+        from data_processing.currency_converter import ExchangeRateUnavailableError
+
+        empty_dir = tmp_path / "fx"
+        empty_dir.mkdir()
+        converter = _converter()
+
+        # Act / Assert
+        with pytest.raises(ExchangeRateUnavailableError) as excinfo:
+            converter.get_exchange_rate([], "2024-01-15", "USD")
+        assert excinfo.value.currency == "USD"
+        assert excinfo.value.target_date == "2024-01-15"
+        assert excinfo.value.searched_files == []
 
     def test_get_exchange_rate_when_multiple_csv_files_then_finds_rate(
         self, tmp_path: Path
