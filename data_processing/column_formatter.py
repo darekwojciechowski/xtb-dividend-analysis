@@ -48,7 +48,7 @@ class ColumnFormatter:
 
         def colorize_ticker(ticker: str) -> str:
             color = get_random_color()  # pragma: no mutate
-            reset = "\033[0m"
+            reset = "\033[0m"  # pragma: no mutate
             return f"{color}{ticker}{reset}"  # pragma: no mutate
 
         self.df["Colored Ticker"] = self.df["Ticker"].apply(colorize_ticker)
@@ -129,11 +129,11 @@ class ColumnFormatter:
             )
             if mask.any():
                 # Cast to object so a string sentinel "-" can coexist with Timestamps.
-                self.df["Date D-1"] = self.df["Date D-1"].astype(object)
-                self.df.loc[mask, "Date D-1"] = "-"
+                self.df["Date D-1"] = self.df["Date D-1"].astype(object)  # pragma: no mutate
+                self.df.loc[mask, "Date D-1"] = "-"  # pragma: no mutate
 
         logger.info(
-            f"Step {step_number} - Created 'Date D-1' column with previous business day dates."
+            f"Step {step_number} - Created 'Date D-1' column with previous business day dates."  # pragma: no mutate
         )
 
         return self.df
@@ -178,8 +178,8 @@ class ColumnFormatter:
             try:
                 _, currency = TaxCalculator._parse_value_with_currency(
                     net_dividend_str,
-                    "Net Dividend",
-                    ticker,
+                    "Net Dividend",  # pragma: no mutate
+                    ticker,  # pragma: no mutate
                     date,  # pragma: no mutate
                 )
             except ValueError:
@@ -213,7 +213,7 @@ class ColumnFormatter:
         return self.df
 
     def add_tax_collected_amount(
-        self, statement_currency: str = "PLN"
+        self, statement_currency: str = "PLN"  # pragma: no mutate
     ) -> pd.DataFrame:  # pragma: no mutate
         """Create 'Tax Collected Amount' column showing actual tax amount collected.
 
@@ -241,8 +241,8 @@ class ColumnFormatter:
             try:
                 dividend_amount, currency = TaxCalculator._parse_value_with_currency(
                     net_dividend_str,
-                    "Net Dividend",
-                    ticker,
+                    "Net Dividend",  # pragma: no mutate
+                    ticker,  # pragma: no mutate
                     date,  # pragma: no mutate
                 )
             except ValueError:

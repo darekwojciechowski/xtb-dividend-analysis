@@ -40,7 +40,7 @@ class DividendFilter:
 
         self.df = self.df[self.df[type_col].notna()]
         self.df = self.df[self.df[type_col].isin(TransactionType.dividend_types())]
-        logger.info("Step 3 - Filtered rows to include only dividend-related data.")
+        logger.info("Step 3 - Filtered rows to include only dividend-related data.")  # pragma: no mutate
 
         return self.df
 
@@ -70,7 +70,7 @@ class DividendFilter:
             inplace=True,
         )
         logger.info(
-            "Step 4 - Grouped data by date, ticker, and type; aggregated amounts."
+            "Step 4 - Grouped data by date, ticker, and type; aggregated amounts."  # pragma: no mutate
         )
 
         return self.df

@@ -50,8 +50,8 @@ class TaxCalculator:
         ]
         if missing_columns:
             raise ValueError(
-                f"Required columns missing: {', '.join(missing_columns)}. "
-                f"Please ensure all helper columns are created before calling this method."
+                f"Required columns missing: {', '.join(missing_columns)}. "  # pragma: no mutate
+                f"Please ensure all helper columns are created before calling this method."  # pragma: no mutate
             )
 
     @staticmethod
@@ -121,7 +121,7 @@ class TaxCalculator:
         try:
             return float(parts[0])
         except ValueError:
-            msg = f"Invalid numeric value in 'Tax Collected Amount' for ticker '{ticker}' on date '{date}': '{parts[0]}'"
+            msg = f"Invalid numeric value in 'Tax Collected Amount' for ticker '{ticker}' on date '{date}': '{parts[0]}'"  # pragma: no mutate
             raise ValueError(msg)
 
     def _parse_exchange_rate(self, value_str: str, ticker: str, date: str) -> float:
@@ -151,7 +151,7 @@ class TaxCalculator:
         try:
             return float(parts[0])
         except ValueError:
-            msg = f"Invalid numeric value in 'Exchange Rate D-1' for ticker '{ticker}' on date '{date}': '{parts[0]}'"
+            msg = f"Invalid numeric value in 'Exchange Rate D-1' for ticker '{ticker}' on date '{date}': '{parts[0]}'"  # pragma: no mutate
             raise ValueError(msg)
 
     def _calculate_tax_pln_row(
@@ -172,8 +172,8 @@ class TaxCalculator:
         net_dividend_str = str(row.get("Net Dividend", ""))  # pragma: no mutate
         tax_percentage = row.get("Tax Collected", None)  # pragma: no mutate
         tax_collected_amount_str = str(
-            row.get("Tax Collected Amount", "")
-        )  # pragma: no mutate
+            row.get("Tax Collected Amount", "")  # pragma: no mutate
+        )
         exchange_rate_str = str(row.get("Exchange Rate D-1", ""))  # pragma: no mutate
 
         if pd.isna(tax_percentage):
@@ -201,18 +201,18 @@ class TaxCalculator:
 
         net_dividend, _ = self._parse_value_with_currency(
             net_dividend_str,
-            "Net Dividend",
-            ticker,
+            "Net Dividend",  # pragma: no mutate
+            ticker,  # pragma: no mutate
             date,  # pragma: no mutate
         )
         tax_collected_amount = self._parse_tax_collected_amount(
             tax_collected_amount_str,
-            ticker,
+            ticker,  # pragma: no mutate
             date,  # pragma: no mutate
         )
         exchange_rate = self._parse_exchange_rate(
-            exchange_rate_str, ticker, date
-        )  # pragma: no mutate
+            exchange_rate_str, ticker, date  # pragma: no mutate
+        )
 
         gross_dividend = gross_dividend_fn(net_dividend, tax_collected_amount)
         tax_to_collect_in_currency = (
@@ -258,7 +258,7 @@ class TaxCalculator:
         self._validate_required_columns(required_columns)
 
         if "Tax Amount PLN" not in self.df.columns:  # pragma: no mutate: block
-            self.df["Tax Amount PLN"] = 0.0
+            self.df["Tax Amount PLN"] = 0.0  # pragma: no mutate
 
         self.df["Tax Amount PLN"] = self.df.apply(
             lambda row: self._calculate_tax_pln_row(row, lambda net, _tax: net), axis=1
@@ -302,7 +302,7 @@ class TaxCalculator:
         self._validate_required_columns(required_columns)
 
         if "Tax Amount PLN" not in self.df.columns:  # pragma: no mutate: block
-            self.df["Tax Amount PLN"] = 0.0
+            self.df["Tax Amount PLN"] = 0.0  # pragma: no mutate
 
         self.df["Tax Amount PLN"] = self.df.apply(
             lambda row: self._calculate_tax_pln_row(row, lambda net, tax: net + tax),

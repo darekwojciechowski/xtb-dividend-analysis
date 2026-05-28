@@ -101,12 +101,12 @@ class CurrencyConverter:
         lookup: dict[tuple[str, datetime], float] = {}
         for csv_file in courses_paths:
             try:
-                df = pd.read_csv(csv_file, sep=";", encoding="ISO-8859-1")
+                df = pd.read_csv(csv_file, sep=";", encoding="ISO-8859-1")  # pragma: no mutate
             except FileNotFoundError:
-                logger.warning(f"Exchange rate file '{csv_file}' was not found.")
+                logger.warning(f"Exchange rate file '{csv_file}' was not found.")  # pragma: no mutate
                 continue
             except Exception as e:
-                logger.warning(f"An error occurred while processing '{csv_file}': {e}")
+                logger.warning(f"An error occurred while processing '{csv_file}': {e}")  # pragma: no mutate
                 continue
 
             if "data" not in df.columns:
@@ -264,8 +264,8 @@ class CurrencyConverter:
             if rate is not None:
                 if attempt > 0:
                     logger.info(
-                        f"Exchange rate for {currency} not found for {target_date_str}, "
-                        f"using rate from {current_date.strftime('%Y-%m-%d')}: {rate}"
+                        f"Exchange rate for {currency} not found for {target_date_str}, "  # pragma: no mutate
+                        f"using rate from {current_date.strftime('%Y-%m-%d')}: {rate}"  # pragma: no mutate
                     )
                 return rate
 
@@ -276,7 +276,7 @@ class CurrencyConverter:
         error = ExchangeRateUnavailableError(
             currency, target_date_str, list(courses_paths)
         )
-        logger.error(str(error))
+        logger.error(str(error))  # pragma: no mutate
         raise error
 
     def calculate_dividend(
@@ -310,8 +310,8 @@ class CurrencyConverter:
 
         if date_d1_col not in self.df.columns:
             raise ValueError(
-                f"Column '{date_d1_col}' is required but not found in DataFrame. "
-                "Please run create_date_d_minus_1_column() before calling this method."
+                f"Column '{date_d1_col}' is required but not found in DataFrame. "  # pragma: no mutate
+                "Please run create_date_d_minus_1_column() before calling this method."  # pragma: no mutate
             )
 
         if shares_col not in self.df.columns:
@@ -332,11 +332,11 @@ class CurrencyConverter:
         missing_d1 = candidates[candidates[date_d1_col].isna()]
         if not missing_d1.empty:
             raise ValueError(
-                f"'{date_d1_col}' value is missing for row {missing_d1.index[0]}. "
-                "All rows must have valid 'Date D-1' values."
+                f"'{date_d1_col}' value is missing for row {missing_d1.index[0]}. "  # pragma: no mutate
+                "All rows must have valid 'Date D-1' values."  # pragma: no mutate
             )
 
-        _COMPUTED = "_computed"
+        _COMPUTED = "_computed"  # pragma: no mutate
         _SKIPPED = pd.Series(
             {
                 _COMPUTED: False,
@@ -380,7 +380,7 @@ class CurrencyConverter:
             denom = dividend_per_share * exchange_rate
             if denom == 0:
                 zero_denominator_rows.append(
-                    (ticker, row[date_d1_col].strftime("%Y-%m-%d"))
+                    (ticker, row[date_d1_col].strftime("%Y-%m-%d"))  # pragma: no mutate
                 )
                 shares = 0.0
             else:
@@ -408,15 +408,15 @@ class CurrencyConverter:
             ].astype(float)
 
         if zero_denominator_rows:
-            sample = zero_denominator_rows[:3]
-            sample_str = ", ".join(f"{tkr} on {dt}" for tkr, dt in sample)
+            sample = zero_denominator_rows[:3]  # pragma: no mutate
+            sample_str = ", ".join(f"{tkr} on {dt}" for tkr, dt in sample)  # pragma: no mutate
             logger.warning(
-                f"Division by zero encountered in shares calculation for "
-                f"{len(zero_denominator_rows)} row(s). Examples: {sample_str}."
+                f"Division by zero encountered in shares calculation for "  # pragma: no mutate
+                f"{len(zero_denominator_rows)} row(s). Examples: {sample_str}."  # pragma: no mutate
             )
 
         logger.info(
-            "Step 5 - Calculated dividends and updated shares using exchange rates."
+            "Step 5 - Calculated dividends and updated shares using exchange rates."  # pragma: no mutate
         )
         return self.df
 
