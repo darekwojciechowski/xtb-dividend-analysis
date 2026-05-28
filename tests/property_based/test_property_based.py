@@ -25,9 +25,12 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
+from config.settings import settings
+from data_processing.constants import Currency
 from data_processing.currency_converter import CurrencyConverter
-from data_processing.date_converter import DateConverter
+from data_processing.date_converter import DateConverter, convert_date
 from data_processing.tax_calculator import TaxCalculator
+from tests.metamorphic.conftest import dividend_rows
 
 # ============================================================================
 # Custom Hypothesis Strategies
@@ -163,23 +166,25 @@ class TestCurrencyConverterProperties:
     @given(st.text(min_size=1, max_size=20))
     @pytest.mark.property_based
     @pytest.mark.unit
-    def test_determine_currency_never_returns_empty_string(self, ticker: str) -> None:
-        """Property: determine_currency should never return empty string.
+    def test_determine_currency_returns_supported_currency_enum_value(
+        self, ticker: str
+    ) -> None:
+        """Invariant: every ticker resolves to a value declared in ``Currency``.
 
-        This validates that currency determination always produces a valid result
-        for any ticker input.
+        Domain rule: the pipeline can only price assets in currencies it has
+        NBP rates for. Any ticker the parser accepts must therefore map to a
+        ``Currency`` enum member — never to a fabricated or unsupported code.
         """
         # Arrange
         df = pd.DataFrame({"Ticker": [ticker]})
         converter = CurrencyConverter(df)
+        supported = {c.value for c in Currency}
 
         # Act
         result = converter.determine_currency(ticker, None)
 
         # Assert
-        assert isinstance(result, str)
-        assert len(result) > 0
-        assert result != ""
+        assert result in supported
 
     @given(st.text(min_size=1, max_size=20), currency_codes())
     @pytest.mark.property_based
@@ -205,22 +210,24 @@ class TestCurrencyConverterProperties:
     @given(ticker_strategies())
     @pytest.mark.property_based
     @pytest.mark.unit
-    def test_determine_currency_returns_known_currency(self, ticker: str) -> None:
-        """Property: currency result should be a known currency code.
+    def test_determine_currency_returns_currency_enum_value_for_known_suffixes(
+        self, ticker: str
+    ) -> None:
+        """Invariant: a ticker drawn from realistic suffixes maps to a ``Currency`` value.
 
-        Method should only return valid currency codes that are supported
-        by the system.
+        Stronger than the generic-text variant above because the strategy
+        only produces suffixes the pipeline actually claims to support.
         """
         # Arrange
         df = pd.DataFrame({"Ticker": [ticker]})
         converter = CurrencyConverter(df)
-        known_currencies = {"USD", "EUR", "PLN", "GBP", "DKK", "SEK"}
+        supported = {c.value for c in Currency}
 
         # Act
         result = converter.determine_currency(ticker, None)
 
         # Assert
-        assert result in known_currencies
+        assert result in supported
 
     @given(st.lists(dividend_comments(), min_size=1, max_size=20, unique=True))
     @pytest.mark.property_based
@@ -393,6 +400,32 @@ class TestDateConverterProperties:
         assert result is not None
         assert 1900 <= result.year <= 2100
 
+    @given(
+        st.dates(
+            min_value=pd.Timestamp("2000-01-01").date(),
+            max_value=pd.Timestamp("2099-12-31").date(),
+        )
+    )
+    @pytest.mark.property_based
+    @pytest.mark.unit
+    def test_convert_date_iso_roundtrip_is_idempotent(self, d) -> None:
+        """Invariant: ``convert_date(d.isoformat(), "%Y-%m-%d")`` returns ``d``.
+
+        The function is documented as a parser, not a transform. Round-tripping
+        through ISO formatting must recover the original date for any valid
+        date — otherwise downstream date arithmetic silently drifts.
+        """
+        # Arrange
+        iso = d.isoformat()
+
+        # Act
+        first = convert_date(iso, format="%Y-%m-%d")
+        second = convert_date(first.isoformat(), format="%Y-%m-%d")
+
+        # Assert
+        assert first == d
+        assert second == first
+
     @given(st.text(min_size=1))
     @pytest.mark.property_based
     @pytest.mark.unit
@@ -419,93 +452,107 @@ class TestDateConverterProperties:
 # ============================================================================
 
 
-class TestTaxCalculatorProperties:
-    """Property-based tests for TaxCalculator."""
+def _tax_pln_amount(result_str: str) -> float:
+    """Parse a ``Tax Amount PLN`` cell, treating ``"-"`` as zero."""
+    if result_str == "-":
+        return 0.0
+    return float(result_str.replace(" PLN", "").strip())
 
-    @given(positive_floats(min_value=1, max_value=100000))
+
+class TestTaxCalculatorProperties:
+    """Domain invariants for TaxCalculator on a PLN-denominated statement."""
+
+    @given(dividend_rows())
     @pytest.mark.property_based
     @pytest.mark.unit
-    def test_tax_rate_is_valid_percentage(self, amount: float) -> None:
-        """Property: tax_calculator stores valid tax rate as percentage.
+    def test_tax_pln_never_exceeds_gross_times_belka_rate(
+        self, df: pd.DataFrame
+    ) -> None:
+        """Invariant: per-row Tax Amount PLN ≤ Net Dividend × polish_tax_rate.
 
-        Tax rate should be between 0 and 100 (or 0.0 and 1.0 normalized).
+        The Belka top-up cannot be larger than the full Belka liability on the
+        gross dividend (because it is reduced by tax already withheld at source).
+        Anything beyond that means the formula is over-collecting.
         """
         # Arrange
-        df = pd.DataFrame({"Amount": [amount]})
+        calculator = TaxCalculator(df.copy())
+        rate = calculator.polish_tax_rate
 
         # Act
-        calculator = TaxCalculator(df, polish_tax_rate=0.19)
+        result = calculator.calculate_tax_for_pln_statement("PLN")
 
         # Assert
-        assert 0 <= calculator.polish_tax_rate <= 1
-        assert calculator.polish_tax_rate > 0
+        for _, row in result.iterrows():
+            gross = float(row["Net Dividend"].split()[0])
+            tax_pln = _tax_pln_amount(row["Tax Amount PLN"])
+            # Allow a tiny rounding slack since the formatted value is rounded
+            # to 2 decimal places.
+            assert tax_pln <= gross * rate + 0.01, (
+                f"tax_pln={tax_pln} exceeds gross*rate={gross * rate} "
+                f"for row {row.to_dict()}"
+            )
 
     @given(
-        st.lists(
-            st.tuples(
-                st.text(min_size=1, max_size=10),  # ticker
-                positive_floats(min_value=0.1, max_value=10000),  # amount
-            ),
-            min_size=1,
-            max_size=50,
-        )
+        st.floats(min_value=10.0, max_value=10000.0, allow_nan=False),
+        st.floats(min_value=20.0, max_value=10000.0, allow_nan=False),
+        st.floats(min_value=0.0, max_value=0.18, allow_nan=False),
     )
     @pytest.mark.property_based
     @pytest.mark.unit
-    def test_tax_calculator_accepts_reasonable_data(
-        self, data: list[tuple[str, float]]
+    def test_tax_pln_monotonic_in_gross_when_wht_held_constant(
+        self, low: float, delta: float, wht_pct: float
     ) -> None:
-        """Property: TaxCalculator should accept reasonable financial data.
+        """Invariant: holding the WHT rate fixed, Tax Amount PLN is non-decreasing in gross.
 
-        Constructor should not raise for valid DataFrame with positive amounts.
+        Tax = (gross × 19% − tax_collected_amount) × fx, with
+        tax_collected_amount = gross × wht_pct. Both terms grow linearly with
+        gross, so a larger gross must never produce a smaller Belka top-up.
         """
-        # Arrange
-        tickers, amounts = zip(*data)
-        df = pd.DataFrame({"Ticker": tickers, "Amount": amounts})
+        # Arrange — same wht rate, two grosses (low and high = low + delta)
+        high = low + delta
 
-        # Act & Assert
+        def _row(net: float) -> dict:
+            return {
+                "Date": "2025-02-21",
+                "Ticker": "TXT.PL",
+                "Net Dividend": f"{net:.2f} PLN",
+                "Tax Collected": wht_pct,
+                "Tax Collected Amount": f"{net * wht_pct:.2f} PLN",
+                "Exchange Rate D-1": "-",
+            }
+
+        df = pd.DataFrame([_row(low), _row(high)])
         calculator = TaxCalculator(df)
-        assert calculator.df is not None
-        assert len(calculator.df) == len(data)
-
-    @given(positive_floats(min_value=0.01, max_value=1))
-    @pytest.mark.property_based
-    @pytest.mark.unit
-    def test_multiple_tax_rates_accepted(self, rate: float) -> None:
-        """Property: different tax rates can be set.
-
-        TaxCalculator should accept various valid tax rates (0-1).
-        """
-        # Arrange
-        df = pd.DataFrame({"Data": [1, 2, 3]})
 
         # Act
-        calculator = TaxCalculator(df, polish_tax_rate=rate)
+        result = calculator.calculate_tax_for_pln_statement("PLN")
+        tax_low = _tax_pln_amount(result.iloc[0]["Tax Amount PLN"])
+        tax_high = _tax_pln_amount(result.iloc[1]["Tax Amount PLN"])
 
-        # Assert
-        assert calculator.polish_tax_rate == rate
-
-    @given(positive_floats())
-    @pytest.mark.property_based
-    @pytest.mark.unit
-    def test_tax_calculator_preserves_dataframe(self, amount: float) -> None:
-        """Property: TaxCalculator should preserve DataFrame integrity.
-
-        The original DataFrame should not be modified during initialization.
-        """
-        # Arrange
-        original_df = pd.DataFrame(
-            {"Ticker": ["AAPL"], "Amount": [amount], "Date": ["2024-01-01"]}
+        # Assert — high gross must owe at least as much as low gross
+        assert tax_high + 0.01 >= tax_low, (
+            f"non-monotonic: gross {low}→{tax_low}, gross {high}→{tax_high}"
         )
-        original_len = len(original_df)
-        original_columns = set(original_df.columns)
+
+    @given(dividend_rows())
+    @pytest.mark.property_based
+    @pytest.mark.unit
+    def test_tax_pln_zero_when_wht_meets_belka_rate(self, df: pd.DataFrame) -> None:
+        """Invariant: any row where Tax Collected ≥ polish_tax_rate yields ``"-"``.
+
+        The statute considers Belka satisfied at source; the pipeline must not
+        compute an additional top-up in that case.
+        """
+        # Arrange — force every row to clear the Belka threshold.
+        df = df.copy()
+        df["Tax Collected"] = settings.polish_tax_rate
+        calculator = TaxCalculator(df)
 
         # Act
-        calculator = TaxCalculator(original_df)
+        result = calculator.calculate_tax_for_pln_statement("PLN")
 
         # Assert
-        assert len(calculator.df) == original_len
-        assert set(calculator.df.columns) == original_columns
+        assert (result["Tax Amount PLN"] == "-").all()
 
 
 # ============================================================================
