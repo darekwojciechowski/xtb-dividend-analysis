@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from data_processing.constants import ColumnName, TransactionType
 from data_processing.dataframe_processor import DataFrameProcessor
 
 from .conftest import (
@@ -50,13 +51,13 @@ class TestDataFrameProcessorPerformance:
             f"DataFrameProcessor.filter_dividends(1k) median={median_s:.4f}s exceeded budget={BUDGET_PIPELINE_1K_S}s"
         )
 
-    def test_filter_dividends_via_processor_preserves_row_count_bounds(
+    def test_filter_dividends_via_processor_keeps_only_dividend_rows(
         self, raw_df_10k: pd.DataFrame
     ) -> None:
-        """DataFrameProcessor.filter_dividends produces a non-empty subset within budget.
+        """DataFrameProcessor.filter_dividends retains only dividend rows within budget.
 
-        Verifies that the processor delegates correctly and does not
-        accidentally drop all rows or keep every row.
+        Verifies that the processor delegates correctly and keeps exactly the
+        dividend-related transaction types — not merely some non-empty subset.
 
         Args:
             raw_df_10k: 10 000-row raw transactions fixture.
@@ -73,7 +74,10 @@ class TestDataFrameProcessorPerformance:
         assert elapsed_s < BUDGET_FILTER_10K_S, (
             f"DataFrameProcessor.filter_dividends(10k) took {elapsed_s:.4f}s > budget={BUDGET_FILTER_10K_S}s"
         )
-        # Assert — correctness: subset, not empty, not identical to input
-        assert 0 < len(processor.df) <= len(raw_df_10k), (
-            f"Unexpected row count after filter: {len(processor.df)}"
+        # Assert — correctness: non-empty, and every retained row is a dividend type
+        dividend_types = set(TransactionType.dividend_types())
+        retained_types = set(processor.df[ColumnName.TYPE.value])
+        assert len(processor.df) > 0, "Filter dropped all rows"
+        assert retained_types.issubset(dividend_types), (
+            f"Filter retained non-dividend rows: {retained_types - dividend_types}"
         )

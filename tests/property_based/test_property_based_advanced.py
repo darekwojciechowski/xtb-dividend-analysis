@@ -8,10 +8,30 @@ from __future__ import annotations
 
 import pandas as pd
 import pytest
-from hypothesis import given
+from hypothesis import assume, given
 from hypothesis import strategies as st
 
 from data_processing.currency_converter import CurrencyConverter
+
+# Documented ticker-suffix → currency mapping that ``_currency_for_ticker``
+# claims to implement. Tests verify the SUT against this table rather than
+# trivial set-membership, so a mis-mapped suffix fails loudly.
+SUFFIX_CURRENCY = {
+    ".US": "USD",
+    ".PL": "PLN",
+    ".DK": "DKK",
+    ".UK": "GBP",
+    ".FR": "EUR",
+    ".DE": "EUR",
+    ".IE": "EUR",
+    ".NL": "EUR",
+    ".ES": "EUR",
+    ".IT": "EUR",
+    ".BE": "EUR",
+    ".AT": "EUR",
+    ".FI": "EUR",
+    ".PT": "EUR",
+}
 
 # ============================================================================
 # Custom Strategies for Complex Data Structures
@@ -136,6 +156,22 @@ def dividend_dataframes(draw, min_rows: int = 1, max_rows: int = 20) -> pd.DataF
     )
 
 
+@st.composite
+def shr_amount_strings(draw) -> str:
+    """Generate plain decimal amount strings the SHR regexes can round-trip.
+
+    Always of the form ``"<int>.<4 digits>"`` so it matches ``[\\d.]+`` and
+    parses cleanly with ``float`` (no thousand separators or scientific
+    notation that would defeat an exact round-trip).
+    """
+    whole = draw(st.integers(min_value=0, max_value=99999))
+    frac = draw(st.integers(min_value=0, max_value=9999))
+    return f"{whole}.{frac:04d}"
+
+
+_SHR_CURRENCIES = ["USD", "EUR", "PLN", "GBP", "DKK", "JPY", "CAD"]
+
+
 # ============================================================================
 # Note: ColumnFormatter Property-Based Tests Skipped
 # ============================================================================
@@ -150,170 +186,100 @@ def dividend_dataframes(draw, min_rows: int = 1, max_rows: int = 20) -> pd.DataF
 
 
 class TestDataTransformationInvariants:
-    """Tests for invariants that should hold across complex transformations."""
+    """Property-based invariants over real CurrencyConverter transformations.
 
-    @given(dividend_dataframes(min_rows=1, max_rows=50))
-    @pytest.mark.property_based
-    @pytest.mark.integration
-    def test_dataframe_never_loses_rows(self, df: pd.DataFrame) -> None:
-        """Property: data transformations should not lose rows.
+    Each test exercises a distinct branch of the parsing/mapping logic and
+    asserts a relation between input and output, so a mutation that breaks
+    the branch produces a failing example.
+    """
 
-        After processing, DataFrame should have same number of rows as input.
-        """
-        # Arrange
-        original_len = len(df)
-        converter = CurrencyConverter(df)
-
-        # Act - just verify the converter preserves structure
-        assert len(converter.df) == original_len
-
-        # Assert
-        assert converter.df.shape[0] >= original_len  # Should not decrease
-
-    @given(dividend_dataframes(min_rows=1, max_rows=30))
+    @given(currency=st.sampled_from(_SHR_CURRENCIES), amount=shr_amount_strings())
     @pytest.mark.property_based
     @pytest.mark.unit
-    def test_dataframe_columns_preserved(self, df: pd.DataFrame) -> None:
-        """Property: data processing should preserve required columns.
-
-        Processing shouldn't remove columns that exist in input.
-        """
-        # Arrange
-        original_columns = set(df.columns)
-
-        # Act
-        converter = CurrencyConverter(df)
-
-        # Assert
-        result_columns = set(converter.df.columns)
-        assert original_columns.issubset(result_columns)
-
-    @given(
-        st.lists(
-            st.tuples(
-                st.text(alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ", min_size=1, max_size=6),
-                st.floats(
-                    min_value=0.01,
-                    max_value=10000,
-                    allow_nan=False,
-                    allow_infinity=False,
-                ),
-            ),
-            min_size=1,
-            max_size=100,
-        )
-    )
-    @pytest.mark.property_based
-    @pytest.mark.performance
-    def test_large_batch_processing_stable(
-        self, ticker_amount_pairs: list[tuple[str, float]]
+    def test_extract_dividend_round_trips_currency_then_amount_format(
+        self, currency: str, amount: str
     ) -> None:
-        """Property: processing large batches should remain stable.
+        """Property: ``"<CUR> <amount>/ SHR"`` round-trips to (amount, CUR).
 
-        Performance and correctness shouldn't degrade with more data.
+        Exercises the ``([A-Z]{3}) ([\\d.]+)/ SHR`` branch.
         """
         # Arrange
-        tickers, amounts = zip(*ticker_amount_pairs)
-        df = pd.DataFrame(
-            {
-                "Ticker": tickers,
-                "Amount": amounts,
-            }
-        )
+        converter = CurrencyConverter(pd.DataFrame())
+        comment = f"{currency} {amount}/ SHR"
 
         # Act
-        converter = CurrencyConverter(df)
-
-        # Assert
-        assert len(converter.df) == len(ticker_amount_pairs)
-        assert all(isinstance(ticker, str) for ticker in converter.df["Ticker"])
-        assert all(
-            isinstance(amount, (int, float)) for amount in converter.df["Amount"]
+        result_amount, result_currency = converter.extract_dividend_from_comment(
+            comment
         )
 
+        # Assert
+        assert result_currency == currency
+        assert result_amount == pytest.approx(float(amount))
 
-# ============================================================================
-# Boundary and Edge Case Properties
-# ============================================================================
-
-
-class TestBoundaryConditions:
-    """Property-based tests for boundary conditions and edge cases."""
-
-    @given(
-        st.floats(min_value=0, max_value=1e-10, allow_nan=False, allow_infinity=False)
-    )
-    @pytest.mark.property_based
-    @pytest.mark.edge_case
-    def test_very_small_amounts_stay_non_negative(self, small_amount: float) -> None:
-        """Property: very small amounts should be non-negative and processable.
-
-        System should handle amounts near zero without errors.
-        """
-        # Property: amounts should be >= 0
-        assert small_amount >= 0
-        assert isinstance(small_amount, float)
-
-    @given(
-        st.floats(min_value=1e10, max_value=1e15, allow_nan=False, allow_infinity=False)
-    )
-    @pytest.mark.property_based
-    @pytest.mark.edge_case
-    def test_very_large_amounts_are_numeric(self, large_amount: float) -> None:
-        """Property: very large amounts should remain valid floats.
-
-        System should handle large amounts without errors or overflow.
-        """
-        # Property: amount should be numeric and positive
-        assert isinstance(large_amount, float)
-        assert large_amount > 0
-        assert not (large_amount == float("inf") or large_amount == float("-inf"))
-
-    @given(st.text(min_size=0, max_size=1))
-    @pytest.mark.property_based
-    @pytest.mark.edge_case
-    def test_minimal_strings_remain_strings(self, minimal_text: str) -> None:
-        """Property: minimal strings should remain strings.
-
-        Empty or single-character strings are valid text.
-        """
-        # Property: should be string
-        assert isinstance(minimal_text, str)
-        assert len(minimal_text) <= 1
-
-    @given(st.text(min_size=100, max_size=1000))
-    @pytest.mark.property_based
-    @pytest.mark.edge_case
-    def test_very_long_strings_remain_strings(self, long_string: str) -> None:
-        """Property: very long strings should remain strings.
-
-        Should not cause issues processing long text.
-        """
-        # Property: should still be string
-        assert isinstance(long_string, str)
-        assert len(long_string) >= 100
-
-
-# ============================================================================
-# Type Safety Properties
-# ============================================================================
-
-
-class TestTypeSafetyProperties:
-    """Property-based tests for type consistency and safety."""
-
-    @given(dividend_dataframes(min_rows=1, max_rows=20))
+    @given(currency=st.sampled_from(_SHR_CURRENCIES), amount=shr_amount_strings())
     @pytest.mark.property_based
     @pytest.mark.unit
-    def test_converter_maintains_dataframe_type(self, df: pd.DataFrame) -> None:
-        """Property: CurrencyConverter should maintain DataFrame type.
+    def test_extract_dividend_round_trips_amount_then_currency_format(
+        self, currency: str, amount: str
+    ) -> None:
+        """Property: ``"<amount> <CUR>/SHR"`` round-trips to (amount, CUR).
 
-        After initialization, df attribute should always be a DataFrame.
+        Exercises the alternative ``([\\d.]+) ([A-Z]{3})/SHR`` branch.
         """
-        # Arrange & Act
-        converter = CurrencyConverter(df)
+        # Arrange
+        converter = CurrencyConverter(pd.DataFrame())
+        comment = f"{amount} {currency}/SHR"
+
+        # Act
+        result_amount, result_currency = converter.extract_dividend_from_comment(
+            comment
+        )
 
         # Assert
-        assert isinstance(converter.df, pd.DataFrame)
-        assert hasattr(converter.df, "shape")
-        assert hasattr(converter.df, "columns")
+        assert result_currency == currency
+        assert result_amount == pytest.approx(float(amount))
+
+    @given(amount=shr_amount_strings())
+    @pytest.mark.property_based
+    @pytest.mark.unit
+    def test_extract_dividend_bare_number_returns_amount_and_no_currency(
+        self, amount: str
+    ) -> None:
+        """Property: a bare numeric comment yields (amount, None).
+
+        Exercises the final number-only branch, where no currency is present.
+        """
+        # Arrange
+        converter = CurrencyConverter(pd.DataFrame())
+
+        # Act
+        result_amount, result_currency = converter.extract_dividend_from_comment(amount)
+
+        # Assert
+        assert result_currency is None
+        assert result_amount == pytest.approx(float(amount))
+
+    @given(
+        base=st.text(alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ", min_size=1, max_size=5),
+        suffix=st.sampled_from(sorted(SUFFIX_CURRENCY)),
+    )
+    @pytest.mark.property_based
+    @pytest.mark.unit
+    def test_determine_currency_maps_each_suffix_to_documented_currency(
+        self, base: str, suffix: str
+    ) -> None:
+        """Property: every documented ticker suffix maps to its claimed currency.
+
+        Verifies ``determine_currency`` (via ``_currency_for_ticker``) against
+        the documented mapping, not mere ``Currency``-enum membership.
+        """
+        # Arrange
+        ticker = base + suffix
+        assume("ASB.PL" not in ticker)  # ASB.PL is a documented USD special case
+        converter = CurrencyConverter(pd.DataFrame())
+
+        # Act
+        result = converter.determine_currency(ticker, None)
+
+        # Assert
+        assert result == SUFFIX_CURRENCY[suffix]

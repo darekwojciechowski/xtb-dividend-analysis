@@ -56,18 +56,25 @@ class TestTaxExtractorPerformance:
         extractor = TaxExtractor(pd.DataFrame())
         non_matching = ["Open position", "Close position", "Deposit", "", "123456"]
         repeat = 2_000
+        results: list[float | None] = []
 
         def _run() -> None:
+            results.clear()
             for _ in range(repeat):
                 for comment in non_matching:
-                    extractor.extract_tax_rate_from_comment(comment)
+                    results.append(extractor.extract_tax_rate_from_comment(comment))
 
         # Act
         start = time.perf_counter_ns()
         _run()
         elapsed_s = (time.perf_counter_ns() - start) / 1e9
 
-        # Assert — 10 000 calls must finish well under 1 second
+        # Assert — every non-matching comment returns None ...
+        assert all(r is None for r in results), (
+            "extract_tax_rate_from_comment returned a non-None value for a "
+            "non-matching comment"
+        )
+        # ... and 10 000 calls finish well under 1 second.
         assert elapsed_s < 1.0, (
             f"Non-matching extract_tax_rate took {elapsed_s:.4f}s for {repeat * len(non_matching)} calls"
         )

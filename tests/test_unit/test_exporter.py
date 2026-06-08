@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -83,8 +84,10 @@ class TestDataTransformation:
     def test_export_when_nan_present_then_replaces_with_zero(
         self, sample_dataframe_with_ansi: pd.DataFrame, tmp_path: Path
     ) -> None:
-        """Tests that NaN values are replaced with 0 during export."""
-        # Arrange
+        """Tests that a NaN at a specific cell becomes 0 in the exported file."""
+        # Arrange — seed a known NaN at one cell, leave the other Comment intact
+        sample_dataframe_with_ansi.loc[0, "Comment"] = "Dividend"
+        sample_dataframe_with_ansi.loc[1, "Comment"] = np.nan
         exporter = GoogleSpreadsheetExporter(sample_dataframe_with_ansi)
         output_file = tmp_path / "test_output.csv"
 
@@ -93,9 +96,10 @@ class TestDataTransformation:
         exported_df = pd.read_csv(output_file, sep="\t")
         exported_df["Comment"] = exported_df["Comment"].astype(str)
 
-        # Assert
+        # Assert — the seeded NaN cell is "0", the untouched cell is preserved
         assert exported_df["Comment"].isnull().sum() == 0
-        assert self.replacement_value in exported_df["Comment"].values
+        assert exported_df.loc[1, "Comment"] == self.replacement_value
+        assert exported_df.loc[0, "Comment"] == "Dividend"
 
     def test_export_when_numeric_columns_then_rounds_to_two_decimals(
         self, sample_dataframe_with_ansi: pd.DataFrame, tmp_path: Path

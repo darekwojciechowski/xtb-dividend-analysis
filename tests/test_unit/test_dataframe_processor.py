@@ -25,6 +25,7 @@ from unittest.mock import patch
 
 import pandas as pd
 import pytest
+from loguru import logger
 
 from data_processing.column_formatter import ColumnFormatter
 from data_processing.column_normalizer import ColumnNormalizer
@@ -748,10 +749,24 @@ class TestParseDividendToPln:
 class TestLogTableWithTaxSummary:
     """Test suite for log_table_with_tax_summary."""
 
+    @staticmethod
+    def _capture_logged_output(processor: DataFrameProcessor, currency: str) -> str:
+        """Run log_table_with_tax_summary and return the concatenated log text."""
+        messages: list[str] = []
+        sink_id = logger.add(
+            lambda msg: messages.append(str(msg)), level="INFO", format="{message}"
+        )
+        try:
+            processor.log_table_with_tax_summary(statement_currency=currency)
+        finally:
+            logger.remove(sink_id)
+
+        return "".join(messages)
+
     def test_log_table_when_tax_collected_present_then_drops_for_display(
         self,
     ) -> None:
-        """Tests that Tax Collected column is dropped from display without raising."""
+        """Tests that the rendered display table omits the Tax Collected column."""
         df = pd.DataFrame(
             {
                 "Date": pd.to_datetime(["2024-01-01"]),
@@ -763,11 +778,15 @@ class TestLogTableWithTaxSummary:
         )
         processor = DataFrameProcessor(df)
 
-        # Should not raise
-        processor.log_table_with_tax_summary(statement_currency="USD")
+        output = self._capture_logged_output(processor, currency="USD")
 
-    def test_log_table_when_no_tax_collected_then_no_error(self) -> None:
-        """Tests that missing Tax Collected column is handled gracefully."""
+        # The summary table is emitted ...
+        assert "Total dividends received (gross)" in output
+        # ... and the numeric Tax Collected column is dropped from the display.
+        assert "Tax Collected" not in output
+
+    def test_log_table_when_no_tax_collected_then_emits_summary(self) -> None:
+        """Tests that the tax summary footer is emitted when no Tax Collected column."""
         df = pd.DataFrame(
             {
                 "Date": pd.to_datetime(["2024-01-01"]),
@@ -778,7 +797,10 @@ class TestLogTableWithTaxSummary:
         )
         processor = DataFrameProcessor(df)
 
-        processor.log_table_with_tax_summary(statement_currency="USD")
+        output = self._capture_logged_output(processor, currency="USD")
+
+        assert "Total dividends received (gross)" in output
+        assert "Net dividends after tax" in output
 
 
 @pytest.mark.performance

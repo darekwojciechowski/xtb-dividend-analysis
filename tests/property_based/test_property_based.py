@@ -22,7 +22,7 @@ from decimal import Decimal
 
 import pandas as pd
 import pytest
-from hypothesis import given
+from hypothesis import assume, given
 from hypothesis import strategies as st
 
 from config.settings import settings
@@ -186,26 +186,42 @@ class TestCurrencyConverterProperties:
         # Assert
         assert result in supported
 
-    @given(st.text(min_size=1, max_size=20), currency_codes())
+    @given(
+        suffix_inferred=st.sampled_from(
+            [
+                (".US", "USD"),
+                (".PL", "PLN"),
+                (".DK", "DKK"),
+                (".UK", "GBP"),
+                (".FR", "EUR"),
+            ]
+        ),
+        extracted=st.sampled_from(["USD", "PLN", "EUR", "DKK", "GBP"]),
+    )
     @pytest.mark.property_based
     @pytest.mark.unit
     def test_determine_currency_prefers_extracted_currency(
-        self, ticker: str, currency: str
+        self, suffix_inferred: tuple[str, str], extracted: str
     ) -> None:
-        """Property: extracted currency takes precedence over ticker-based detection.
+        """Property: an explicit extracted currency overrides ticker inference.
 
-        If a currency is explicitly extracted/provided, it should be returned
-        regardless of ticker format.
+        Uses a ticker whose suffix would *infer* currency X, then supplies a
+        different extracted currency Y, and asserts the result is Y. This
+        proves precedence rather than merely restating the early ``return
+        extracted_currency`` branch.
         """
         # Arrange
-        df = pd.DataFrame({"Ticker": [ticker]})
-        converter = CurrencyConverter(df)
+        suffix, inferred = suffix_inferred
+        assume(extracted != inferred)  # Y must differ from X to prove precedence
+        ticker = f"ABC{suffix}"  # fixed base avoids the ASB.PL special case
+        converter = CurrencyConverter(pd.DataFrame({"Ticker": [ticker]}))
 
         # Act
-        result = converter.determine_currency(ticker, currency)
+        result = converter.determine_currency(ticker, extracted)
 
         # Assert
-        assert result == currency
+        assert result == extracted
+        assert result != inferred  # the extracted value won over ticker inference
 
     @given(ticker_strategies())
     @pytest.mark.property_based
@@ -259,31 +275,6 @@ class TestCurrencyConverterProperties:
             assert currency is None or (
                 isinstance(currency, str) and len(currency) == 3
             )
-
-    @given(
-        dividend_comments(),
-        st.just(None),  # No extracted currency
-    )
-    @pytest.mark.property_based
-    @pytest.mark.unit
-    def test_extract_dividend_returns_non_negative_amounts(
-        self, comment: str, _: None
-    ) -> None:
-        """Property: extracted dividend amounts are never negative.
-
-        Financial calculations should never produce negative dividend amounts.
-        """
-        # Arrange
-        df = pd.DataFrame()
-        converter = CurrencyConverter(df)
-
-        # Act
-        dividend, _ = converter.extract_dividend_from_comment(comment)
-
-        # Assert
-        if dividend is not None:
-            assert dividend >= 0
-            assert isinstance(dividend, float)
 
     @given(
         st.one_of(
