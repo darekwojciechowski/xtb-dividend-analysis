@@ -1923,14 +1923,14 @@ xml = ["lxml (>=5.3.0)"]
 
 [[package]]
 name = "pandera"
-version = "0.31.1"
+version = "0.32.1"
 description = "A light-weight and flexible data validation and testing tool for statistical data objects."
 optional = false
 python-versions = ">=3.10"
 groups = ["dev"]
 files = [
-    {file = "pandera-0.31.1-py3-none-any.whl", hash = "sha256:f9f1ff4852804e1a181a4cb968e732a492f4b6dbefe051a8c5500da43d5c326d"},
-    {file = "pandera-0.31.1.tar.gz", hash = "sha256:c75aa3868af15d4f9aa613acf1a7f436a518f81f1eb658ad630c1dbe1dab0f13"},
+    {file = "pandera-0.32.1-py3-none-any.whl", hash = "sha256:1a17a3ffa906174d19207715f4f082ec3db3709647927ad8c095c147d74d8454"},
+    {file = "pandera-0.32.1.tar.gz", hash = "sha256:72ecd74226847abf0f0437c05f7f10cc8368e306d88a2acc78fa93762c5a0a02"},
 ]
 
 [package.dependencies]
@@ -1941,7 +1941,7 @@ typing_extensions = "*"
 typing_inspect = ">=0.6.0"
 
 [package.extras]
-all = ["black", "dask[dataframe]", "distributed", "fastapi", "frictionless (<=4.40.8)", "geopandas", "hypothesis (>=6.92.7)", "ibis-framework (>=9.0.0)", "modin", "numpy (>=1.24.4)", "pandas-stubs", "polars (>=0.20.0)", "pyarrow-hotfix", "pyspark[connect] (>=3.2.0)", "pyyaml (>=5.1)", "ray", "scipy", "scipy-stubs ; python_version >= \"3.10\"", "shapely", "xarray (>=2024.10.0)"]
+all = ["black", "dask[dataframe]", "distributed", "fastapi", "frictionless (<=4.40.8)", "geopandas", "hypothesis (>=6.92.7)", "ibis-framework (>=9.0.0)", "modin", "narwhals (>=1.26.0)", "numpy (>=1.24.4)", "pandas-stubs", "polars (>=0.20.0)", "pyarrow-hotfix", "pyspark[connect] (>=3.2.0)", "pyyaml (>=5.1)", "ray", "scipy", "scipy-stubs ; python_version >= \"3.10\"", "shapely", "xarray (>=2024.10.0)"]
 dask = ["dask[dataframe]", "distributed"]
 fastapi = ["fastapi"]
 frictionless = ["frictionless (<=4.40.8)"]
@@ -1953,6 +1953,7 @@ modin = ["dask[dataframe]", "distributed", "modin", "ray"]
 modin-dask = ["dask[dataframe]", "distributed", "modin"]
 modin-ray = ["modin", "ray"]
 mypy = ["pandas-stubs", "scipy-stubs ; python_version >= \"3.10\""]
+narwhals = ["narwhals (>=1.26.0)"]
 pandas = ["numpy (>=1.24.4)", "pandas (>=2.1.1)"]
 polars = ["polars (>=0.20.0)"]
 pyspark = ["pyspark[connect] (>=3.2.0)"]
@@ -3338,4 +3339,4 @@ dev = ["black (>=19.3b0) ; python_version >= \"3.6\"", "pytest (>=4.6.2)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13,<4.0"
-content-hash = "285240331973f0ab88bc76b7ff0938415d489295fc5c27095bfc7515c5703c00"
+content-hash = "e84af65238e3cb770d4e3e7c8cf4d970033cce8767bd8af3bba3f42a5bfd87eb"
