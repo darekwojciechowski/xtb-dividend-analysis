@@ -717,47 +717,24 @@ class TestGetPreviousBusinessDay:
 
 
 @pytest.mark.unit
-class TestParseDividendToPln:
-    """Test suite for parse_dividend_to_pln static method."""
-
-    def test_parse_when_pln_then_uses_exchange_rate_1(self) -> None:
-        """Tests that exchange rate '-' (PLN) results in factor of 1.0."""
-        row = pd.Series({"Net Dividend": "10.0 PLN", "Exchange Rate D-1": "-"})
-
-        result = DataFrameProcessor.parse_dividend_to_pln(row)
-
-        assert result == pytest.approx(10.0)
-
-    def test_parse_when_usd_then_multiplies_by_rate(self) -> None:
-        """Tests that USD net dividend is multiplied by exchange rate."""
-        row = pd.Series({"Net Dividend": "5.0 USD", "Exchange Rate D-1": "4.0 PLN"})
-
-        result = DataFrameProcessor.parse_dividend_to_pln(row)
-
-        assert result == pytest.approx(20.0)
-
-    def test_parse_when_invalid_values_then_returns_zero(self) -> None:
-        """Tests that malformed data returns 0.0 without raising."""
-        row = pd.Series({"Net Dividend": "N/A", "Exchange Rate D-1": "bad"})
-
-        result = DataFrameProcessor.parse_dividend_to_pln(row)
-
-        assert result == pytest.approx(0.0)
-
-
-@pytest.mark.unit
 class TestLogTableWithTaxSummary:
     """Test suite for log_table_with_tax_summary."""
 
     @staticmethod
-    def _capture_logged_output(processor: DataFrameProcessor, currency: str) -> str:
+    def _capture_logged_output(
+        processor: DataFrameProcessor,
+        currency: str,
+        courses_paths: list[str] | None = None,
+    ) -> str:
         """Run log_table_with_tax_summary and return the concatenated log text."""
         messages: list[str] = []
         sink_id = logger.add(
             lambda msg: messages.append(str(msg)), level="INFO", format="{message}"
         )
         try:
-            processor.log_table_with_tax_summary(statement_currency=currency)
+            processor.log_table_with_tax_summary(
+                statement_currency=currency, courses_paths=courses_paths
+            )
         finally:
             logger.remove(sink_id)
 
@@ -801,6 +778,67 @@ class TestLogTableWithTaxSummary:
 
         assert "Total dividends received (gross)" in output
         assert "Net dividends after tax" in output
+
+    def test_log_table_when_pln_statement_then_pit38_block_present(self) -> None:
+        """Tests that a PLN statement renders the PIT-38 declaration block."""
+        df = pd.DataFrame(
+            {
+                "Date": pd.to_datetime(["2024-01-02"]),
+                "Ticker": ["AAPL.US"],
+                "Net Dividend": ["10.0 USD"],
+                "Tax Collected %": ["15%"],
+                "Exchange Rate D-1": ["4.0 PLN"],
+            }
+        )
+        processor = DataFrameProcessor(df)
+
+        output = self._capture_logged_output(processor, currency="PLN")
+
+        # gross 40.00 PLN, poz. 47 = 7.60, wariant A/B poz. 48 = 6.00
+        assert "RAPORT PODATKOWY PIT-38" in output
+        assert "poz. 47" in output
+        assert "7.60 PLN  (8 zl)" in output
+
+    def test_log_table_when_usd_statement_then_pit38_block_absent(self) -> None:
+        """Tests that a USD statement suppresses the PLN-only PIT-38 block."""
+        df = pd.DataFrame(
+            {
+                "Date": pd.to_datetime(["2024-01-02"]),
+                "Ticker": ["AAPL.US"],
+                "Net Dividend": ["10.0 USD"],
+                "Tax Collected %": ["15%"],
+                "Exchange Rate D-1": ["4.0 PLN"],
+            }
+        )
+        processor = DataFrameProcessor(df)
+
+        output = self._capture_logged_output(processor, currency="USD")
+
+        assert "RAPORT PODATKOWY PIT-38" not in output
+        assert "PIT-38 block is emitted for PLN statements only" in output
+
+    def test_log_table_when_nbp_rate_missing_then_renders_degraded_block(self) -> None:
+        """Tests that a missing NBP rate degrades the block instead of aborting.
+
+        ExchangeRateUnavailableError subclasses ValueError, so letting it escape
+        would have main() report a generic processing failure and print nothing.
+        """
+        df = pd.DataFrame(
+            {
+                "Date": pd.to_datetime(["2024-01-02"]),
+                "Ticker": ["AAPL.US"],
+                "Net Dividend": ["10.0 USD"],
+                "Tax Collected %": ["25%"],
+                # Blank rate forces an NBP lookup, and no CSV paths are supplied.
+                "Exchange Rate D-1": ["-"],
+            }
+        )
+        processor = DataFrameProcessor(df)
+
+        output = self._capture_logged_output(processor, currency="PLN")
+
+        assert "Brak kursu NBP" in output
+        assert "unavailable - missing NBP exchange rate" in output
 
 
 @pytest.mark.performance

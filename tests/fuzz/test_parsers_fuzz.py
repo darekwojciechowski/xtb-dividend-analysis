@@ -21,6 +21,7 @@ from hypothesis import strategies as st
 
 from data_processing.currency_converter import CurrencyConverter
 from data_processing.date_converter import convert_date
+from data_processing.pit38_report import resolve_issuer_country
 from data_processing.tax_calculator import TaxCalculator
 
 pytestmark = pytest.mark.fuzz
@@ -131,3 +132,22 @@ def test_extract_dividend_from_comment_never_crashes(
     value, currency = currency_conv.extract_dividend_from_comment(comment)
     assert value is None or isinstance(value, float)
     assert currency is None or (isinstance(currency, str) and len(currency) == 3)
+
+
+@example(raw="")
+@example(raw="-")
+@example(raw="ASB.PL")
+@example(raw="\x1b[31mSBUX.US\x1b[0m")
+@given(raw=hostile_text)
+def test_resolve_issuer_country_never_crashes(raw: str) -> None:
+    """Given an arbitrary Unicode string (Hypothesis-generated),
+    when resolve_issuer_country processes it,
+    then it returns a country code or None — it never raises.
+
+    Country resolution is a total function: a ticker the pipeline cannot
+    classify must degrade to the conservative 19% cap, not abort a run after
+    all the expensive processing has already succeeded.
+    """
+    result = resolve_issuer_country(raw)
+
+    assert result is None or isinstance(result, str)

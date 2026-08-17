@@ -14,9 +14,11 @@ import pandas as pd
 import pytest
 from hypothesis import assume, given
 
+from data_processing.currency_converter import CurrencyConverter
+from data_processing.pit38_report import Pit38Summary, build_pit38_summary
 from data_processing.tax_calculator import TaxCalculator
 
-from .conftest import dividend_rows
+from .conftest import dividend_rows, pit38_rows
 
 pytestmark = pytest.mark.metamorphic
 
@@ -123,3 +125,81 @@ def test_linear_scaling_of_dividends(df: pd.DataFrame) -> None:
 
     # Tolerance grows with row count because each row re-rounds to 2 d.p.
     assert math.isclose(scaled_total, k * base, abs_tol=0.02 * len(df) + 0.01)
+
+
+# ---------------------------------------------------------------------------
+# PIT-38 declaration figures
+# ---------------------------------------------------------------------------
+
+
+def _pit38(df: pd.DataFrame) -> Pit38Summary:
+    """Fold a generated DataFrame into PIT-38 declaration figures."""
+    return build_pit38_summary(df.copy(), CurrencyConverter(df), [], 0.19)
+
+
+@given(df=pit38_rows())
+def test_pit38_permutation_invariance(df: pd.DataFrame) -> None:
+    """Given a generated foreign-dividend DataFrame and a row-shuffled copy,
+    when the PIT-38 summary is folded for each,
+    then poz. 47 and both poz. 48 variants agree to within one grosz.
+
+    Order dependence beyond that would mean the fold carries state between
+    rows, or that rows are being lost or double-counted — either moves the
+    total by złoty, well outside this bound.
+
+    The bound cannot be exact equality: float addition is not associative, so
+    reordering can land an unrounded total either side of a half-grosz
+    boundary (80.4999... vs 80.5000...) and shift the rounded figure by 0.01.
+    The tolerance is a hair above one grosz so that a single such flip passes
+    while ``math.isclose``'s strict ``>`` comparison does not reject it.
+    """
+    shuffled = df.sample(frac=1, random_state=42).reset_index(drop=True)
+
+    base = _pit38(df)
+    permuted = _pit38(shuffled)
+
+    one_grosz_flip = 0.011
+    assert math.isclose(
+        base.tax_19_pct_pln, permuted.tax_19_pct_pln, abs_tol=one_grosz_flip
+    )
+    assert math.isclose(
+        base.deductible_treaty_pln,
+        permuted.deductible_treaty_pln,
+        abs_tol=one_grosz_flip,
+    )
+    assert math.isclose(
+        base.deductible_full_pln, permuted.deductible_full_pln, abs_tol=one_grosz_flip
+    )
+
+
+@given(df=pit38_rows())
+def test_pit38_linear_scaling_of_gross(df: pd.DataFrame) -> None:
+    """Given a foreign-dividend DataFrame and a copy with every gross doubled,
+    when the PIT-38 summary is folded for each,
+    then poz. 47 and both poz. 48 variants double.
+
+    Every term is a ``min()`` over quantities linear in gross, so the whole
+    declaration is homogeneous of degree one in the income base.
+    """
+    k = 2.0
+
+    def _scale_amount(s: str, factor: float) -> str:
+        value, currency = s.split()
+        return f"{float(value) * factor:.2f} {currency}"
+
+    scaled = df.copy()
+    scaled["Net Dividend"] = scaled["Net Dividend"].apply(lambda s: _scale_amount(s, k))
+
+    base = _pit38(df)
+    doubled = _pit38(scaled)
+
+    tolerance = 0.02 * len(df) + 0.01
+    assert math.isclose(
+        doubled.tax_19_pct_pln, k * base.tax_19_pct_pln, abs_tol=tolerance
+    )
+    assert math.isclose(
+        doubled.deductible_treaty_pln, k * base.deductible_treaty_pln, abs_tol=tolerance
+    )
+    assert math.isclose(
+        doubled.deductible_full_pln, k * base.deductible_full_pln, abs_tol=tolerance
+    )

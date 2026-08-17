@@ -62,7 +62,8 @@ class TaxExtractor:
         Returns:
             Default tax rate as decimal.
         """
-        # Special case: ASB.PL is a US company listed in Poland with 0% withholding at source
+        # Special case: ASB.PL (ASBIS) is a Cypriot company listed in Poland;
+        # nothing is withheld at source, so the full Polish 19% is owed on it.
         if "ASB.PL" in ticker:
             return 0.0
 
@@ -107,7 +108,7 @@ class TaxExtractor:
         all rows in that group.
 
         Special cases (0% withholding tax at source):
-        - ASB.PL: US company listed in Poland, no withholding tax in Excel
+        - ASB.PL: Cypriot company listed in Poland, no withholding tax in Excel
         - UK stocks: No withholding tax for non-residents
         - FR stocks: 0% withholding under Poland-France tax treaty
 

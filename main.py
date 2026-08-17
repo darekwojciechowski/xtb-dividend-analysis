@@ -80,7 +80,9 @@ def process_data(file_path: str, courses_paths: list[str]) -> pd.DataFrame:
         processor.calculate_tax_in_pln_for_detected_pln(statement_currency)
 
     processor.reorder_columns()
-    processor.log_table_with_tax_summary(statement_currency)
+    processor.log_table_with_tax_summary(
+        statement_currency, courses_paths=courses_paths
+    )
 
     return processor.get_processed_df()
 

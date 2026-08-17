@@ -29,8 +29,9 @@ from config.settings import settings
 from data_processing.constants import Currency
 from data_processing.currency_converter import CurrencyConverter
 from data_processing.date_converter import DateConverter, convert_date
+from data_processing.pit38_report import build_pit38_summary
 from data_processing.tax_calculator import TaxCalculator
-from tests.metamorphic.conftest import dividend_rows
+from tests.metamorphic.conftest import dividend_rows, pit38_rows
 
 # ============================================================================
 # Custom Hypothesis Strategies
@@ -611,3 +612,51 @@ class TestDataProcessingInvariants:
         # Assert - idempotent property
         assert result1 == result2
         assert result2 == result3
+
+
+@pytest.mark.property_based
+@pytest.mark.unit
+class TestPit38DeclarationInvariants:
+    """Property-based tests for the PIT-38 declaration figures."""
+
+    @staticmethod
+    def _summary(df: pd.DataFrame):
+        """Fold a generated DataFrame into PIT-38 declaration figures."""
+        return build_pit38_summary(
+            df, CurrencyConverter(df), [], settings.polish_tax_rate
+        )
+
+    @given(df=pit38_rows())
+    def test_deduction_never_exceeds_19_percent_tax(self, df: pd.DataFrame) -> None:
+        """Property: poz. 48 <= poz. 47 under both variants.
+
+        This is the statutory constraint on the form: you cannot deduct more
+        foreign tax than the Polish liability the income generates.
+        """
+        summary = self._summary(df)
+
+        assert summary.deductible_full_pln <= summary.tax_19_pct_pln + 0.01
+        assert summary.deductible_treaty_pln <= summary.tax_19_pct_pln + 0.01
+
+    @given(df=pit38_rows())
+    def test_treaty_variant_never_exceeds_full_variant(self, df: pd.DataFrame) -> None:
+        """Property: wariant A <= wariant B.
+
+        Wariant A adds the treaty-rate cap on top of wariant B's 19% cap, so
+        it can only ever be the smaller of the two.
+        """
+        summary = self._summary(df)
+
+        assert summary.deductible_treaty_pln <= summary.deductible_full_pln + 0.01
+
+    @given(df=pit38_rows())
+    def test_payable_is_never_negative(self, df: pd.DataFrame) -> None:
+        """Property: the amount still due in Poland never goes below zero.
+
+        A negative payable would mean the form claims a refund of foreign tax,
+        which PIT-38 does not provide for.
+        """
+        summary = self._summary(df)
+
+        assert summary.payable_treaty_pln >= 0.0
+        assert summary.payable_full_pln >= 0.0

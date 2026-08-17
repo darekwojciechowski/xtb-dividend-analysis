@@ -1,7 +1,7 @@
 # XTB dividend analysis
 
 > A production-grade Python pipeline, engineered as a **senior-level testing showcase** —
-> 530+ tests across 8 independent tiers: unit, integration, property-based, fuzz,
+> 800+ tests across 8 independent tiers: unit, integration, property-based, fuzz,
 > metamorphic, contract, security, and mutation.
 
 ![CI/CD](https://img.shields.io/github/actions/workflow/status/darekwojciechowski/xtb-dividend-analysis/ci.yml?branch=main&style=flat-square&logo=github-actions&logoColor=white&label=CI/CD)
@@ -37,8 +37,8 @@ themselves are actually asserting something.
 
 | Tier            | Files | Framework                        | What it catches that nothing else does                                                                                         |
 |-----------------|-------|----------------------------------|--------------------------------------------------------------------------------------------------------------------------------|
-| Unit            | 17    | `pytest` + `unittest.mock`       | Logic defects in every specialist class in isolation; all I/O mocked                                                           |
-| Integration     | 6     | `pytest` + real DataFrames       | Wiring defects — end-to-end pipeline against real XLSX fixtures and NBP CSV files                                              |
+| Unit            | 18    | `pytest` + `unittest.mock`       | Logic defects in every specialist class in isolation; all I/O mocked                                                           |
+| Integration     | 7     | `pytest` + real DataFrames       | Wiring defects — end-to-end pipeline against real XLSX fixtures and NBP CSV files                                              |
 | Property-based  | 2     | `hypothesis` (100 examples/run)  | Violated mathematical invariants in tax, FX, and date logic that hand-picked cases miss                                        |
 | Metamorphic     | 3     | `hypothesis` + relation asserts  | Incorrect behaviour when there is no ground-truth oracle — permutation, duplication, additivity, linear scaling relations      |
 | Fuzz            | 2     | `hypothesis` (binary + text)     | Crashes, hangs, and silent corruption on hostile XLSX bytes and malformed strings; whitelisted exceptions only                 |

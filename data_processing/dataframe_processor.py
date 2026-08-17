@@ -11,12 +11,20 @@ from __future__ import annotations
 import pandas as pd
 from loguru import logger
 
+from config.settings import settings
+
 from .column_formatter import ColumnFormatter
 from .column_normalizer import ColumnNormalizer
-from .constants import ColumnName
-from .currency_converter import CurrencyConverter
+from .constants import ColumnName, Currency
+from .currency_converter import CurrencyConverter, ExchangeRateUnavailableError
 from .data_aggregator import DataAggregator
 from .dividend_filter import DividendFilter
+from .pit38_report import (
+    Pit38Summary,
+    build_pit38_summary,
+    format_pit38_block,
+    format_pit38_unavailable_block,
+)
 from .tax_calculator import TaxCalculator
 from .tax_extractor import TaxExtractor
 
@@ -516,44 +524,22 @@ class DataFrameProcessor:
         """
         return self.df
 
-    @staticmethod
-    def parse_dividend_to_pln(row) -> float:
-        """Parse Net Dividend and convert to PLN using Exchange Rate D-1.
-
-        Args:
-            row: DataFrame row containing 'Net Dividend' and 'Exchange Rate D-1' columns.
-
-        Returns:
-            Dividend amount converted to PLN.
-        """
-        try:
-            # Extract numeric value from "Net Dividend" (e.g., "5.05 USD" -> 5.05)
-            net_div_str = str(row[ColumnName.NET_DIVIDEND.value])
-            net_div_value, _ = TaxCalculator._parse_value_with_currency(
-                net_div_str, "Net Dividend", "Unknown", "Unknown"
-            )
-
-            # Get exchange rate (handle "-" for PLN)
-            exchange_rate_str = str(row[ColumnName.EXCHANGE_RATE_D_MINUS_1.value])
-            if exchange_rate_str == "-":
-                exchange_rate = 1.0
-            else:
-                exchange_rate, _ = TaxCalculator._parse_value_with_currency(
-                    exchange_rate_str, "Exchange Rate D-1", "Unknown", "Unknown"
-                )
-
-            return net_div_value * exchange_rate
-        except (ValueError, IndexError, KeyError):
-            return 0.0
-
     def log_table_with_tax_summary(  # pragma: no mutate
         self,
         statement_currency: str = "PLN",  # pragma: no mutate
+        courses_paths: list[str] | None = None,  # pragma: no mutate
     ) -> None:
         """Log the processed DataFrame as a formatted table with comprehensive tax summary.
 
+        For PLN statements the PIT-38 declaration block is appended below the
+        summary. It is suppressed for other statement currencies: every figure
+        in it is a PLN-denominated declaration value derived from a code path
+        that has no USD fixture to validate it against.
+
         Args:
             statement_currency: Currency of the statement ('USD' or 'PLN').
+            courses_paths: NBP CSV paths, used when a foreign row's displayed
+                'Exchange Rate D-1' is blank and the rate must be re-resolved.
         """
         from tabulate import tabulate  # pragma: no mutate
 
@@ -566,18 +552,25 @@ class DataFrameProcessor:
                 columns=[ColumnName.TAX_COLLECTED.value]
             )  # pragma: no mutate
 
-        # Calculate total dividends in PLN
-        total_dividends_pln = df_display.apply(
-            self.parse_dividend_to_pln, axis=1
-        ).sum()  # pragma: no mutate
+        # Build the PIT-38 figures; they also supply the gross total below.
+        # ExchangeRateUnavailableError subclasses ValueError, so an uncaught
+        # raise would be swallowed by main() and reported as a generic
+        # processing failure with no table printed at all.
+        summary: Pit38Summary | None = None
+        try:
+            summary = build_pit38_summary(
+                df_display,
+                self._get_currency_converter(),
+                list(courses_paths or []),
+                settings.polish_tax_rate,
+            )
+        except ExchangeRateUnavailableError as exc:
+            logger.error(f"PIT-38 summary unavailable: {exc}")  # pragma: no mutate
 
         # Calculate total tax to pay in PLN
         total_tax = TaxCalculator.calculate_total_tax_amount(
             df_display
         )  # pragma: no mutate
-
-        # Calculate net dividends after tax
-        net_after_tax = total_dividends_pln - total_tax  # pragma: no mutate
 
         # Create table with data
         table = tabulate(  # pragma: no mutate
@@ -595,22 +588,31 @@ class DataFrameProcessor:
         separator = "+" + "-" * (table_width - 2) + "+"  # pragma: no mutate
 
         # Create summary texts
-        dividends_text = (  # pragma: no mutate
-            f"Total dividends received (gross): {total_dividends_pln:.2f} PLN"  # pragma: no mutate
-        )
+        if summary is None:
+            unavailable = "unavailable - missing NBP exchange rate"  # pragma: no mutate
+            dividends_text = (
+                f"Total dividends received (gross): {unavailable}"  # pragma: no mutate
+            )
+            net_text = f"Net dividends after tax: {unavailable}"  # pragma: no mutate
+        else:
+            total_dividends_pln = summary.total_gross_all_pln
+            net_after_tax = total_dividends_pln - total_tax  # pragma: no mutate
+            dividends_text = (  # pragma: no mutate
+                f"Total dividends received (gross): {total_dividends_pln:.2f} PLN"  # pragma: no mutate
+            )
+            net_text = (
+                f"Net dividends after tax: {net_after_tax:.2f} PLN"  # pragma: no mutate
+            )
         tax_text = f"Total tax due in PLN: {total_tax:.2f} PLN"  # pragma: no mutate
-        net_text = (
-            f"Net dividends after tax: {net_after_tax:.2f} PLN"  # pragma: no mutate
-        )
 
         # Center the summary texts
         def center_text(text, width):  # pragma: no mutate
-            padding = (width - len(text) - 2) // 2  # pragma: no mutate
+            padding = max((width - len(text) - 2) // 2, 0)  # pragma: no mutate
             return (  # pragma: no mutate
                 "|"  # pragma: no mutate
                 + " " * padding  # pragma: no mutate
                 + text  # pragma: no mutate
-                + " " * (width - len(text) - padding - 2)  # pragma: no mutate
+                + " " * max(width - len(text) - padding - 2, 0)  # pragma: no mutate
                 + "|"  # pragma: no mutate
             )
 
@@ -620,6 +622,20 @@ class DataFrameProcessor:
 
         # Combine table with summary
         table_with_summary = f"{table}\n{separator}\n{dividends_line}\n{separator}\n{tax_line}\n{separator}\n{net_line}\n{separator}"  # pragma: no mutate
+
+        if statement_currency != Currency.PLN.value:
+            logger.info(  # pragma: no mutate
+                "PIT-38 block is emitted for PLN statements only; "  # pragma: no mutate
+                f"statement currency is {statement_currency}."  # pragma: no mutate
+            )
+        elif summary is None:
+            table_with_summary += "\n" + "\n".join(
+                format_pit38_unavailable_block(table_width)
+            )
+        else:
+            table_with_summary += "\n" + "\n".join(
+                format_pit38_block(summary, table_width)
+            )
 
         # Log processed data with summary
         logger.info("\n" + table_with_summary)  # pragma: no mutate
