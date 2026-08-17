@@ -588,3 +588,45 @@ def test_tax_pln_statement_raises_on_missing_net_dividend_value(
     # Act / Assert
     with pytest.raises(ValueError, match="Net Dividend"):
         TaxCalculator(valid_pln_df).calculate_tax_for_pln_statement("PLN")
+
+
+@pytest.mark.slow
+@pytest.mark.integration
+def test_tax_collected_amount_on_demo_statement_matches_statement_withholding_lines(
+    processed_pln_result: pd.DataFrame,
+) -> None:
+    """Test that Tax Collected Amount reproduces the raw statement's withholding lines.
+
+    Given: ``demo_XTB_broker_statement_currency_PLN.xlsx`` processed end to end
+    When:  The PLN rows are read back from the processed DataFrame
+    Then:  Each ``Tax Collected Amount`` equals the sum of the withholding
+           lines booked for that dividend in the source XLSX
+
+    Expected values are taken from the source document, not from the code:
+    TXT.PL 2025-02-21 → 2.21 + 3.15 = 5.36; XTB.PL 2025-06-25 →
+    8.28 + 4.14 + 5.18 = 17.60; XTB.PL 2025-10-14 → 7.25.
+
+    Args:
+        processed_pln_result: Module-scoped fixture with fully processed DataFrame.
+    """
+    # Arrange
+    expected = {
+        ("TXT.PL", "2025-02-21"): "5.36 PLN",
+        ("XTB.PL", "2025-06-25"): "17.60 PLN",
+        ("XTB.PL", "2025-10-14"): "7.25 PLN",
+    }
+    result = processed_pln_result
+
+    # Act
+    actual = {
+        (row["Ticker"], str(row["Date"])[:10]): row["Tax Collected Amount"]
+        for _, row in result.iterrows()
+    }
+
+    # Assert
+    for key, expected_amount in expected.items():
+        assert key in actual, f"Row {key} missing from processed output"
+        assert actual[key] == expected_amount, (
+            f"{key[0]} on {key[1]}: expected {expected_amount} "
+            f"(sum of the statement's withholding lines), got {actual[key]}"
+        )
