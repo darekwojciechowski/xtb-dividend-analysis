@@ -283,12 +283,6 @@ class TestBuildPit38Summary:
         assert summary.deductible_treaty_pln == pytest.approx(19.0)
         assert summary.deductible_full_pln == pytest.approx(19.0)
 
-    def test_summary_when_currency_not_fx_converted_then_flags_ticker(self) -> None:
-        """DKK shares are computed without an FX rate today (Bug C, plan 22)."""
-        summary = _summary([_make_row("NOVOB.DK", "26.25 DKK", "27%", "0.5702 PLN")])
-
-        assert summary.unconverted_currency_tickers == ("NOVOB.DK",)
-
     def test_summary_when_multiple_rows_then_accumulates_tax_paid(self) -> None:
         """Foreign tax paid must accumulate across rows, not overwrite."""
         summary = _summary(
@@ -364,7 +358,6 @@ class TestBuildPit38Summary:
         assert summary.total_gross_all_pln == 0.0
         assert summary.rows == ()
         assert summary.unknown_country_tickers == ()
-        assert summary.unconverted_currency_tickers == ()
 
     def test_summary_when_total_ties_at_half_grosz_then_rounds_up(self) -> None:
         """Totals round half-up, not banker's: 12.345 must become 12.35.
@@ -438,7 +431,7 @@ class TestFormatPit38Block:
 
     def test_block_when_label_only_row_then_no_stray_value_is_rendered(self) -> None:
         """Section headers and footnotes carry a label and nothing else."""
-        summary = _summary([_make_row("NOVOB.DK", "26.25 DKK", "27%", "0.5702 PLN")])
+        summary = _summary([_make_row("SBUX.US", "1.71 USD", "15%", "4.1512 PLN")])
 
         lines = self._block(summary, width=140)
         label_only = [
@@ -494,13 +487,6 @@ class TestFormatPit38Block:
         text = "\n".join(self._block(summary, width=140))
 
         assert "(!) FOO.ZZ: nieznany kraj emitenta" in text
-
-    def test_block_when_unconverted_currency_then_renders_footnote(self) -> None:
-        summary = _summary([_make_row("NOVOB.DK", "26.25 DKK", "27%", "0.5702 PLN")])
-
-        text = "\n".join(self._block(summary, width=140))
-
-        assert "(!) NOVOB.DK: liczba akcji bez kursu FX" in text
 
 
 @pytest.mark.unit

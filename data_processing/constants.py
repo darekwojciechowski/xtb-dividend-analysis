@@ -26,6 +26,10 @@ class Currency(str, Enum):
     EUR = "EUR"
     DKK = "DKK"
     GBP = "GBP"
+    CHF = "CHF"
+    NOK = "NOK"
+    SEK = "SEK"
+    CAD = "CAD"
 
 
 class TickerSuffix(str, Enum):

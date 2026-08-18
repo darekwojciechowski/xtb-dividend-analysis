@@ -45,12 +45,6 @@ from .tax_calculator import TaxCalculator
 # any ticker string handed to this module; strip them before matching suffixes.
 _ANSI_PATTERN: re.Pattern[str] = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
 
-# Currencies the pipeline converts to PLN correctly today. Anything else is
-# reported through 'unconverted_currency_tickers' (see plan 22 / Bug C).
-_FX_SUPPORTED_CURRENCIES: frozenset[str] = frozenset(
-    {Currency.PLN.value, Currency.USD.value}
-)
-
 # Sentinel written by ColumnFormatter for rows that need no FX lookup.
 _NO_VALUE = "-"
 
@@ -274,8 +268,6 @@ class Pit38Summary:
         rows: Per-row breakdown of the foreign rows only.
         unknown_country_tickers: Tickers whose issuer country or treaty rate
             could not be resolved; their wariant A cap degrades to 19%.
-        unconverted_currency_tickers: Tickers in a currency the pipeline does
-            not yet FX-convert, whose gross is therefore understated.
     """
 
     gross_foreign_pln: float
@@ -288,7 +280,6 @@ class Pit38Summary:
     total_gross_all_pln: float
     rows: tuple[Pit38Row, ...]
     unknown_country_tickers: tuple[str, ...]
-    unconverted_currency_tickers: tuple[str, ...]
 
 
 def build_pit38_summary(
@@ -319,7 +310,6 @@ def build_pit38_summary(
     """
     rows: list[Pit38Row] = []
     unknown_country: list[str] = []
-    unconverted_currency: list[str] = []
 
     total_gross_all = 0.0
     gross_foreign = 0.0
@@ -338,10 +328,6 @@ def build_pit38_summary(
 
         if country == DOMESTIC_ISSUER_COUNTRY:
             continue
-
-        _amount, currency = _net_dividend(row)
-        if currency not in _FX_SUPPORTED_CURRENCIES:
-            unconverted_currency.append(ticker)
 
         # One degradation path, two triggers: an unresolved country and a
         # country with no treaty entry both fall back to the 19% cap, which
@@ -396,7 +382,6 @@ def build_pit38_summary(
         total_gross_all_pln=_round_2dp(total_gross_all),
         rows=tuple(rows),
         unknown_country_tickers=tuple(dict.fromkeys(unknown_country)),
-        unconverted_currency_tickers=tuple(dict.fromkeys(unconverted_currency)),
     )
 
 
@@ -415,7 +400,6 @@ _LABEL_POZ_48_B = "  poz. 48"  # pragma: no mutate
 _LABEL_PAYABLE = "  Do zaplaty w Polsce"  # pragma: no mutate
 _DOMESTIC_NOTE = "Pominieto pozycje polskich emitentow - podatek pobrany przez platnika."  # pragma: no mutate
 _UNKNOWN_COUNTRY_NOTE = "(!) {ticker}: nieznany kraj emitenta - limit UPO zastapiony limitem 19%."  # pragma: no mutate
-_UNCONVERTED_CURRENCY_NOTE = "(!) {ticker}: liczba akcji bez kursu FX - zanizony przychod (plan 22)."  # pragma: no mutate
 _UNAVAILABLE_NOTES = (
     "Brak kursu NBP - nie mozna obliczyc pozycji PIT-38.",  # pragma: no mutate
     "Szczegoly w logu bledow.",  # pragma: no mutate
@@ -506,8 +490,6 @@ def format_pit38_block(summary: Pit38Summary, width: int) -> list[str]:
 
     for ticker in summary.unknown_country_tickers:
         body.append((_UNKNOWN_COUNTRY_NOTE.format(ticker=ticker), ""))
-    for ticker in summary.unconverted_currency_tickers:
-        body.append((_UNCONVERTED_CURRENCY_NOTE.format(ticker=ticker), ""))
 
     longest = max(
         [len(_TITLE)] + [len(label) + len(value) + 1 for label, value in body if label]

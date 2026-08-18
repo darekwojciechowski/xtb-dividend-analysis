@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timedelta
+from decimal import ROUND_HALF_UP, Decimal
 
 import numpy as np
 import pandas as pd
@@ -21,6 +22,23 @@ from .constants import (
     TickerSuffix,
 )
 from .date_converter import to_date
+
+
+def _round_shares_half_up(shares: float) -> float:
+    """Round a share count to the nearest whole share, halves going up.
+
+    Built-in :func:`round` applies banker's rounding, so an exact .5 share count
+    lands on the nearest even integer -- 2.5 becomes 2, not 3. Share counts are
+    back-solved from an amount and a per-share figure, so ties are reachable and
+    a downward tie propagates into the reconstructed dividend amount.
+
+    Args:
+        shares: Unrounded share count.
+
+    Returns:
+        The share count rounded half-up, as a float.
+    """
+    return float(Decimal(repr(shares)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
 class ExchangeRateUnavailableError(ValueError):
@@ -59,11 +77,20 @@ class CurrencyConverter:
     """
 
     # Map of supported currency codes to the NBP CSV column that holds the rate.
+    #
+    # Only per-1-unit columns belong here. The NBP file also carries per-100
+    # columns (100HUF, 100JPY, 100KRW, 100INR, 100CLP, 100ISK) and 10000IDR;
+    # adding any of those without applying the divisor yields a silent 100x
+    # (or 10000x) error, so they are deliberately absent.
     _CURRENCY_COLUMN_MAP = {
         Currency.USD.value: "1USD",
         Currency.EUR.value: "1EUR",
         Currency.GBP.value: "1GBP",
         Currency.DKK.value: "1DKK",
+        Currency.CHF.value: "1CHF",
+        Currency.NOK.value: "1NOK",
+        Currency.SEK.value: "1SEK",
+        Currency.CAD.value: "1CAD",
     }
 
     def __init__(self, df: pd.DataFrame):
@@ -376,7 +403,7 @@ class CurrencyConverter:
             exchange_rate = 1.0
             if (
                 statement_currency == Currency.PLN.value
-                and currency == Currency.USD.value
+                and currency != Currency.PLN.value
             ):
                 target_date_str = row[date_d1_col].strftime("%Y-%m-%d")
                 exchange_rate = self.get_exchange_rate(
@@ -392,13 +419,14 @@ class CurrencyConverter:
             else:
                 shares = float(row[amount_col]) / denom
 
+            rounded_shares = _round_shares_half_up(shares)
             return pd.Series(
                 {
                     _COMPUTED: True,
-                    shares_col: float(round(shares)),
+                    shares_col: rounded_shares,
                     currency_col: currency,
                     # Total dividend = shares × per-share (was a 2-pass calc).
-                    amount_col: float(round(shares)) * dividend_per_share,
+                    amount_col: rounded_shares * dividend_per_share,
                 }
             )
 

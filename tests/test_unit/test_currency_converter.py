@@ -466,11 +466,12 @@ class TestGetExchangeRate:
     def test_get_exchange_rate_when_unsupported_currency_then_raises(
         self, tmp_path: Path
     ) -> None:
-        """Arrange: Currency is unsupported (e.g., CHF).
+        """Arrange: Currency has no column in the map (JPY is quoted per 100).
         Act: get the exchange rate.
         Assert: Raises ExchangeRateUnavailableError instead of silently returning 1.0.
         """
-        # Arrange
+        # Arrange — JPY is deliberately unmapped: the NBP file quotes it per 100,
+        # so mapping it without a divisor would produce a silent 100x error.
         from data_processing.currency_converter import ExchangeRateUnavailableError
 
         csv_file = _nbp_csv(tmp_path, "20240115", 3.95)
@@ -478,10 +479,31 @@ class TestGetExchangeRate:
 
         # Act / Assert
         with pytest.raises(ExchangeRateUnavailableError) as excinfo:
-            converter.get_exchange_rate([str(csv_file)], "2024-01-15", "CHF")
-        assert excinfo.value.currency == "CHF"
+            converter.get_exchange_rate([str(csv_file)], "2024-01-15", "JPY")
+        assert excinfo.value.currency == "JPY"
         assert excinfo.value.target_date == "2024-01-15"
         assert excinfo.value.searched_files == [str(csv_file)]
+
+    def test_get_exchange_rate_when_chf_then_resolves_from_per_one_column(
+        self, tmp_path: Path
+    ) -> None:
+        """Arrange: NBP CSV carries the per-1 '1CHF' column.
+        Act: get the exchange rate for CHF.
+        Assert: The rate is read, not rejected as an unsupported currency.
+        """
+        # Arrange
+        content = (
+            "data;1USD;1CHF\nnazwa;US dollar;Swiss franc\n20240115;3,9500;4,6100\n"
+        )
+        csv_file = tmp_path / "archiwum_tab_a_2024.csv"
+        csv_file.write_text(content, encoding="ISO-8859-1")
+        converter = _converter()
+
+        # Act
+        rate = converter.get_exchange_rate([str(csv_file)], "2024-01-15", "CHF")
+
+        # Assert
+        assert rate == pytest.approx(4.61)
 
     def test_get_exchange_rate_when_no_csv_files_and_nonpln_then_raises(self) -> None:
         """Arrange: No CSV files available, currency is non-PLN.
@@ -996,6 +1018,52 @@ class TestCalculateDividendMutations:
             result = converter.calculate_dividend([], "PLN", _COMMENT, _AMOUNT)
 
         assert result.loc[0, _SHARES] == 2
+
+    def test_dkk_dividend_is_converted_with_the_nbp_rate(self) -> None:
+        """Arrange: a DKK row on a PLN statement, NBP DKK rate 0.5702.
+        Act: calculate the dividend.
+        Assert: Shares back-solve through the rate — 27.43 / (3.75 x 0.5702) = 12.8.
+
+        Before plan 22 the FX branch fired only for USD, so a DKK row divided by
+        the bare per-share figure and produced 7 shares / 26.25 DKK.
+        """
+        # Arrange
+        df = pd.DataFrame(
+            _valid_row(
+                ticker="NOVOB.DK", amount=27.43, comment="NOVOB.DK DKK 3.75/ SHR"
+            )
+        )
+        converter = CurrencyConverter(df)
+
+        # Act
+        with patch.object(converter, "get_exchange_rate", return_value=0.5702):
+            result = converter.calculate_dividend([], "PLN", _COMMENT, _AMOUNT)
+
+        # Assert
+        assert result.loc[0, _SHARES] == 13
+        assert result.loc[0, _AMOUNT] == pytest.approx(48.75)
+
+    def test_share_count_tie_rounds_half_up_not_to_even(self) -> None:
+        """Arrange: total=5.0, per_share=1.0, rate=2.0 — exactly 2.5 shares.
+        Act: calculate the dividend.
+        Assert: Shares is 3, not the 2 that banker's rounding would give.
+
+        The operands must divide exactly. A tie assembled from decimal-looking
+        figures usually does not: 2.85 / (0.57 * 2.0) is 2.5000000000000004,
+        which already rounds up and would make this test pass against the bug.
+        """
+        # Arrange — 5.0 / (1.0 * 2.0) == 2.5 exactly
+        df = pd.DataFrame(
+            _valid_row(ticker="AAPL.US", amount=5.0, comment="AAPL.US USD 1.0/ SHR")
+        )
+        converter = CurrencyConverter(df)
+
+        # Act
+        with patch.object(converter, "get_exchange_rate", return_value=2.0):
+            result = converter.calculate_dividend([], "PLN", _COMMENT, _AMOUNT)
+
+        # Assert
+        assert result.loc[0, _SHARES] == 3
 
     # ------------------------------------------------------------------
     # mutmut_66–69: warning message for division-by-zero case
