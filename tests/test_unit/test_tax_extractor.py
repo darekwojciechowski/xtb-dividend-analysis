@@ -184,6 +184,31 @@ class TestGetDefaultTaxRate:
         # Assert
         assert result == pytest.approx(expected)
 
+    @pytest.mark.parametrize(
+        "ticker, expected",
+        [
+            ("XASB.PL", 0.19),  # merely contains "ASB.PL" -- not the override
+            ("FOO.USX", 0.0),  # merely contains ".US" -- not a US listing
+            ("ASB.PL", 0.0),  # the override itself still applies
+        ],
+    )
+    def test_get_default_rate_matches_the_suffix_not_any_substring(
+        self, ticker: str, expected: float
+    ) -> None:
+        """Substring matching resolved tickers off an embedded suffix.
+
+        "XASB.PL" took ASBIS's 0% override and "FOO.USX" took the US 15%, both
+        wrong, and the outcome depended on dict insertion order.
+        """
+        # Arrange
+        extractor = TaxExtractor(pd.DataFrame())
+
+        # Act
+        result = extractor.get_default_tax_rate(ticker)
+
+        # Assert
+        assert result == pytest.approx(expected)
+
     def test_get_default_rate_when_unknown_suffix_then_returns_zero(self) -> None:
         """Unknown country suffix → 0.0 (safe default)."""
         # Arrange

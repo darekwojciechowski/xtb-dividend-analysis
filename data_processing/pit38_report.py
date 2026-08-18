@@ -97,9 +97,9 @@ def resolve_issuer_country(ticker: str) -> str | None:
 
     clean = _ANSI_PATTERN.sub("", ticker).strip()
 
-    for override_ticker, country in TICKER_COUNTRY_OVERRIDES.items():
-        if override_ticker in clean:
-            return country
+    override = TICKER_COUNTRY_OVERRIDES.get(clean)
+    if override is not None:
+        return override
 
     for suffix, country in SUFFIX_TO_ISSUER_COUNTRY.items():
         if clean.endswith(suffix):

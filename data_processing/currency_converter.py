@@ -176,18 +176,20 @@ class CurrencyConverter:
         Returns:
             Inferred currency code.
         """
-        if "ASB.PL" in ticker:  # pragma: no mutate
+        # ASBIS pays its dividend in USD despite the .PL listing. Matched by
+        # exact ticker, not substring, so "XASB.PL" does not inherit it.
+        if ticker == "ASB.PL":  # pragma: no mutate
             return Currency.USD.value  # pragma: no mutate
-        if TickerSuffix.US.value in ticker:  # pragma: no mutate
+        if ticker.endswith(TickerSuffix.US.value):  # pragma: no mutate
             return Currency.USD.value  # pragma: no mutate
-        elif TickerSuffix.PL.value in ticker:  # pragma: no mutate
+        elif ticker.endswith(TickerSuffix.PL.value):  # pragma: no mutate
             return Currency.PLN.value  # pragma: no mutate
-        elif TickerSuffix.DK.value in ticker:  # pragma: no mutate
+        elif ticker.endswith(TickerSuffix.DK.value):  # pragma: no mutate
             return Currency.DKK.value  # pragma: no mutate
-        elif TickerSuffix.UK.value in ticker:  # pragma: no mutate
+        elif ticker.endswith(TickerSuffix.UK.value):  # pragma: no mutate
             return Currency.GBP.value  # pragma: no mutate
         elif any(  # pragma: no mutate
-            suffix.value in ticker for suffix in TickerSuffix.eurozone_suffixes()
+            ticker.endswith(suffix.value) for suffix in TickerSuffix.eurozone_suffixes()
         ):
             return Currency.EUR.value  # pragma: no mutate
         return Currency.USD.value  # pragma: no mutate

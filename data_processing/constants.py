@@ -108,6 +108,33 @@ TICKER_COUNTRY_OVERRIDES: dict[str, str] = {
     "ASB.PL": "CY",
 }
 
+# Withholding actually levied at source, keyed by the ticker's listing venue.
+#
+# Distinct from ``TREATY_DIVIDEND_RATES`` below, and the two must not be merged:
+# this table is what the broker deducts (Denmark takes 27%), while the treaty
+# table is the *cap* Poland allows as a PIT-38 deduction, keyed by the issuer's
+# tax residence (Denmark's cap is 15%). Conflating them either overstates the
+# deduction or understates the tax withheld.
+#
+# Note: the US default assumes a filed W-8BEN. Without one the broker withholds
+# 30%, which reaches the pipeline from the statement comment rather than here.
+SUFFIX_WITHHOLDING_RATES: dict[str, float] = {
+    TickerSuffix.US.value: 0.15,
+    TickerSuffix.PL.value: 0.19,  # Belka, withheld by the Polish payer
+    TickerSuffix.DK.value: 0.15,
+    TickerSuffix.UK.value: 0.0,  # no UK withholding on non-residents
+    TickerSuffix.IE.value: 0.15,
+    TickerSuffix.FR.value: 0.0,
+}
+
+# Tickers whose withholding differs from their listing venue's default.
+# Keys must match ``TICKER_COUNTRY_OVERRIDES`` exactly -- a ticker whose issuer
+# sits in another country is precisely a ticker whose withholding is not its
+# venue's. A contract test pins the two key sets together.
+TICKER_WITHHOLDING_OVERRIDES: dict[str, float] = {
+    "ASB.PL": 0.0,
+}
+
 # Maximum dividend withholding rate Poland's double-taxation treaties allow the
 # source state to levy. Used as the "wariant A" cap on the PIT-38 poz. 48
 # deduction. Poland is absent by design: domestic issuers are settled by the

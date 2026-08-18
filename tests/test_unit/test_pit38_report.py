@@ -112,6 +112,16 @@ class TestResolveIssuerCountry:
 
         assert resolve_issuer_country(colored) == "CY"
 
+    def test_resolve_when_ticker_merely_contains_an_override_then_no_match(
+        self,
+    ) -> None:
+        """An override applies to its exact ticker, not anything containing it.
+
+        Substring matching resolved "ASB.PLUS" to Cyprus, silently moving a
+        real position onto ASBIS's 5% treaty cap.
+        """
+        assert resolve_issuer_country("ASB.PLUS") is None
+
     def test_resolve_when_unknown_suffix_then_returns_none(self) -> None:
         assert resolve_issuer_country("FOO.ZZ") is None
 

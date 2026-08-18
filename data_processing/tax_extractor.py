@@ -11,7 +11,11 @@ import re
 import pandas as pd
 from loguru import logger
 
-from .constants import ColumnName, TickerSuffix
+from .constants import (
+    SUFFIX_WITHHOLDING_RATES,
+    TICKER_WITHHOLDING_OVERRIDES,
+    ColumnName,
+)
 
 
 class TaxExtractor:
@@ -62,29 +66,18 @@ class TaxExtractor:
         Returns:
             Default tax rate as decimal.
         """
-        # Special case: ASB.PL (ASBIS) is a Cypriot company listed in Poland;
-        # nothing is withheld at source, so the full Polish 19% is owed on it.
-        if "ASB.PL" in ticker:
-            return 0.0
+        # Issuer-specific overrides win over the listing venue's default:
+        # ASB.PL (ASBIS) is a Cypriot company listed in Poland, and nothing is
+        # withheld at source.
+        override = TICKER_WITHHOLDING_OVERRIDES.get(ticker)
+        if override is not None:
+            return override
 
-        # Define the withholding tax rates at source
-        # Note: US default is 15% with W8BEN form. Without W8BEN, the rate is 30%.
-        tax_rates = {
-            # 15% withholding tax for US stocks (with W8BEN form)
-            TickerSuffix.US.value: 0.15,
-            # 19% withholding tax for PL stocks (Belka tax)
-            TickerSuffix.PL.value: 0.19,
-            TickerSuffix.DK.value: 0.15,  # 15% withholding tax for DK stocks (Denmark)
-            # 0% withholding tax for UK stocks (no UK withholding tax for non-residents)
-            TickerSuffix.UK.value: 0.0,
-            # 15% withholding tax for IE stocks (Ireland, reduced rate for Polish residents)
-            TickerSuffix.IE.value: 0.15,
-            # 0% withholding tax for FR stocks (France, under Poland-France tax treaty)
-            TickerSuffix.FR.value: 0.0,
-        }
-
-        for suffix, rate in tax_rates.items():
-            if suffix in ticker:
+        # Match the suffix, not any substring: "in" would resolve "XASB.PL" and
+        # "FOO.USX" off tickers that merely contain a suffix, and would make the
+        # result depend on dict insertion order.
+        for suffix, rate in SUFFIX_WITHHOLDING_RATES.items():
+            if ticker.endswith(suffix):
                 return rate
 
         return 0.0  # Default to 0% if country not recognized
