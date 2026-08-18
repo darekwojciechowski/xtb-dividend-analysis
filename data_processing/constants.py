@@ -121,7 +121,7 @@ TICKER_COUNTRY_OVERRIDES: dict[str, str] = {
 SUFFIX_WITHHOLDING_RATES: dict[str, float] = {
     TickerSuffix.US.value: 0.15,
     TickerSuffix.PL.value: 0.19,  # Belka, withheld by the Polish payer
-    TickerSuffix.DK.value: 0.15,
+    TickerSuffix.DK.value: 0.27,  # Denmark's statutory rate, not the 15% cap
     TickerSuffix.UK.value: 0.0,  # no UK withholding on non-residents
     TickerSuffix.IE.value: 0.15,
     TickerSuffix.FR.value: 0.0,
