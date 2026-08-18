@@ -71,6 +71,61 @@ class TickerSuffix(str, Enum):
         ]
 
 
+# Issuer tax residence used for PIT-38 classification.
+#
+# These are ratified double-taxation-treaty facts, not deployment configuration,
+# so they live here rather than in ``config/settings.py``.
+DOMESTIC_ISSUER_COUNTRY: str = "PL"
+
+# Ticker suffix -> issuer tax residence. The suffix is normally the listing
+# venue, which usually coincides with tax residence; where it does not, add an
+# entry to ``TICKER_COUNTRY_OVERRIDES`` instead of bending this map.
+SUFFIX_TO_ISSUER_COUNTRY: dict[str, str] = {
+    TickerSuffix.US.value: "US",
+    TickerSuffix.PL.value: "PL",
+    TickerSuffix.UK.value: "UK",
+    TickerSuffix.DK.value: "DK",
+    TickerSuffix.FR.value: "FR",
+    TickerSuffix.DE.value: "DE",
+    TickerSuffix.IE.value: "IE",
+    TickerSuffix.NL.value: "NL",
+    TickerSuffix.ES.value: "ES",
+    TickerSuffix.IT.value: "IT",
+    TickerSuffix.BE.value: "BE",
+    TickerSuffix.AT.value: "AT",
+    TickerSuffix.FI.value: "FI",
+    TickerSuffix.PT.value: "PT",
+}
+
+# Tickers whose listing venue differs from the issuer's tax residence.
+# ASBIS (ASB.PL) is a Cypriot company listed on the WSE: nothing is withheld at
+# source, so the full Polish 19% is owed on it.
+TICKER_COUNTRY_OVERRIDES: dict[str, str] = {
+    "ASB.PL": "CY",
+}
+
+# Maximum dividend withholding rate Poland's double-taxation treaties allow the
+# source state to levy. Used as the "wariant A" cap on the PIT-38 poz. 48
+# deduction. Poland is absent by design: domestic issuers are settled by the
+# payer and are excluded from the declaration block entirely.
+TREATY_DIVIDEND_RATES: dict[str, float] = {
+    "US": 0.15,
+    "UK": 0.10,
+    "IT": 0.10,
+    "BE": 0.10,
+    "DE": 0.15,
+    "FR": 0.15,
+    "IE": 0.15,
+    "NL": 0.15,
+    "ES": 0.15,
+    "AT": 0.15,
+    "FI": 0.15,
+    "PT": 0.15,
+    "DK": 0.15,
+    "CY": 0.05,
+}
+
+
 class ColumnName(str, Enum):
     """Standard column names used throughout processing.
 

@@ -514,8 +514,8 @@ class TestAddTaxCollectedAmount:
 
         result = formatter.add_tax_collected_amount(statement_currency="PLN")
 
-        # gross = 28.22 / (1 - 0.19) = 34.8395..., tax = gross * 0.19 = 6.6195...
-        assert result["Tax Collected Amount"].iloc[0] == "6.62 PLN"
+        # 'Net Dividend' is the gross amount: tax = 28.22 * 0.19 = 5.3618
+        assert result["Tax Collected Amount"].iloc[0] == "5.36 PLN"
 
     def test_tax_amount_default_statement_currency_is_pln(self) -> None:
         """Arrange: add_tax_collected_amount called without statement_currency argument.
@@ -529,7 +529,7 @@ class TestAddTaxCollectedAmount:
         result = formatter.add_tax_collected_amount()
 
         # Should use PLN calculation
-        assert result["Tax Collected Amount"].iloc[0] == "6.62 PLN"
+        assert result["Tax Collected Amount"].iloc[0] == "5.36 PLN"
 
     def test_tax_amount_tax_percentage_default_is_zero_not_one(self) -> None:
         """Arrange: Tax Collected is NaN (uses default value).
@@ -602,9 +602,9 @@ class TestAddTaxCollectedAmount:
         # Call with PLN (non-USD) statement - should NOT use raw column
         result = formatter.add_tax_collected_amount(statement_currency="PLN")
 
-        # With PLN, should calculate from percentage, not use raw amount
-        # gross = 6.84 / (1 - 0.15) = 8.047..., tax = gross * 0.15 = 1.207...
-        expected = "1.21 USD"  # calculated, not "1.21 USD" from raw
+        # With PLN, should calculate from percentage, not use raw amount.
+        # Calculated: 6.84 * 0.15 = 1.026 -> "1.03 USD"; raw path would give "1.21 USD".
+        expected = "1.03 USD"
         assert result["Tax Collected Amount"].iloc[0] == expected
 
     def test_tax_amount_condition_equality_not_inequality(self) -> None:
@@ -647,8 +647,8 @@ class TestAddTaxCollectedAmount:
 
         result = formatter.add_tax_collected_amount(statement_currency="USD")
 
-        # With raw = 0, should calculate from percentage instead
-        expected = "1.21 USD"  # calculated
+        # With raw = 0, should calculate from percentage instead: 6.84 * 0.15 = 1.026
+        expected = "1.03 USD"  # calculated
         assert result["Tax Collected Amount"].iloc[0] == expected
 
     def test_tax_amount_usd_raw_nan_not_used(self) -> None:
@@ -669,8 +669,8 @@ class TestAddTaxCollectedAmount:
 
         result = formatter.add_tax_collected_amount(statement_currency="USD")
 
-        # With raw = NaN, should calculate from percentage instead
-        expected = "1.21 USD"  # calculated
+        # With raw = NaN, should calculate from percentage instead: 6.84 * 0.15 = 1.026
+        expected = "1.03 USD"  # calculated
         assert result["Tax Collected Amount"].iloc[0] == expected
 
     def test_tax_amount_absolute_value_of_raw(self) -> None:
@@ -737,30 +737,31 @@ class TestAddTaxCollectedAmount:
     def test_tax_amount_calculation_formula_correct(self) -> None:
         """Arrange: PLN statement with 100.00 PLN and 20% tax.
         Act: add Tax Collected Amount column.
-        Assert: Calculation uses gross = net / (1 - tax%), tax = gross * tax%.
+        Assert: Calculation is tax = gross * tax%.
         """
         df = _make_tax_amount_df("100.00 PLN", tax_collected=0.20)
         formatter = ColumnFormatter(df)
 
         result = formatter.add_tax_collected_amount(statement_currency="PLN")
 
-        # gross = 100 / (1 - 0.20) = 100 / 0.80 = 125
-        # tax = 125 * 0.20 = 25.00
-        assert result["Tax Collected Amount"].iloc[0] == "25.00 PLN"
+        # tax = 100 * 0.20 = 20.00
+        assert result["Tax Collected Amount"].iloc[0] == "20.00 PLN"
 
-    def test_tax_amount_formula_dividend_not_swapped(self) -> None:
+    def test_tax_amount_when_pln_statement_then_multiplies_gross_by_rate_not_divides(
+        self,
+    ) -> None:
         """Arrange: PLN statement with 100.00 PLN and 25% tax.
         Act: add Tax Collected Amount column.
-        Assert: Calculation divides by (1 - tax%), not (1 + tax%).
+        Assert: Result is gross * rate, not the grossed-up gross / (1 - rate) * rate.
         """
         df = _make_tax_amount_df("100.00 PLN", tax_collected=0.25)
         formatter = ColumnFormatter(df)
 
         result = formatter.add_tax_collected_amount(statement_currency="PLN")
 
-        # With division by (1 - 0.25) = 0.75: gross = 133.33, tax = 33.33
-        # With division by (1 + 0.25) = 1.25: gross = 80.00, tax = 20.00
-        assert result["Tax Collected Amount"].iloc[0] == "33.33 PLN"
+        # Multiplying: 100 * 0.25 = 25.00
+        # Grossing up first would give 100 / 0.75 * 0.25 = 33.33
+        assert result["Tax Collected Amount"].iloc[0] == "25.00 PLN"
 
     def test_tax_amount_column_created(self) -> None:
         """Arrange: DataFrame with Net Dividend and Tax Collected.
@@ -830,10 +831,9 @@ class TestAddTaxCollectedAmount:
 
         result = formatter.add_tax_collected_amount(statement_currency="PLN")
 
-        # Formula path: gross = 10.00 / (1 - 0.30) ≈ 14.286, tax = 14.286 * 0.30 ≈ 4.286
-        # Expected: "4.29 USD"
+        # Formula path: tax = 10.00 * 0.30 = 3.00 -> "3.00 USD"
         # Raw path would give "1.30 USD"
-        assert result["Tax Collected Amount"].iloc[0] == "4.29 USD"
+        assert result["Tax Collected Amount"].iloc[0] == "3.00 USD"
 
 
 @pytest.mark.unit

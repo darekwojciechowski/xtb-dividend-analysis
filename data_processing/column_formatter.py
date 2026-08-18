@@ -223,7 +223,12 @@ class ColumnFormatter:
         Shows the tax amount in the same currency as the dividend (not as percentage).
 
         For USD statement: uses the raw tax amount from file (Tax Collected Raw column)
-        For PLN statement: calculates from Net Dividend and tax percentage
+        For PLN statement: multiplies 'Net Dividend' by the withholding rate.
+
+        Despite its name, 'Net Dividend' holds the **gross** dividend: in the raw
+        XTB statement the ``Dywidenda``/``DIVIDENT`` amount is gross and withholding
+        is a separate negative line, and ``CurrencyConverter.calculate_dividend``
+        rebuilds the column as ``shares x gross_dividend_per_share``.
 
         Args:
             statement_currency: Currency of the statement ('USD' or 'PLN')
@@ -264,12 +269,10 @@ class ColumnFormatter:
                     formatted_amount = f"{tax_amount:.2f}"
                     return f"{formatted_amount} {currency}"
 
-            # For PLN statement or if raw amount not available: calculate from percentage
-            # Net Dividend = Gross Dividend * (1 - tax_percentage)
-            # Therefore: Gross Dividend = Net Dividend / (1 - tax_percentage)
-            # Tax Amount = Gross Dividend * tax_percentage
-            gross_dividend = dividend_amount / (1 - tax_percentage)
-            tax_amount = gross_dividend * tax_percentage
+            # For PLN statement or if raw amount not available: calculate from percentage.
+            # 'Net Dividend' already holds the gross amount (see docstring), and the
+            # statement's withholding line equals gross * rate, so no grossing-up.
+            tax_amount = dividend_amount * tax_percentage
 
             # Format with currency
             formatted_amount = f"{tax_amount:.2f}"
