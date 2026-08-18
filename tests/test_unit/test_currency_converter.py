@@ -1024,8 +1024,9 @@ class TestCalculateDividendMutations:
         Act: calculate the dividend.
         Assert: Shares back-solve through the rate — 27.43 / (3.75 x 0.5702) = 12.8.
 
-        Before plan 22 the FX branch fired only for USD, so a DKK row divided by
-        the bare per-share figure and produced 7 shares / 26.25 DKK.
+        Before the NBP-rate fix the FX branch fired only for USD, so a DKK
+        row divided by the bare per-share figure and produced 7 shares /
+        26.25 DKK.
         """
         # Arrange
         df = pd.DataFrame(

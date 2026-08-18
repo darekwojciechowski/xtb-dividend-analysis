@@ -14,9 +14,9 @@ SBUX.US      US 15%    6.42       0.96      1.22    0.96       0.96
 NOVOB.DK     DK 15%    27.80      7.51      5.28    4.17       5.28
 ===========  ========  =========  ========  ======  =========  =========
 
-NOVOB.DK's figures come from applying the NBP DKK rate to its share count
-(plan 22 commit 1). Before that fix the row was divided by the bare per-share
-figure and understated its gross as 14.97 PLN.
+NOVOB.DK's figures come from applying the NBP DKK rate to its share count.
+Before that fix the row was divided by the bare per-share figure and
+understated its gross as 14.97 PLN.
 
 The totals are **not** the sum of those 2-decimal displays: accumulation runs
 at full float precision and rounds once at the end. Do not "correct" a total to
@@ -172,7 +172,7 @@ def test_pit38_reconciles_with_calculated_total_tax(
     re-parses values that were already formatted to two decimals, so each row
     can drift by a few groszy. 27.0605 - 8.3724 = 18.6881 vs 18.66 here.
 
-    ``calculate_total_tax_amount`` stays at 18.66 across plan 22 commit 1:
+    ``calculate_total_tax_amount`` stays at 18.66 across the NBP-rate fix:
     ``Tax Amount PLN`` is computed from the reconstructed ``Net Dividend``, and
     every row the FX fix moves (MMM at 30%, NOVOB at 27%) is masked to "-" for
     being withheld at or above 19%.
