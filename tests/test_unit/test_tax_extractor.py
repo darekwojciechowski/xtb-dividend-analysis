@@ -19,6 +19,7 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
+from data_processing.constants import TREATY_DIVIDEND_RATES
 from data_processing.tax_extractor import TaxExtractor
 
 # ---------------------------------------------------------------------------
@@ -163,7 +164,7 @@ class TestGetDefaultTaxRate:
         [
             ("AAPL.US", 0.15),
             ("XTB.PL", 0.19),
-            ("NOVOB.DK", 0.15),
+            ("NOVOB.DK", 0.27),
             ("HSBA.UK", 0.0),
             ("CRH.IE", 0.15),
             ("AIR.FR", 0.0),
@@ -175,6 +176,46 @@ class TestGetDefaultTaxRate:
         self, ticker: str, expected: float
     ) -> None:
         """Correct default WHT rate is returned for each ticker suffix."""
+        # Arrange
+        extractor = TaxExtractor(pd.DataFrame())
+
+        # Act
+        result = extractor.get_default_tax_rate(ticker)
+
+        # Assert
+        assert result == pytest.approx(expected)
+
+    def test_dk_withholding_and_dk_treaty_cap_stay_separate(self) -> None:
+        """Denmark withholds 27%; 15% is the treaty cap, not the withholding.
+
+        The two tables answer different questions -- what SKAT deducts versus
+        what Poland lets you deduct -- and merging them either overstates the
+        PIT-38 deduction or understates the tax withheld. Asserting both here
+        means a future merge cannot pass this test.
+        """
+        # Arrange
+        extractor = TaxExtractor(pd.DataFrame())
+
+        # Act / Assert
+        assert extractor.get_default_tax_rate("NOVOB.DK") == pytest.approx(0.27)
+        assert TREATY_DIVIDEND_RATES["DK"] == pytest.approx(0.15)
+
+    @pytest.mark.parametrize(
+        "ticker, expected",
+        [
+            ("XASB.PL", 0.19),  # merely contains "ASB.PL" -- not the override
+            ("FOO.USX", 0.0),  # merely contains ".US" -- not a US listing
+            ("ASB.PL", 0.0),  # the override itself still applies
+        ],
+    )
+    def test_get_default_rate_matches_the_suffix_not_any_substring(
+        self, ticker: str, expected: float
+    ) -> None:
+        """Substring matching resolved tickers off an embedded suffix.
+
+        "XASB.PL" took ASBIS's 0% override and "FOO.USX" took the US 15%, both
+        wrong, and the outcome depended on dict insertion order.
+        """
         # Arrange
         extractor = TaxExtractor(pd.DataFrame())
 

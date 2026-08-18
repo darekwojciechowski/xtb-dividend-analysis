@@ -11,13 +11,16 @@ SBUX.US      US 15%    7.10       1.06      1.35    1.06       1.06
 MMM.US       US 15%    5.60       1.68      1.06    0.84       1.06
 ASB.PL       CY 5%     95.51      0.00      18.15   0.00       0.00
 SBUX.US      US 15%    6.42       0.96      1.22    0.96       0.96
-NOVOB.DK     DK 15%    14.97      4.04      2.84    2.25       2.84
+NOVOB.DK     DK 15%    27.80      7.51      5.28    4.17       5.28
 ===========  ========  =========  ========  ======  =========  =========
 
+NOVOB.DK's figures come from applying the NBP DKK rate to its share count.
+Before that fix the row was divided by the bare per-share figure and
+understated its gross as 14.97 PLN.
+
 The totals are **not** the sum of those 2-decimal displays: accumulation runs
-at full float precision and rounds once at the end. Adding the displayed
-wariant-B column gives 5.92, while the unrounded terms give 5.93. Do not
-"correct" a total to match its column.
+at full float precision and rounds once at the end. Do not "correct" a total to
+match its column.
 """
 
 from __future__ import annotations
@@ -68,8 +71,8 @@ def test_pit38_gross_foreign_excludes_polish_issuers(
     Args:
         pit38_summary: Module-scoped summary fixture.
     """
-    assert pit38_summary.gross_foreign_pln == pytest.approx(129.59)
-    assert pit38_summary.total_gross_all_pln == pytest.approx(288.61)
+    assert pit38_summary.gross_foreign_pln == pytest.approx(142.42)
+    assert pit38_summary.total_gross_all_pln == pytest.approx(301.44)
     assert pit38_summary.total_gross_all_pln - pit38_summary.gross_foreign_pln == (
         pytest.approx(_POLISH_GROSS_PLN, abs=0.01)
     )
@@ -89,11 +92,11 @@ def test_pit38_declaration_figures_match_expected_demo_values(
     Args:
         pit38_summary: Module-scoped summary fixture.
     """
-    assert pit38_summary.foreign_tax_paid_pln == pytest.approx(7.75)
-    assert pit38_summary.tax_19_pct_pln == pytest.approx(24.62)
-    assert pit38_summary.deductible_treaty_pln == pytest.approx(5.11)
-    assert pit38_summary.deductible_full_pln == pytest.approx(5.93)
-    assert pit38_summary.payable_treaty_pln == pytest.approx(19.51)
+    assert pit38_summary.foreign_tax_paid_pln == pytest.approx(11.21)
+    assert pit38_summary.tax_19_pct_pln == pytest.approx(27.06)
+    assert pit38_summary.deductible_treaty_pln == pytest.approx(7.04)
+    assert pit38_summary.deductible_full_pln == pytest.approx(8.37)
+    assert pit38_summary.payable_treaty_pln == pytest.approx(20.02)
     assert pit38_summary.payable_full_pln == pytest.approx(18.69)
 
 
@@ -115,7 +118,7 @@ def test_pit38_per_row_breakdown_matches_expected_demo_values(
         ("MMM.US", "US", 5.60, 0.84, 1.06),
         ("ASB.PL", "CY", 95.51, 0.00, 0.00),
         ("SBUX.US", "US", 6.42, 0.96, 0.96),
-        ("NOVOB.DK", "DK", 14.97, 2.25, 2.84),
+        ("NOVOB.DK", "DK", 27.80, 4.17, 5.28),
     ]
 
     actual = [
@@ -138,22 +141,21 @@ def test_pit38_per_row_breakdown_matches_expected_demo_values(
         assert got[4] == pytest.approx(want[4])
 
 
-def test_pit38_flags_non_usd_foreign_row_as_unconverted(
+def test_pit38_resolves_every_demo_issuer_country(
     pit38_summary: Pit38Summary,
 ) -> None:
-    """Test that the DKK row is flagged as not yet FX-converted.
+    """Test that no demo row degrades to the unknown-country 19% cap.
 
-    Given: NOVOB.DK, whose share count is computed without an FX rate
-           (Bug C, deferred to plan 22) and whose gross is therefore understated
+    Given: The demo statement's five foreign rows
     When:  The PIT-38 summary is folded
-    Then:  The ticker appears in ``unconverted_currency_tickers`` so the block
-           can print an explicit warning, and no country is left unresolved
+    Then:  Every issuer country resolves, so no wariant-A cap is silently
+           replaced by the 19% fallback
 
     Args:
         pit38_summary: Module-scoped summary fixture.
     """
-    assert pit38_summary.unconverted_currency_tickers == ("NOVOB.DK",)
     assert pit38_summary.unknown_country_tickers == ()
+    assert all(row.country is not None for row in pit38_summary.rows)
 
 
 def test_pit38_reconciles_with_calculated_total_tax(
@@ -168,7 +170,12 @@ def test_pit38_reconciles_with_calculated_total_tax(
 
     The tolerance is not slack for its own sake: ``_calculate_tax_pln_row``
     re-parses values that were already formatted to two decimals, so each row
-    can drift by a few groszy. 24.6229 - 5.9348 = 18.688 vs 18.66 here.
+    can drift by a few groszy. 27.0605 - 8.3724 = 18.6881 vs 18.66 here.
+
+    ``calculate_total_tax_amount`` stays at 18.66 across the NBP-rate fix:
+    ``Tax Amount PLN`` is computed from the reconstructed ``Net Dividend``, and
+    every row the FX fix moves (MMM at 30%, NOVOB at 27%) is masked to "-" for
+    being withheld at or above 19%.
 
     Precondition: ``calculate_total_tax_amount`` sums over *all* rows,
     including the Polish ones poz. 47 excludes. The relation holds only

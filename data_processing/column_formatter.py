@@ -6,6 +6,8 @@ including tax percentage display, currency annotations, and date calculations.
 
 from __future__ import annotations
 
+from decimal import ROUND_HALF_UP, Decimal
+
 import pandas as pd
 from loguru import logger
 
@@ -87,8 +89,17 @@ class ColumnFormatter:
             """Format tax percentage for display."""
             if pd.isna(value) or value == 0:
                 return "-"
-            # Convert decimal to percentage (e.g., 0.15 -> "15%")
-            return f"{int(value * 100)}%"
+            # Convert decimal to percentage (e.g., 0.15 -> "15%").
+            #
+            # int() truncates, and the binary representation of a rate lands
+            # just below its decimal value often enough to matter: 0.29 * 100
+            # is 28.999999999999996, which truncated printed "28%" on a row
+            # withheld at 29%. Round half-up at 2dp, then drop trailing zeros
+            # so whole percents keep their bare "15%" form.
+            percentage = Decimal(repr(value * 100)).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+            return f"{percentage.normalize():f}%"
 
         # Create display column from numeric column
         self.df["Tax Collected %"] = self.df["Tax Collected"].apply(

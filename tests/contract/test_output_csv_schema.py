@@ -69,8 +69,8 @@ class TestOutputCsvSchema:
             {
                 "Date": ["2025-02-21", "2025-05-29", "2025-08-19"],
                 "Ticker": ["TXT.PL", "ASB.PL", "NOVOB.DK"],
-                "Shares": [17.0, 85.0, 7.0],
-                "Net Dividend": ["28.22 PLN", "25.50 USD", "26.25 DKK"],
+                "Shares": [17.0, 85.0, 13.0],
+                "Net Dividend": ["28.22 PLN", "25.50 USD", "48.75 DKK"],
                 "Tax Collected %": ["19%", "-", "27%"],
                 "Tax Amount PLN": ["-", "18.15 PLN", "-"],
             }
