@@ -888,13 +888,33 @@ class TestAddTaxPercentageDisplay:
 
         assert result["Tax Collected %"].iloc[0] == "7%"
 
-    def test_uses_integer_truncation_for_percentage(self) -> None:
-        df = pd.DataFrame({"Tax Collected": [0.156]})
+    @pytest.mark.parametrize(
+        "rate, expected",
+        [
+            (0.29, "29%"),  # int(0.29 * 100) == 28 -- truncation loses a point
+            (0.57, "57%"),
+            (0.58, "58%"),
+            (0.15, "15%"),  # whole percents keep their bare form
+            (0.156, "15.6%"),  # a fractional rate is not flattened
+        ],
+    )
+    def test_formats_percentage_without_truncating_the_float(
+        self, rate: float, expected: str
+    ) -> None:
+        """A rate's float form can sit just under its decimal value.
+
+        0.29 * 100 is 28.999999999999996, so int() printed "28%" for a row
+        withheld at 29% -- a wrong number on the user's screen.
+        """
+        # Arrange
+        df = pd.DataFrame({"Tax Collected": [rate]})
         formatter = ColumnFormatter(df)
 
+        # Act
         result = formatter.add_tax_percentage_display()
 
-        assert result["Tax Collected %"].iloc[0] == "15%"
+        # Assert
+        assert result["Tax Collected %"].iloc[0] == expected
 
     def test_creates_named_tax_collected_pct_column(self) -> None:
         df = pd.DataFrame({"Tax Collected": [0.19]})
