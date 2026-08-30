@@ -71,9 +71,9 @@ def pit38_rows(draw, *, max_rows: int = 8) -> pd.DataFrame:
 
     Rows carry foreign (US) tickers so nothing is excluded as domestic, but
     are denominated in PLN so no NBP lookup is needed. Withholding rates are
-    whole percents because the pipeline writes ``Tax Collected %`` through
-    ``f"{int(value * 100)}%"``, and they straddle the US treaty rate (15%) and
-    the Polish rate (19%) so both deduction caps get exercised.
+    whole percents to keep the generated cases readable while still straddling
+    the US treaty cap (15%) and the Polish rate (19%), so both deduction caps
+    get exercised.
     """
     n = draw(st.integers(min_value=1, max_value=max_rows))
     tickers = draw(

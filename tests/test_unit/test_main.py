@@ -177,41 +177,34 @@ class TestMainFunction:
     Spreadsheet format. Includes both successful execution and error scenarios.
     """
 
-    @patch("main.GoogleSpreadsheetExporter")
-    @patch("main.process_data")
-    @patch("main.get_file_paths")
-    @patch("main.setup_logging")
     def test_main_when_successful_then_exports_results(
-        self,
-        mock_logging,
-        mock_get_paths,
-        mock_process,
-        mock_exporter_class,
-        sample_processed_df,
+        self, sample_processed_df
     ) -> None:
         """Tests that main() successfully processes and exports data.
 
         Args:
-            mock_logging: Mock of setup_logging function.
-            mock_get_paths: Mock of get_file_paths function.
-            mock_process: Mock of process_data function.
-            mock_exporter_class: Mock of GoogleSpreadsheetExporter class.
             sample_processed_df: Fixture providing sample DataFrame.
 
         Verifies:
-            - Logging is configured with INFO level
+            - Logging is configured
             - File paths are retrieved
-            - Data processing is executed
+            - Data processing is executed against those paths
             - Export to Google Spreadsheet format is performed
         """
-        # Arrange
-        mock_get_paths.return_value = ("input.xlsx", ["rates.csv"])
-        mock_process.return_value = sample_processed_df
+        # Arrange — collaborators injected through main()'s seam, no patching
+        mock_logging = MagicMock()
+        mock_get_paths = MagicMock(return_value=("input.xlsx", ["rates.csv"]))
+        mock_process = MagicMock(return_value=sample_processed_df)
         mock_exporter_instance = MagicMock()
-        mock_exporter_class.return_value = mock_exporter_instance
+        mock_exporter_class = MagicMock(return_value=mock_exporter_instance)
 
         # Act
-        main()
+        main(
+            setup_logging_fn=mock_logging,
+            get_file_paths_fn=mock_get_paths,
+            process_fn=mock_process,
+            exporter_cls=mock_exporter_class,
+        )
 
         # Assert
         mock_logging.assert_called_once_with()
@@ -223,18 +216,12 @@ class TestMainFunction:
         )
 
     @patch("main.logger")
-    @patch("main.process_data")
-    @patch("main.get_file_paths")
-    @patch("main.setup_logging")
     def test_main_when_value_error_then_logs_error_and_exits_gracefully(
-        self, mock_logging, mock_get_paths, mock_process, mock_logger
+        self, mock_logger
     ) -> None:
         """Tests that main() handles ValueError gracefully with proper logging.
 
         Args:
-            mock_logging: Mock of setup_logging function.
-            mock_get_paths: Mock of get_file_paths function.
-            mock_process: Mock of process_data function that raises ValueError.
             mock_logger: Mock of logger instance.
 
         Verifies:
@@ -243,47 +230,41 @@ class TestMainFunction:
             - Application exits gracefully without crashing
         """
         # Arrange
-        mock_get_paths.return_value = ("input.xlsx", ["rates.csv"])
-        mock_process.side_effect = ValueError("Exchange rate not found")
+        exploding_process = MagicMock(side_effect=ValueError("Exchange rate not found"))
 
         # Act
-        main()
+        main(
+            setup_logging_fn=MagicMock(),
+            get_file_paths_fn=MagicMock(return_value=("input.xlsx", ["rates.csv"])),
+            process_fn=exploding_process,
+        )
 
         # Assert
         mock_logger.error.assert_called()
         mock_logger.warning.assert_called()
         mock_logger.info.assert_called()
 
-    @patch("main.GoogleSpreadsheetExporter")
-    @patch("main.process_data")
-    @patch("main.get_file_paths")
-    @patch("main.setup_logging")
     def test_main_when_called_then_uses_default_input_file(
-        self,
-        mock_logging,
-        mock_get_paths,
-        mock_process,
-        mock_exporter_class,
-        sample_processed_df,
+        self, sample_processed_df
     ) -> None:
         """Tests that main() uses settings.default_input_file.
 
         Args:
-            mock_logging: Mock of setup_logging function.
-            mock_get_paths: Mock of get_file_paths function.
-            mock_process: Mock of process_data function.
-            mock_exporter_class: Mock of GoogleSpreadsheetExporter class.
             sample_processed_df: Fixture providing sample DataFrame.
 
         Verifies:
             - get_file_paths is called with settings.default_input_file value
         """
         # Arrange
-        mock_get_paths.return_value = ("test.xlsx", ["rates.csv"])
-        mock_process.return_value = sample_processed_df
+        mock_get_paths = MagicMock(return_value=("test.xlsx", ["rates.csv"]))
 
         # Act
-        main()
+        main(
+            setup_logging_fn=MagicMock(),
+            get_file_paths_fn=mock_get_paths,
+            process_fn=MagicMock(return_value=sample_processed_df),
+            exporter_cls=MagicMock(),
+        )
 
         # Assert
         # Verify get_file_paths was called with string version of settings.default_input_file
@@ -301,18 +282,12 @@ class TestMainErrorHandling:
     """
 
     @patch("main.logger")
-    @patch("main.process_data")
-    @patch("main.get_file_paths")
-    @patch("main.setup_logging")
     def test_main_when_missing_exchange_rates_then_provides_helpful_message(
-        self, mock_logging, mock_get_paths, mock_process, mock_logger
+        self, mock_logger
     ) -> None:
         """Tests that missing exchange rate error provides actionable guidance.
 
         Args:
-            mock_logging: Mock of setup_logging function.
-            mock_get_paths: Mock of get_file_paths function.
-            mock_process: Mock of process_data function that raises ValueError.
             mock_logger: Mock of logger instance.
 
         Verifies:
@@ -321,11 +296,16 @@ class TestMainErrorHandling:
             - Info message references "playwright_download_currency_archive" script
         """
         # Arrange
-        mock_get_paths.return_value = ("input.xlsx", [])
-        mock_process.side_effect = ValueError("No exchange rate data found")
+        exploding_process = MagicMock(
+            side_effect=ValueError("No exchange rate data found")
+        )
 
         # Act
-        main()
+        main(
+            setup_logging_fn=MagicMock(),
+            get_file_paths_fn=MagicMock(return_value=("input.xlsx", [])),
+            process_fn=exploding_process,
+        )
 
         # Assert
         error_calls = [call[0][0] for call in mock_logger.error.call_args_list]

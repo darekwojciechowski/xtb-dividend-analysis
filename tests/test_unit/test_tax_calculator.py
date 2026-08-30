@@ -1546,8 +1546,10 @@ class TestParsingNullHandling:
         )
         calculator = TaxCalculator(df)
 
-        # Act & Assert — no exception raised
-        calculator._validate_required_columns(["Date", "Ticker", "Amount"])
+        # Act & Assert — passes silently (returns None) when all columns exist
+        assert (
+            calculator._validate_required_columns(["Date", "Ticker", "Amount"]) is None
+        )
 
 
 @pytest.mark.unit

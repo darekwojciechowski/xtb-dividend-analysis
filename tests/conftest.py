@@ -219,6 +219,15 @@ def configure_test_logging() -> Generator[None, None, None]:
     Scope: session - Configure once for all tests.
     Autouse: True - Automatically applied to all tests.
 
+    Why session scope is safe here (project rule requires a written
+    justification for any autouse fixture above function scope): the fixture
+    holds no mutable state that tests can observe or corrupt. It swaps loguru's
+    default stderr sink for a no-op sink and restores the default afterwards,
+    so the only cross-test effect is silence. Tests that need to assert on log
+    output add their own sink for the duration of the test and remove it again,
+    which composes with this fixture rather than fighting it. Making it
+    function-scoped would re-register the sink ~830 times for no benefit.
+
     Yields:
         None - Cleanup happens after all tests complete.
     """

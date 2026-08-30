@@ -237,19 +237,12 @@ class TestCreateExchangeRateDMinus1Column:
 
         assert result["Exchange Rate D-1"].iloc[0] == "3.8512 PLN"
 
-    def test_exchange_rate_converter_created_with_df(self) -> None:
-        """Arrange: Exchange Rate D-1 column creation is requested.
-        Act: create the Exchange Rate D-1 column.
-        Assert: CurrencyConverter is instantiated with self.df.
-        """
-        df = _make_exchange_rate_df("6.84 USD", tax_collected=0.10)
-        formatter = ColumnFormatter(df)
-
-        with patch("data_processing.column_formatter.CurrencyConverter") as MockCC:
-            MockCC.return_value.get_exchange_rate.return_value = 3.85
-            formatter.create_exchange_rate_d_minus_1_column([])
-
-        MockCC.assert_called_once_with(df)
+    # NOTE: ``test_exchange_rate_converter_created_with_df`` was removed here
+    # (plan 23, step 4a). It asserted only ``MockCC.assert_called_once_with(df)``.
+    # ``get_exchange_rate`` never reads ``self.df`` — it reads the NBP CSVs — so
+    # the constructor argument has no observable consequence, and a behavioural
+    # rewrite would have duplicated ``test_exchange_rate_usd_valid_returns_formatted_rate``
+    # above. The converter seam itself stays covered by the injection test below.
 
     def test_exchange_rate_injected_converter_is_reused(self) -> None:
         """Arrange: CurrencyConverter is pre-injected via the converter parameter.

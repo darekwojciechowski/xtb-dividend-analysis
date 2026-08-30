@@ -7,6 +7,7 @@ tax 19%).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pandas as pd
@@ -87,20 +88,36 @@ def process_data(file_path: str, courses_paths: list[str]) -> pd.DataFrame:
     return processor.get_processed_df()
 
 
-def main() -> None:
+def main(
+    *,
+    setup_logging_fn: Callable[[], None] = setup_logging,
+    get_file_paths_fn: Callable[[str], tuple[str, list[str]]] = get_file_paths,
+    process_fn: Callable[[str, list[str]], pd.DataFrame] = process_data,
+    exporter_cls: type[GoogleSpreadsheetExporter] = GoogleSpreadsheetExporter,
+) -> None:
     """Orchestrate the complete dividend analysis workflow.
 
     Sets up logging, validates file paths, processes XTB broker statement data,
     and exports results to CSV format suitable for Google Sheets import.
+
+    The collaborators are injectable so tests can substitute fakes without
+    patching module globals; the defaults are the production implementations,
+    so ``main()`` with no arguments is the CLI behaviour.
+
+    Args:
+        setup_logging_fn: Callable configuring the loguru sinks.
+        get_file_paths_fn: Callable resolving the statement and NBP archive paths.
+        process_fn: Callable running the processing pipeline over those paths.
+        exporter_cls: Exporter class constructed with the processed DataFrame.
     """
-    setup_logging()
+    setup_logging_fn()
 
     input_path = settings.get_input_file_path()
 
-    xlsx_path, courses_paths = get_file_paths(str(input_path))
+    xlsx_path, courses_paths = get_file_paths_fn(str(input_path))
 
     try:
-        df_processed = process_data(xlsx_path, courses_paths)
+        df_processed = process_fn(xlsx_path, courses_paths)
     except ValueError as e:
         logger.error(f"Processing failed: {e}")
         logger.warning(
@@ -112,7 +129,7 @@ def main() -> None:
         )
         return
 
-    exporter = GoogleSpreadsheetExporter(df_processed)
+    exporter = exporter_cls(df_processed)
     exporter.export_to_google(settings.default_output_file)
 
 

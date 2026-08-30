@@ -1144,6 +1144,7 @@ class TestDelegateForwarding:
             processor.extract_tax_percentage_from_comment("USD")
 
         patched.assert_called_once_with("USD")
+        assert processor.df is sentinel
 
     def test_merge_rows_and_reorder_default_drop_columns(self) -> None:
         processor = self._processor()
@@ -1236,6 +1237,7 @@ class TestDelegateForwarding:
             processor.add_tax_collected_amount("USD")
 
         patched.assert_called_once_with("USD")
+        assert processor.df is sentinel
 
     def test_reorder_columns_forwards_and_returns_df(self) -> None:
         processor = self._processor()

@@ -896,30 +896,35 @@ class TestCalculateDividendMutations:
         assert date_arg == "2024-01-12"
 
     # ------------------------------------------------------------------
-    # mutmut_37, 46, 47: ticker and extracted_currency passed correctly
+    # mutmut_37, 46, 47: ticker and extracted_currency passed correctly.
+    # Asserted behaviourally: the resolved currency and the FX path it selects
+    # are observable in the returned frame, so no mutation of the call site
+    # survives without changing Currency or Shares.
     # ------------------------------------------------------------------
 
-    def test_determine_currency_called_with_correct_ticker_and_extracted_currency(
+    def test_determine_currency_uses_extracted_currency_then_shares_reflect_usd_rate(
         self,
     ) -> None:
-        """Arrange: Dividend comment with extracted currency.
-        Act: calculate the dividend.
-        Assert: determine_currency receives correct ticker and extracted currency.
+        """Arrange: Dividend comment carrying an explicit currency.
+        Act: calculate the dividend with the FX lookup stubbed to 4.0.
+        Assert: the row took the USD FX path — Currency is USD and Shares
+        reflect the 4.0 rate, not the PLN pass-through rate of 1.0.
         """
-        # Arrange — comment "AAPL.US USD 1.0/ SHR" extracts ("USD", 1.0)
-        df = pd.DataFrame(_valid_row(ticker="AAPL.US", comment="AAPL.US USD 1.0/ SHR"))
+        # Arrange — comment "AAPL.US USD 1.0/ SHR" extracts (1.0, "USD")
+        df = pd.DataFrame(
+            _valid_row(ticker="AAPL.US", amount=4.0, comment="AAPL.US USD 1.0/ SHR")
+        )
         converter = CurrencyConverter(df)
-        mock_determine = MagicMock(return_value="USD")
 
-        # Act
-        with (
-            patch.object(converter, "determine_currency", mock_determine),
-            patch.object(converter, "get_exchange_rate", return_value=4.0),
-        ):
-            converter.calculate_dividend([], "PLN", _COMMENT, _AMOUNT)
+        # Act — real determine_currency; only the FX lookup is stubbed
+        with patch.object(converter, "get_exchange_rate", return_value=4.0):
+            result = converter.calculate_dividend([], "PLN", _COMMENT, _AMOUNT)
 
-        # Assert
-        mock_determine.assert_called_once_with("AAPL.US", "USD")
+        # Assert — shares = round(4.0 / (1.0 * 4.0)) = 1; a ticker or currency
+        # that resolved to PLN would skip the lookup and yield 4 instead.
+        assert result.loc[0, _CURRENCY] == "USD"
+        assert result.loc[0, _SHARES] == 1
+        assert result.loc[0, _AMOUNT] == pytest.approx(1.0)
 
     # ------------------------------------------------------------------
     # mutmut_51, 52, 53: exchange_rate stays 1.0 for PLN/PLN rows
@@ -951,33 +956,47 @@ class TestCalculateDividendMutations:
         assert result.loc[0, _SHARES] == 5
 
     # ------------------------------------------------------------------
-    # mutmut_57–62: get_exchange_rate called with correct positional args
+    # mutmut_57–62: get_exchange_rate called with correct positional args.
+    # Asserted behaviourally: the fake rate source honours only the expected
+    # argument triple, so a wrong or reordered argument changes Shares.
     # ------------------------------------------------------------------
 
-    def test_get_exchange_rate_called_with_correct_positional_args(self) -> None:
-        """Arrange: Valid dividend row with courses paths.
-        Act: calculate the dividend.
-        Assert: get_exchange_rate receives (courses_paths, date_str, currency).
+    def test_get_exchange_rate_receives_courses_date_and_currency_then_shares_reflect_that_rate(
+        self,
+    ) -> None:
+        """Arrange: USD dividend row with courses paths and a D-1 of 2024-01-12.
+        Act: calculate the dividend against a rate source that honours only the
+        exact (courses, '2024-01-12', 'USD') triple.
+        Assert: Shares and Net Dividend reflect the honoured 4.0 rate, proving
+        all three arguments arrived in the right positions.
         """
         # Arrange
         courses = ["/some/path/archiwum_tab_a_2024.csv"]
+
+        def fake_rate(courses_paths: list[str], target_date: str, currency: str):
+            # Any other argument triple falls back to the PLN pass-through rate.
+            if (courses_paths, target_date, currency) == (courses, "2024-01-12", "USD"):
+                return 4.0
+            return 1.0
+
         df = pd.DataFrame(
             _valid_row(
                 ticker="AAPL.US",
-                amount=4.0,
+                amount=8.0,
                 comment="AAPL.US USD 1.0/ SHR",
                 date_d1=pd.Timestamp("2024-01-12"),
             )
         )
         converter = CurrencyConverter(df)
-        mock_rate = MagicMock(return_value=3.95)
 
         # Act
-        with patch.object(converter, "get_exchange_rate", mock_rate):
-            converter.calculate_dividend(courses, "PLN", _COMMENT, _AMOUNT)
+        with patch.object(converter, "get_exchange_rate", fake_rate):
+            result = converter.calculate_dividend(courses, "PLN", _COMMENT, _AMOUNT)
 
-        # Assert — exactly one call with correct positional arguments
-        mock_rate.assert_called_once_with(courses, "2024-01-12", "USD")
+        # Assert — shares = round(8.0 / (1.0 * 4.0)) = 2; a wrong argument
+        # triple falls back to rate 1.0 and would yield 8.
+        assert result.loc[0, _SHARES] == 2
+        assert result.loc[0, _AMOUNT] == pytest.approx(2.0)
 
     # ------------------------------------------------------------------
     # mutmut_63, 65, 70, 71: zero-dividend guard and shares = 0.0
